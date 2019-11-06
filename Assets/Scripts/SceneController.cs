@@ -6,9 +6,12 @@ public class SceneController : MonoBehaviour
 {
     public ImageSynthesis synth;
     public Camera cam;
-
+    //cmd line arguments
     private int numberOfIterations;
     private bool getImage;
+    private bool shiftCamera;
+    private bool rotateCamera;
+    //init parameters
     private Vector3 camInitialPosition = new Vector3(0f, 0f, 15f);
     private Vector3 camInitialRotation = new Vector3(0f, 180f, 0f);
     private Vector3 faceInitialPosition = new Vector3(0f, 0f, 0f);
@@ -47,10 +50,20 @@ public class SceneController : MonoBehaviour
         {
             numberOfIterations = 10;
         }
-        iterationsString = GetArg("-get_image");
+        iterationsString = GetArg("-image");
         if (!bool.TryParse(iterationsString, out getImage))
         {
             getImage = false;
+        }
+        iterationsString = GetArg("-shift");
+        if (!bool.TryParse(iterationsString, out getImage))
+        {
+            shiftCamera = true;
+        }
+        iterationsString = GetArg("-rotate");
+        if (!bool.TryParse(iterationsString, out getImage))
+        {
+            rotateCamera = true;
         }
         cam.transform.eulerAngles = camInitialRotation;
         cam.transform.position = camInitialPosition;
@@ -64,7 +77,21 @@ public class SceneController : MonoBehaviour
         float randy = Random.Range(-3f, 3f);
         float randz = Random.Range(-3f, 3f);
         mask.transform.localRotation = Quaternion.Euler(randx, randy, randz);
-        
+        if (shiftCamera)
+        {
+            randx = Random.Range(-4f, 4f);
+            randy = Random.Range(-4f, 4f);
+            randz = Random.Range(12f, 20f);
+            cam.transform.position = new Vector3(randx, randy, randz);
+        }
+        if (rotateCamera)
+        {
+            randx = Random.Range(-5f, 5f);
+            randy = Random.Range(175f, 185f);
+            randz = Random.Range(-5f, 5f);
+            cam.transform.eulerAngles = new Vector3(randx, randy, randz);
+        }
+
         //numberOfIterations = 5;
     }
     void FixedUpdate()
@@ -88,6 +115,20 @@ public class SceneController : MonoBehaviour
                 float randy = Random.Range(-3f, 3f);
                 float randz = Random.Range(-3f, 3f);
                 mask.transform.localRotation = Quaternion.Euler(randx, randy, randz);
+                if (shiftCamera)
+                {
+                    randx = Random.Range(-4f, 4f);
+                    randy = Random.Range(-4f, 4f);
+                    randz = Random.Range(12f, 20f);
+                    cam.transform.position = new Vector3(randx, randy, randz);
+                }
+                if (rotateCamera)
+                {
+                    randx = Random.Range(-5f, 5f);
+                    randy = Random.Range(175f, 185f);
+                    randz = Random.Range(-5f, 5f);
+                    cam.transform.eulerAngles = new Vector3(randx, randy, randz);
+                }
                 stage = RotationPaths.up_to_back;
             }
         }
