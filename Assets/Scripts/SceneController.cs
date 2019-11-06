@@ -53,17 +53,20 @@ public class SceneController : MonoBehaviour
         iterationsString = GetArg("-image");
         if (!bool.TryParse(iterationsString, out getImage))
         {
+            Debug.Log("supressing image output");
             getImage = false;
         }
         iterationsString = GetArg("-shift");
-        if (!bool.TryParse(iterationsString, out getImage))
+        if (!bool.TryParse(iterationsString, out shiftCamera))
         {
-            shiftCamera = true;
+            Debug.Log("using no shift");
+            shiftCamera = false;
         }
         iterationsString = GetArg("-rotate");
-        if (!bool.TryParse(iterationsString, out getImage))
+        if (!bool.TryParse(iterationsString, out rotateCamera))
         {
-            rotateCamera = true;
+            Debug.Log("using no rotation");
+            rotateCamera = false;
         }
         cam.transform.eulerAngles = camInitialRotation;
         cam.transform.position = camInitialPosition;

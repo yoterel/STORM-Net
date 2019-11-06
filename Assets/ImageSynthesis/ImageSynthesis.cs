@@ -265,6 +265,8 @@ public class ImageSynthesis : MonoBehaviour {
         {
             Vector3 sticker_3dloc = GameObject.Find("sticker_" + i).transform.position;
             Vector3 sticker_2dloc = cam.WorldToScreenPoint(sticker_3dloc);
+            if ((sticker_2dloc.x > 512) || (sticker_2dloc.x < 0) || (sticker_2dloc.y > 512) || (sticker_2dloc.y < 0))
+                valid_stickers[i - 1] = false; //center of object is out of screen
             stickers_locs[i - 1] = sticker_2dloc;
         }
         Vector3 cap_rot = GameObject.Find("mask").transform.localRotation.eulerAngles;
