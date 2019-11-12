@@ -55,19 +55,19 @@ public class SceneController : MonoBehaviour
         if (!bool.TryParse(iterationsString, out getImage))
         {
             Debug.Log("supressing image output");
-            getImage = true;
+            getImage = false;
         }
         iterationsString = GetArg("-shift");
         if (!bool.TryParse(iterationsString, out shiftCamera))
         {
             Debug.Log("using no shift");
-            shiftCamera = true;
+            shiftCamera = false;
         }
         iterationsString = GetArg("-rotate");
         if (!bool.TryParse(iterationsString, out rotateCamera))
         {
             Debug.Log("using no rotation");
-            rotateCamera = true;
+            rotateCamera = false;
         }
         face = GameObject.Find("face");
         mask = GameObject.Find("mask");
