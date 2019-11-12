@@ -5,15 +5,16 @@ using UnityEngine;
 public class SceneController : MonoBehaviour
 {
     public ImageSynthesis synth;
-    public Camera cam;
+    private Camera cam;
+    private GameObject camHolder;
     //cmd line arguments
     private int numberOfIterations;
     private bool getImage;
     private bool shiftCamera;
     private bool rotateCamera;
     //init parameters
-    private Vector3 camInitialPosition = new Vector3(0f, 0f, 15f);
-    private Vector3 camInitialRotation = new Vector3(0f, 180f, 0f);
+    private Vector3 camHolderInitialPosition = new Vector3(0f, 0f, 15f);
+    private Vector3 camHolderInitialRotation = new Vector3(0f, 180f, 0f);
     private Vector3 faceInitialPosition = new Vector3(0f, 0f, 0f);
     private Vector3 faceInitialRotation = new Vector3(270f, 180f, 0f);
     private Vector3 maskInitialPosition = new Vector3(0f, 5.2f, 0f);
@@ -54,55 +55,70 @@ public class SceneController : MonoBehaviour
         if (!bool.TryParse(iterationsString, out getImage))
         {
             Debug.Log("supressing image output");
-            getImage = false;
+            getImage = true;
         }
         iterationsString = GetArg("-shift");
         if (!bool.TryParse(iterationsString, out shiftCamera))
         {
             Debug.Log("using no shift");
-            shiftCamera = false;
+            shiftCamera = true;
         }
         iterationsString = GetArg("-rotate");
         if (!bool.TryParse(iterationsString, out rotateCamera))
         {
             Debug.Log("using no rotation");
-            rotateCamera = false;
+            rotateCamera = true;
         }
-        cam.transform.eulerAngles = camInitialRotation;
-        cam.transform.position = camInitialPosition;
         face = GameObject.Find("face");
         mask = GameObject.Find("mask");
+        camHolder = GameObject.Find("CameraHolder");
+        cam = Camera.main;
         startOrientation = face.transform.rotation;
         face.transform.position = faceInitialPosition;
         face.transform.eulerAngles = faceInitialRotation;
+        
+        setMaskProperties();
+        setCameraProperties();
+    }
+    void setMaskProperties()
+    {
         mask.transform.localPosition = maskInitialPosition;
-        float randx = Random.Range(-3f, 3f);
-        float randy = Random.Range(-3f, 3f);
-        float randz = Random.Range(-3f, 3f);
+        //set mask rotation
+        float randx = Random.Range(-4f, 4f);
+        float randy = Random.Range(-15f, 15f);
+        float randz = Random.Range(-5f, 5f);
         mask.transform.localRotation = Quaternion.Euler(randx, randy, randz);
+        //set mask scale
+        randx = Random.Range(0.8f, 1.2f);
+        randy = 1f;
+        randz = Random.Range(0.8f, 1.2f);
+        mask.transform.localScale = new Vector3(randx, randy, randz);
+    }
+    void setCameraProperties()
+    {
+        camHolder.transform.position = camHolderInitialPosition;
+        camHolder.transform.eulerAngles = camHolderInitialRotation;
+        cam.transform.localPosition = Vector3.zero;
+        cam.transform.localEulerAngles = Vector3.zero;
+        float randx, randy, randz;
+        //set camera properties
         if (shiftCamera)
         {
             randx = Random.Range(-4f, 4f);
             randy = Random.Range(-4f, 4f);
-            randz = Random.Range(12f, 20f);
-            cam.transform.position = new Vector3(randx, randy, randz);
+            randz = Random.Range(10f, 15f);
+            camHolder.transform.position = new Vector3(randx, randy, randz);
         }
         if (rotateCamera)
         {
             randx = Random.Range(-5f, 5f);
             randy = Random.Range(175f, 185f);
             randz = Random.Range(-5f, 5f);
-            cam.transform.eulerAngles = new Vector3(randx, randy, randz);
+            camHolder.transform.eulerAngles = new Vector3(randx, randy, randz);
         }
-
-        //numberOfIterations = 5;
     }
     void FixedUpdate()
     {
-        //Debug.DrawRay(Vector3.zero, Vector3.forward * 10, Color.cyan, 1);
-        //Debug.DrawRay(Vector3.zero, face.transform.forward * 10, Color.blue, 1);
-        //Debug.DrawRay(Vector3.zero, face.transform.up * 10, Color.green, 1);
-        //Debug.DrawRay(Vector3.zero, face.transform.right * 10, Color.red, 1);
         if (iterationCount < numberOfIterations)
         {
             if (!iterationComplete)
@@ -114,24 +130,8 @@ public class SceneController : MonoBehaviour
                 iterationCount++;
                 frameCounter = 0;
                 iterationComplete = false;
-                float randx = Random.Range(-3f, 3f);
-                float randy = Random.Range(-3f, 3f);
-                float randz = Random.Range(-3f, 3f);
-                mask.transform.localRotation = Quaternion.Euler(randx, randy, randz);
-                if (shiftCamera)
-                {
-                    randx = Random.Range(-4f, 4f);
-                    randy = Random.Range(-4f, 4f);
-                    randz = Random.Range(12f, 20f);
-                    cam.transform.position = new Vector3(randx, randy, randz);
-                }
-                if (rotateCamera)
-                {
-                    randx = Random.Range(-5f, 5f);
-                    randy = Random.Range(175f, 185f);
-                    randz = Random.Range(-5f, 5f);
-                    cam.transform.eulerAngles = new Vector3(randx, randy, randz);
-                }
+                setMaskProperties();
+                setCameraProperties();
                 stage = RotationPaths.up_to_back;
             }
         }
@@ -163,6 +163,15 @@ public class SceneController : MonoBehaviour
                 synth.Save(filename, 512, 512, "captures", 1, getImage);
                 amount += Time.fixedDeltaTime * speed;
                 face.transform.rotation = startOrientation * Quaternion.AngleAxis(amount, axis);
+                float magnitude = 0.2f;
+                float x = Random.Range(-1f, 1f) * magnitude;
+                float y = Random.Range(-1f, 1f) * magnitude;
+                float z = Random.Range(-1f, 1f) * magnitude;
+                cam.transform.localPosition = new Vector3(x, y, z);
+                float rx = Random.Range(-1f, 1f) * magnitude;
+                float ry = Random.Range(-1f, 1f) * magnitude;
+                float rz = Random.Range(-1f, 1f) * magnitude;
+                cam.transform.localEulerAngles = new Vector3(rx, ry, rz);
                 frameCounter++;
             }
             face.transform.rotation = startOrientation * Quaternion.AngleAxis(angle, axis);
