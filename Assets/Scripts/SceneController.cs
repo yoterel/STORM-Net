@@ -9,7 +9,8 @@ public class SceneController : MonoBehaviour
     private GameObject camHolder;
     //cmd line arguments
     private int numberOfIterations;
-    private bool getImage;
+    private bool saveImage;
+    private bool saveData;
     private bool shiftCamera;
     private bool rotateCamera;
     //init parameters
@@ -51,22 +52,24 @@ public class SceneController : MonoBehaviour
         {
             numberOfIterations = 10;
         }
-        iterationsString = GetArg("-image");
-        if (!bool.TryParse(iterationsString, out getImage))
+        iterationsString = GetArg("-save_image");
+        if (!bool.TryParse(iterationsString, out saveImage))
         {
-            Debug.Log("supressing image output");
-            getImage = false;
+            saveImage = false;
+        }
+        iterationsString = GetArg("-save_data");
+        if (!bool.TryParse(iterationsString, out saveData))
+        {
+            saveData = true;
         }
         iterationsString = GetArg("-shift");
         if (!bool.TryParse(iterationsString, out shiftCamera))
         {
-            Debug.Log("using no shift");
             shiftCamera = false;
         }
         iterationsString = GetArg("-rotate");
         if (!bool.TryParse(iterationsString, out rotateCamera))
         {
-            Debug.Log("using no rotation");
             rotateCamera = false;
         }
         face = GameObject.Find("face");
@@ -160,7 +163,7 @@ public class SceneController : MonoBehaviour
             {
                 yield return new WaitForEndOfFrame();
                 string filename = $"image_{iterationCount.ToString().PadLeft(5, '0')}_{frameCounter.ToString().PadLeft(5, '0')}";
-                synth.Save(filename, 512, 512, "captures", 1, getImage);
+                synth.Save(filename, 512, 512, "captures", 1, saveImage, saveData);
                 amount += Time.fixedDeltaTime * speed;
                 face.transform.rotation = startOrientation * Quaternion.AngleAxis(amount, axis);
                 float magnitude = 0.2f;
@@ -270,7 +273,7 @@ public class SceneController : MonoBehaviour
             GameObject.Find("mask").transform.localRotation = Quaternion.Euler(randx, randy, randz);
             //GameObject.Find("mask").transform.localScale = new Vector3(Random.Range(0.9f, 1.1f), 1f, Random.Range(0.9f, 1.1f));
             string filename = $"image_{frameCounter.ToString().PadLeft(5, '0')}";
-            synth.Save(filename, 512, 512, "captures", 1, getImage);
+            synth.Save(filename, 512, 512, "captures", 1, saveImage);
         }
         else
         {

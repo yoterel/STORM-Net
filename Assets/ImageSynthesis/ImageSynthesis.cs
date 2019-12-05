@@ -144,7 +144,7 @@ public class ImageSynthesis : MonoBehaviour {
 		}
 	}
 
-	public void Save(string filename, int width = -1, int height = -1, string path = "", int specificPass = -1, bool saveImage = false)
+	public void Save(string filename, int width = -1, int height = -1, string path = "", int specificPass = -1, bool saveImage = false, bool saveData = true)
 	{
 		if (width <= 0 || height <= 0)
 		{
@@ -161,32 +161,32 @@ public class ImageSynthesis : MonoBehaviour {
 
 		// execute as coroutine to wait for the EndOfFrame before starting capture
 		StartCoroutine(
-			WaitForEndOfFrameAndSave(pathWithoutExtension, filenameExtension, width, height, specificPass, saveImage));
+			WaitForEndOfFrameAndSave(pathWithoutExtension, filenameExtension, width, height, specificPass, saveImage, saveData));
 	}
 
-	private IEnumerator WaitForEndOfFrameAndSave(string filenameWithoutExtension, string filenameExtension, int width, int height, int specificPass, bool saveImage)
+	private IEnumerator WaitForEndOfFrameAndSave(string filenameWithoutExtension, string filenameExtension, int width, int height, int specificPass, bool saveImage, bool saveData)
 	{
 		yield return new WaitForEndOfFrame();
-		Save(filenameWithoutExtension, filenameExtension, width, height, specificPass, saveImage);
+		Save(filenameWithoutExtension, filenameExtension, width, height, specificPass, saveImage, saveData);
 	}
 
-	private void Save(string filenameWithoutExtension, string filenameExtension, int width, int height, int specificPass, bool saveImage)
+	private void Save(string filenameWithoutExtension, string filenameExtension, int width, int height, int specificPass, bool saveImage, bool saveData)
 	{
         if (specificPass == -1)
         {
 		    foreach (var pass in capturePasses)
-			    Save(pass.camera, filenameWithoutExtension + pass.name + filenameExtension, width, height, pass.supportsAntialiasing, pass.needsRescale, saveImage);
+			    Save(pass.camera, filenameWithoutExtension + pass.name + filenameExtension, width, height, pass.supportsAntialiasing, pass.needsRescale, saveImage, saveData);
         }
         else
         {
             //var pass = capturePasses[0];
             //Save(pass.camera, filenameWithoutExtension + pass.name + filenameExtension, width, height, pass.supportsAntialiasing, pass.needsRescale);
             var pass = capturePasses[specificPass];
-            Save(pass.camera, filenameWithoutExtension + pass.name + filenameExtension, width, height, pass.supportsAntialiasing, pass.needsRescale, true, saveImage);
+            Save(pass.camera, filenameWithoutExtension + pass.name + filenameExtension, width, height, pass.supportsAntialiasing, pass.needsRescale, saveImage, saveData);
         }
 	}
 
-	private void Save(Camera cam, string filename, int width, int height, bool supportsAntialiasing, bool needsRescale, bool extractInfo = false, bool saveImage = false)
+	private void Save(Camera cam, string filename, int width, int height, bool supportsAntialiasing, bool needsRescale, bool saveImage = false, bool saveData = true)
 	{
 		var mainCamera = GetComponent<Camera>();
 		var depth = 24;
@@ -221,7 +221,7 @@ public class ImageSynthesis : MonoBehaviour {
 		// read offsreen texture contents into the CPU readable texture
 		tex.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
 		tex.Apply();
-        if (extractInfo)
+        if (saveData)
         {
             bool[] valid_stickers = { false, false, false, false, false, false, false, false, false };
             Color[] pix = tex.GetPixels();
