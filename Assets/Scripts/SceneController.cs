@@ -55,7 +55,7 @@ public class SceneController : MonoBehaviour
         iterationsString = GetArg("-save_image");
         if (!bool.TryParse(iterationsString, out saveImage))
         {
-            saveImage = false;
+            saveImage = true;
         }
         iterationsString = GetArg("-save_data");
         if (!bool.TryParse(iterationsString, out saveData))
@@ -65,12 +65,12 @@ public class SceneController : MonoBehaviour
         iterationsString = GetArg("-shift");
         if (!bool.TryParse(iterationsString, out shiftCamera))
         {
-            shiftCamera = false;
+            shiftCamera = true;
         }
         iterationsString = GetArg("-rotate");
         if (!bool.TryParse(iterationsString, out rotateCamera))
         {
-            rotateCamera = false;
+            rotateCamera = true;
         }
         face = GameObject.Find("face");
         mask = GameObject.Find("mask");
@@ -107,9 +107,9 @@ public class SceneController : MonoBehaviour
         //set camera properties
         if (shiftCamera)
         {
-            randx = Random.Range(-4f, 4f);
+            randx = Random.Range(-8f, 8f);
             randy = Random.Range(-4f, 4f);
-            randz = Random.Range(10f, 15f);
+            randz = Random.Range(5f, 15f);
             camHolder.transform.position = new Vector3(randx, randy, randz);
         }
         if (rotateCamera)
@@ -163,17 +163,18 @@ public class SceneController : MonoBehaviour
             {
                 yield return new WaitForEndOfFrame();
                 string filename = $"image_{iterationCount.ToString().PadLeft(5, '0')}_{frameCounter.ToString().PadLeft(5, '0')}";
-                synth.Save(filename, 512, 512, "captures", 1, saveImage, saveData);
+                synth.Save(filename, 960, 540, "captures", 1, saveImage, saveData);
                 amount += Time.fixedDeltaTime * speed;
                 face.transform.rotation = startOrientation * Quaternion.AngleAxis(amount, axis);
-                float magnitude = 0.2f;
-                float x = Random.Range(-1f, 1f) * magnitude;
-                float y = Random.Range(-1f, 1f) * magnitude;
-                float z = Random.Range(-1f, 1f) * magnitude;
+                float magxy = 0.3f;
+                float magz = 2.0f;
+                float x = Random.Range(-1f, 1f) * magxy;
+                float y = Random.Range(-1f, 1f) * magxy;
+                float z = Random.Range(-1f, 1f) * magz;
                 cam.transform.localPosition = new Vector3(x, y, z);
-                float rx = Random.Range(-1f, 1f) * magnitude;
-                float ry = Random.Range(-1f, 1f) * magnitude;
-                float rz = Random.Range(-1f, 1f) * magnitude;
+                float rx = Random.Range(-1f, 1f) * magxy;
+                float ry = Random.Range(-1f, 1f) * magxy;
+                float rz = Random.Range(-1f, 1f) * magxy;
                 cam.transform.localEulerAngles = new Vector3(rx, ry, rz);
                 frameCounter++;
             }

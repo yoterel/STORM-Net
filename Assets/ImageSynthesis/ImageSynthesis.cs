@@ -231,7 +231,7 @@ public class ImageSynthesis : MonoBehaviour {
                 bool exists = doesColorExists(pix, color);
                 valid_stickers[i] = exists;
             }
-            saveJson(filename, cam, valid_stickers);
+            saveJson(filename, cam, valid_stickers, width, height);
         }
         //encode texture into PNG
         if (saveImage)
@@ -258,14 +258,14 @@ public class ImageSynthesis : MonoBehaviour {
         }
         return retVal;
     }
-    void saveJson(string filename, Camera cam, bool[] valid_stickers)
+    void saveJson(string filename, Camera cam, bool[] valid_stickers, int width, int height)
     {
         Vector3[] stickers_locs = new Vector3[9];
         for (int i = 1; i < 10; i++)
         {
             Vector3 sticker_3dloc = GameObject.Find("sticker_" + i).transform.position;
             Vector3 sticker_2dloc = cam.WorldToScreenPoint(sticker_3dloc);
-            if ((sticker_2dloc.x > 512) || (sticker_2dloc.x < 0) || (sticker_2dloc.y > 512) || (sticker_2dloc.y < 0))
+            if ((sticker_2dloc.x > width) || (sticker_2dloc.x < 0) || (sticker_2dloc.y > height) || (sticker_2dloc.y < 0))
                 valid_stickers[i - 1] = false; //center of object is out of screen
             stickers_locs[i - 1] = sticker_2dloc;
         }
