@@ -186,7 +186,7 @@ public class ImageSynthesis : MonoBehaviour {
         }
 	}
 
-	private void Save(Camera cam, string filename, int width, int height, bool supportsAntialiasing, bool needsRescale, bool saveImage = false, bool saveData = true)
+	private void Save(Camera cam, string filename, int width, int height, bool supportsAntialiasing, bool needsRescale, bool saveImage = true, bool saveData = true)
 	{
 		var mainCamera = GetComponent<Camera>();
 		var depth = 24;
@@ -223,9 +223,9 @@ public class ImageSynthesis : MonoBehaviour {
 		tex.Apply();
         if (saveData)
         {
-            bool[] valid_stickers = { false, false, false, false, false, false, false, false, false };
+            bool[] valid_stickers = { false, false, false, false, false, false, false };
             Color[] pix = tex.GetPixels();
-            for (int i=0; i<9; i++)
+            for (int i=0; i<7; i++)
             {
                 Color color = ColorEncoding.EncodeLayerAsColor(i);
                 bool exists = doesColorExists(pix, color);
@@ -260,8 +260,8 @@ public class ImageSynthesis : MonoBehaviour {
     }
     void saveJson(string filename, Camera cam, bool[] valid_stickers, int width, int height)
     {
-        Vector3[] stickers_locs = new Vector3[9];
-        for (int i = 1; i < 10; i++)
+        Vector3[] stickers_locs = new Vector3[7];
+        for (int i = 1; i < 8; i++)
         {
             Vector3 sticker_3dloc = GameObject.Find("sticker_" + i).transform.position;
             Vector3 sticker_2dloc = cam.WorldToScreenPoint(sticker_3dloc);
