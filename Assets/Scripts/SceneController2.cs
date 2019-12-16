@@ -26,7 +26,7 @@ public class SceneController2 : MonoBehaviour
     private GameObject face;
     private GameObject mask;
     private RotationPaths stage = RotationPaths.front_to_up;
-    private float speed = 420;
+    private float speed = 450;
     private Quaternion startOrientation;
     private int angleAmount;
     private bool doingRotation = false;
