@@ -70,7 +70,7 @@ public class ColorEncoding
             new Color(z,1,z,1), //sticker 9
             new Color(1,1,1,1), //cap
             new Color(1,1,1,1), //face
-            new Color(z,z,1,1), // 
+            new Color(0,0,0,0), //occlusion
 			new Color(z,0,0,1),
             new Color(0,z,0,1),
             new Color(0,0,z,1), // 

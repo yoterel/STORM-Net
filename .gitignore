@@ -61,3 +61,5 @@ linux_build/
 linux_server_build/
 *.meta
 build2/
+*.json
+build3/

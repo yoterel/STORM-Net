@@ -15,7 +15,7 @@ using System.IO;
 //      2) rendering several cameras with different aspect ratios - vectors do stretch to the sides of the screen
 
 [RequireComponent (typeof(Camera))]
-//[ExecuteInEditMode]
+[ExecuteInEditMode]
 public class ImageSynthesis : MonoBehaviour {
     public Shader uberReplacementShader;
 
@@ -261,13 +261,14 @@ public class ImageSynthesis : MonoBehaviour {
     void saveJson(string filename, Camera cam, bool[] valid_stickers, int width, int height)
     {
         Vector3[] stickers_locs = new Vector3[7];
-        for (int i = 1; i < 8; i++)
+        string[] names = new string[] { "AL", "NZ", "AR", "CZ", "T1", "T2", "T3" };
+        for (int i = 0; i < 7; i++)
         {
-            Vector3 sticker_3dloc = GameObject.Find("sticker_" + i).transform.position;
+            Vector3 sticker_3dloc = GameObject.Find(names[i]).transform.position;
             Vector3 sticker_2dloc = cam.WorldToScreenPoint(sticker_3dloc);
             if ((sticker_2dloc.x > width) || (sticker_2dloc.x < 0) || (sticker_2dloc.y > height) || (sticker_2dloc.y < 0))
-                valid_stickers[i - 1] = false; //center of object is out of screen
-            stickers_locs[i - 1] = sticker_2dloc;
+                valid_stickers[i] = false; //center of object is out of screen
+            stickers_locs[i] = sticker_2dloc;
         }
         Vector3 cap_rot = GameObject.Find("mask").transform.localRotation.eulerAngles;
         Vector3 scale = GameObject.Find("mask").transform.localScale;
