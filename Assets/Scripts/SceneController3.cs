@@ -153,7 +153,7 @@ public class SceneController3 : MonoBehaviour
             randx = Random.Range(-5f, 5f);
             randy = Random.Range(-5f, 5f);
             randz = Random.Range(-5f, 5f);
-            camHolder.transform.localEulerAngles = new Vector3(randx, randy, randz);
+            cam.transform.localEulerAngles = new Vector3(randx, randy, randz);
         }
     }
 
@@ -197,11 +197,11 @@ public class SceneController3 : MonoBehaviour
                         startOrientation = face.transform.rotation;
                         angleAmount = 90;
                         doingRotation = true;
-                        StartCoroutine(Rotate90(Vector3.right, angleAmount, false));
+                        StartCoroutine(Rotate90(Vector3.left, angleAmount, false));
                     }
                     else
                     {
-                        if (face.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.right))
+                        if (face.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.left))
                         {
                             doingRotation = false;
                             stage = RotationPaths.up_to_front;
@@ -216,11 +216,11 @@ public class SceneController3 : MonoBehaviour
                         startOrientation = face.transform.rotation;
                         angleAmount = 90;
                         doingRotation = true;
-                        StartCoroutine(Rotate90(Vector3.left, angleAmount, true));
+                        StartCoroutine(Rotate90(Vector3.right, angleAmount, true));
                     }
                     else
                     {
-                        if (face.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.left))
+                        if (face.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.right))
                         {
                             doingRotation = false;
                             iterationComplete = true;
