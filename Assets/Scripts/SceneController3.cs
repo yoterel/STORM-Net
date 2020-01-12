@@ -14,11 +14,12 @@ public class SceneController3 : MonoBehaviour
     private bool shiftCamera;
     private bool rotateCamera;
     //init parameters
-    private Vector3 camHolderInitialPosition = new Vector3(0f, 0f, 30f);
-    private Vector3 camHolderInitialRotation = new Vector3(0f, 180f, 0f);
+    private Vector3 camHolderInitialPosition = new Vector3(0f, 30f, 0);
+    private Vector3 camHolderInitialRotation = new Vector3(90f, 0f, 0f);
     private Vector3 faceInitialPosition = new Vector3(0f, 0f, 0f);
     private Vector3 faceInitialRotation = new Vector3(0f, 0f, 0f);
     private Vector3 maskInitialPosition = new Vector3(0f, 0f, 0f);
+    private Vector3[] initial_sticker_positions = new Vector3[7];
     private bool[] valid_stickers;
     private Vector3[] stickers_locs;
     private int frameCounter = 0;
@@ -76,28 +77,62 @@ public class SceneController3 : MonoBehaviour
         mask = GameObject.Find("mask");
         camHolder = GameObject.Find("CameraHolder");
         cam = Camera.main;
+        string[] names = new string[] { "AL", "NZ", "AR", "CZ", "FP1", "FPZ", "FP2" };
+        for (int i = 0; i < 7; i++)
+        {
+            GameObject sticker = GameObject.Find(names[i]);
+            initial_sticker_positions[i] = sticker.transform.localPosition;
+        }
         startOrientation = face.transform.rotation;
         face.transform.position = faceInitialPosition;
         face.transform.eulerAngles = faceInitialRotation;
+        setStickerProperties();
         setMaskProperties();
         setCameraProperties();
     }
-
+    void setStickerProperties()
+    {
+        string[] names = new string[] { "AL", "NZ", "AR", "CZ", "FP1", "FPZ", "FP2" };
+        for (int i = 0; i < 7; i++)
+        {
+            GameObject sticker = GameObject.Find(names[i]);
+            sticker.transform.localPosition = initial_sticker_positions[i];
+        }
+        string[] mask_stickers_names = new string[] { "CZ", "FP1", "FPZ", "FP2" };
+        for (int i = 0; i < 4; i++)
+        {
+            float horiz = Random.Range(-0.5f, 0.5f);
+            float vert = Random.Range(-0.5f, 0.5f);
+            GameObject sticker = GameObject.Find(mask_stickers_names[i]);
+            sticker.transform.localPosition += sticker.transform.right * horiz;
+            sticker.transform.localPosition += sticker.transform.forward * vert;
+        }
+        //set eye distance
+        float eye_dist = Random.Range(3.8f, 5.4f);
+        //float eye_dist = Random.Range(2f, 8f);
+        GameObject AR = GameObject.Find("AR");
+        GameObject AL = GameObject.Find("AL");
+        AR.transform.localPosition = new Vector3(-eye_dist / 2, AR.transform.localPosition.y, AR.transform.localPosition.z);
+        AL.transform.localPosition = new Vector3(eye_dist / 2, AL.transform.localPosition.y, AL.transform.localPosition.z);
+        //set nose distance
+        float nose_dist = Random.Range(0f, 0.5f);
+        GameObject NZ = GameObject.Find("NZ");
+        NZ.transform.localPosition += NZ.transform.forward * nose_dist;
+    }
     void setMaskProperties()
     {
-        mask.transform.localPosition = maskInitialPosition;
+        mask.transform.localPosition = maskInitialPosition;     
         //set mask rotation
         float randx = Random.Range(-10f, 10f);
-        float randy = Random.Range(-20f, 20f);
-        float randz = Random.Range(-15f, 15f);
+        float randy = Random.Range(-15f, 15f);
+        float randz = Random.Range(-20f, 20f);
         mask.transform.localRotation = Quaternion.Euler(randx, randy, randz);
         //set mask scale
         randx = Random.Range(0.8f, 1.2f);
-        randy = 1f;
-        randz = Random.Range(0.8f, 1.2f);
+        randy = Random.Range(0.8f, 1.2f);
+        randz = 1f;
         mask.transform.localScale = new Vector3(randx, randy, randz);
     }
-
     void setCameraProperties()
     {
         camHolder.transform.position = camHolderInitialPosition;
@@ -109,16 +144,16 @@ public class SceneController3 : MonoBehaviour
         if (shiftCamera)
         { 
             randx = Random.Range(-5f, 5f);
-            randy = Random.Range(-4f, 0f);
-            randz = Random.Range(18f, 30f);
+            randy = Random.Range(18f, 30f); 
+            randz = Random.Range(-4f, 0f);
             camHolder.transform.position = new Vector3(randx, randy, randz);
         }
         if (rotateCamera)
         {
             randx = Random.Range(-5f, 5f);
-            randy = Random.Range(175f, 185f);
+            randy = Random.Range(-5f, 5f);
             randz = Random.Range(-5f, 5f);
-            camHolder.transform.eulerAngles = new Vector3(randx, randy, randz);
+            camHolder.transform.localEulerAngles = new Vector3(randx, randy, randz);
         }
     }
 
@@ -135,6 +170,7 @@ public class SceneController3 : MonoBehaviour
                 iterationCount++;
                 frameCounter = 0;
                 iterationComplete = false;
+                setStickerProperties();
                 setMaskProperties();
                 setCameraProperties();
                 stage = RotationPaths.front_to_up;
