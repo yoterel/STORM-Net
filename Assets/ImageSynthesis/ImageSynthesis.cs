@@ -272,7 +272,7 @@ public class ImageSynthesis : MonoBehaviour {
         }
         Vector3 cap_rot = GameObject.Find("mask").transform.localRotation.eulerAngles;
         Vector3 scale = GameObject.Find("mask").transform.localScale;
-        SaveObject obj = new SaveObject { valid_stickers = valid_stickers, stickers_locs = stickers_locs , cap_rot = cap_rot, scalex = scale.x, scalez = scale.z};
+        SaveObject obj = new SaveObject { valid_stickers = valid_stickers, stickers_locs = stickers_locs , cap_rot = cap_rot, scalex = scale.x, scaley = scale.y};
         string json = JsonUtility.ToJson(obj);
         //Debug.Log(json);
         var filenameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
@@ -287,7 +287,7 @@ public class ImageSynthesis : MonoBehaviour {
         public Vector3[] stickers_locs;
         public Vector3 cap_rot;
         public float scalex;
-        public float scalez;
+        public float scaley;
     }
 #if UNITY_EDITOR
     private GameObject lastSelectedGO;
