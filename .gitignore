@@ -63,3 +63,4 @@ linux_server_build/
 build2/
 *.json
 build3/
+captures/

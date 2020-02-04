@@ -14,7 +14,10 @@ EditorBuildSettings:
   - enabled: 0
     path: 
     guid: 00000000000000000000000000000000
+  - enabled: 0
+    path: 
+    guid: 00000000000000000000000000000000
   - enabled: 1
     path: Assets/Solids3.unity
-    guid: 1a2697367359e6a4ab2ce61a8708a90e
+    guid: a4b1a7eb201d06149b579be0d3a73d1e
   m_configObjects: {}
