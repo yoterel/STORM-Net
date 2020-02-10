@@ -15,6 +15,7 @@ public class SceneController3 : MonoBehaviour
     private bool rotateCamera;
     //init parameters
     private Vector3 camHolderInitialPosition = new Vector3(0f, 30f, 0);
+    private Vector3 targetCamHolderPosition;
     private Vector3 camHolderInitialRotation = new Vector3(90f, 0f, 0f);
     private Vector3 faceInitialPosition = new Vector3(0f, 0f, 0f);
     private Vector3 faceInitialRotation = new Vector3(0f, 0f, 0f);
@@ -171,6 +172,9 @@ public class SceneController3 : MonoBehaviour
             //randz = Random.Range(-5f, 5f);
             cam.transform.localEulerAngles = new Vector3(randx, randy, 0f);
         }
+        float rand = Random.Range(20f, 35f);
+        targetCamHolderPosition = camHolder.transform.position;
+        targetCamHolderPosition.y = rand;
     }
 
     void FixedUpdate()
@@ -180,6 +184,7 @@ public class SceneController3 : MonoBehaviour
             if (!iterationComplete)
             {
                 smoothPath();
+                camPath();
             }
             else
             {
@@ -202,7 +207,11 @@ public class SceneController3 : MonoBehaviour
 #endif
         }
     }
-
+    void camPath()
+    {
+        Vector3 dirNormalized = (targetCamHolderPosition - camHolder.transform.position).normalized;
+        camHolder.transform.position = camHolder.transform.position + dirNormalized * Time.deltaTime * 5; //magic number for speed
+    }
     void smoothPath()
     {
         switch (stage)

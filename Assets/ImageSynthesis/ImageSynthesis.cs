@@ -313,7 +313,7 @@ public class ImageSynthesis : MonoBehaviour {
 			var potentialChangeHappened = lastSelectedGOLayer != go.layer || lastSelectedGOTag != go.tag;
 			if (go == lastSelectedGO && potentialChangeHappened)
 				change = true;
-
+            
 			lastSelectedGO = go;
 			lastSelectedGOLayer = go.layer;
 			lastSelectedGOTag = go.tag;
