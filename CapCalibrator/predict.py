@@ -14,6 +14,31 @@ import matplotlib.pyplot as plt
 import dlib
 from imutils import face_utils
 from scipy.spatial.transform import Rotation as R
+import numpy as np
+import sys
+import tkinter as tk
+from tkinter import filedialog
+image_hsv = None
+pixel = (0,0,0) #RANDOM DEFAULT VALUE
+
+ftypes = [
+    ('JPG', '*.jpg;*.JPG;*.JPEG'),
+    ('PNG', '*.png;*.PNG'),
+    ('GIF', '*.gif;*.GIF'),
+]
+
+def pick_color(event,x,y,flags,param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        pixel = image_hsv[y,x]
+
+        #HUE, SATURATION, AND VALUE (BRIGHTNESS) RANGES. TOLERANCE COULD BE ADJUSTED.
+        upper =  np.array([pixel[0] + 10, pixel[1] + 10, pixel[2] + 40])
+        lower =  np.array([pixel[0] - 10, pixel[1] - 10, pixel[2] - 40])
+        print(lower, upper)
+
+        #A MONOCHROME MASK FOR GETTING A BETTER VISION OVER THE COLORS
+        image_mask = cv2.inRange(image_hsv,lower,upper)
+        cv2.imshow("Mask",image_mask)
 
 
 def predict_rigid_transform(sticker_locations, v):
@@ -84,6 +109,44 @@ def get_facial_landmarks(frames, v):
         landmarks_list.append(my_landmarks)
     np_kp = np.array(landmarks_list)
     np_kp[:, 1::2] = 540 - np_kp[:, 1::2]
+    return np_kp
+
+
+def get_puppet_landmarks(frames, v):
+    """
+    predicts location of center of eyes and nose tip in a set of images of a puppet
+    :param frames: the images to predict the landmarks on
+    :param v: verbosity
+    :return: a 2d numpy array containing x, y coordinates of required landmarks for each frame
+    """
+    # global image_hsv, pixel
+    #
+    # #OPEN DIALOG FOR READING THE IMAGE FILE
+    # root = tk.Tk()
+    # root.withdraw() #HIDE THE TKINTER GUI
+    # image_src = cv2.cvtColor(np.array(frames[0]), cv2.COLOR_RGB2BGR)
+    # cv2.imshow("BGR",image_src)
+    #
+    # #CREATE THE HSV FROM THE BGR IMAGE
+    # image_hsv = cv2.cvtColor(image_src,cv2.COLOR_BGR2HSV)
+    # cv2.imshow("HSV",image_hsv)
+    #
+    # #CALLBACK FUNCTION
+    # cv2.setMouseCallback("HSV", pick_color)
+    #
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    key_points_list = []
+    for frame in frames:
+        # plt.imshow(frame)
+        # plt.show()
+        frame_HSV = cv2.cvtColor(np.array(frame), cv2.COLOR_RGB2HSV)
+        purp1 = (140, 138, 84)
+        purp2 = (160, 158, 164)
+        mask = cv2.inRange(frame_HSV, purp1, purp2)
+        key_points = get_blob_keypoints(mask, 1)
+        key_points_list.append(key_points.flatten()) ## todo: fix resolution & padding
+    np_kp = np.array(key_points_list)
     return np_kp
 
 
@@ -163,7 +226,7 @@ def get_sticker_locations(frames, v):
     return kp_np
 
 
-def predict_keypoints_locations(frames, vid_name, v):
+def predict_keypoints_locations(frames, is_puppet=False, vid_name="", v=0):
     """
     predicts all requried keypoints (stickers & facial landmarks) locations from frames.
     :param frames: the frames to process
@@ -180,7 +243,10 @@ def predict_keypoints_locations(frames, vid_name, v):
     else:
         if v:
             print("Detecting facial key points.")
-        facial_keypoints = get_facial_landmarks(frames, v)
+        if is_puppet:
+            facial_keypoints = get_puppet_landmarks(frames, v)
+        else:
+            facial_keypoints = get_facial_landmarks(frames, v)
         if v:
             print("Detecting sticker key points.")
         sticker_keypoints = get_sticker_locations(frames, v)

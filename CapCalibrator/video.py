@@ -29,31 +29,36 @@ def process_video(vid_path, automation_level, v):
     else:
         if v:
             print("Selecting 10 frames from:", vid_path)
-        frames = select_frames(vid_path, data_points, steps_per_datapoint, number_of_features)
+        frames = select_frames(vid_path, steps_per_datapoint)
         f = open(pickle_path, 'wb')
         pickle.dump(frames, f)
         f.close()
     return annotate_video(frames, automation_level, vid_path.name, v)
 
 
-def select_frames(vid_path, data_points=1, steps_per_datapoint=10, number_of_features=14):
+def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0):
+
     # Read an image, a window and bind the function to window
     # cap = cv2.VideoCapture(str(video_path))
     reader = imageio.get_reader(vid_path, 'ffmpeg')
     meta_data = reader.get_meta_data()
     estimated_total_frames = np.array(meta_data["fps"] * meta_data["duration"], dtype=int).tolist()
     frames_to_use = estimated_total_frames
+    if starting_frame >= (frames_to_use // steps_per_datapoint):
+        starting_frame = 0
     # db = np.zeros((frames_to_use // steps_per_datapoint, steps_per_datapoint, number_of_features))
     # imgs = np.zeros((steps_per_datapoint, 960, 540))
     # my_dict = {"db": db, "img": img}
     frames = []
+    indices = []
     for i, im in enumerate(reader):
         if i >= frames_to_use:
             break
         else:
-            if i % (frames_to_use // steps_per_datapoint) == 0:
+            if i % (frames_to_use // steps_per_datapoint) == starting_frame:
                 frames.append(Image.fromarray(im).resize((960, 540)))
-    return frames
+                indices.append(i)
+    return frames, indices
 
 
 def annotate_video(frames, automation_level, vid_name, v):  # contains GUI mainloop
