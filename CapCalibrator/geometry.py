@@ -7,6 +7,15 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 from sklearn.metrics import mean_squared_error
 
 
+def get_euler_angles(data, gt_data):
+    A = np.mat(np.transpose(data))
+    B = np.mat(np.transpose(gt_data))
+    ret_R, ret_t = rigid_transform_3d(A, B)
+    gt_rot_m = R.from_matrix(ret_R)
+    gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
+    return gt_rot_e
+
+
 def visualize_pc(points_blue, names_blue, points_red=None, names_red=None, title=""):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')

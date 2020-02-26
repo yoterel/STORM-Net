@@ -6,6 +6,9 @@ import pickle
 import predict
 from PIL import Image, ImageTk
 import numpy as np
+import geometry
+import argparse
+import utils
 
 ### GLOBALS FOR GUI ###
 video_number = 0
@@ -19,7 +22,7 @@ frames =[]
 ### GLOBALS FOR GUI ###
 
 
-def process_video(vid_path, starting_frame=0, force_reselect=False):
+def process_video(vid_path, dump_frames=False, starting_frame=0, force_reselect=False):
     pickle_path = Path.joinpath(Path("data"), vid_path.name+"_frames.pickle")
     if pickle_path.is_file() and not force_reselect:
         f = open(pickle_path, 'rb')
@@ -27,21 +30,28 @@ def process_video(vid_path, starting_frame=0, force_reselect=False):
         f.close()
     else:
         frames, indices = video.select_frames(vid_path, steps_per_datapoint=10, starting_frame=starting_frame)
-        f = open(pickle_path, 'wb')
-        pickle.dump([frames, indices], f)
-        f.close()
+        if dump_frames:
+            f = open(pickle_path, 'wb')
+            pickle.dump([frames, indices], f)
+            f.close()
     return frames, indices
 
 
-def save_full_db(db):
-    pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
+def save_full_db(db, path=None):
+    if path:
+        pickle_path = path
+    else:
+        pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
     f = open(pickle_path, 'wb')
     pickle.dump(db, f)
     f.close()
 
 
-def load_full_db():
-    pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
+def load_full_db(db_path=None):
+    if db_path is None:
+        pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
+    else:
+        pickle_path = db_path
     if pickle_path.is_file():
         f = open(pickle_path, 'rb')
         db = pickle.load(f)
@@ -54,22 +64,50 @@ def load_full_db():
     return db
 
 
-def annotate_videos():  # contains GUI mainloop
+def auto_annotate_videos(vid_folder, gt_digi_file):
+
+    model_dir = Path("models")
+    data_dir = Path("data")
+    db_path = Path.joinpath(data_dir, "full_db.pickle")
+    model_name = 'unet_try_2'
+    model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
+    my_model = utils.load_semantic_seg_model(str(model_full_name))
+    # get label
+    my_digi_file = vid_folder.glob("*.txt").__next__()
+    names, data = geometry.get_data_from_model_file(my_digi_file)
+    sticker_data = geometry.get_sticker_data(names, data)
+    names, data = geometry.get_data_from_model_file(gt_digi_file)
+    gt_sticker_data = geometry.get_sticker_data(names, data)
+    label = geometry.get_euler_angles(gt_sticker_data, sticker_data)  # obtain the angels needed to turn gt into my data
+    label = np.array([1, -1, -1])*label  # flip y and z for network label
+    # get data
+    paths = []
+    for file in vid_folder.glob("*.MP4"):
+        paths.append(file)
+    my_db = load_full_db(db_path)
+    for path in paths:
+        print("processing video:", path)
+        if path.name not in my_db.keys():
+            frames, indices = process_video(path)
+            data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False, my_model, 1)
+            new_db[paths[video_number].name] = {"data": data,
+                                                "label": np.array(label),
+                                                "frame_indices": indices}
+            save_full_db(new_db, db_path)
+
+
+def annotate_videos(video_folder):  # contains GUI mainloop
     global new_db, frames
-    root_videos_folder = Path("E:/University/masters/CapTracking/videos")
-    base_model_folder = Path.joinpath(root_videos_folder, "openPos46")
-    video_folder = Path.joinpath(root_videos_folder, "openPos47")
     paths = []
     for file in video_folder.glob("*.MP4"):
         paths.append(file)
     frames, indices = process_video(paths[video_number])
     new_db = load_full_db()
     if paths[video_number].name not in new_db.keys():
-        data = predict.predict_keypoints_locations(frames, paths[video_number].name)
+        data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False)
         new_db[paths[video_number].name] = {"data": data,
                                             "label": np.array([0, 0, 0]),
                                             "frame_indices": indices}
-    current_video = paths[video_number].name
     root = tk.Tk()
     root.title("Video Annotator")
     root.resizable(False, False)
@@ -163,7 +201,7 @@ def annotate_videos():  # contains GUI mainloop
         global frames, new_db, frame_number, sticker_number
         current_video = paths[video_number].name
         current_starting_frame_index = new_db[current_video]["frame_indices"][0]
-        frames, indices = process_video(paths[video_number], current_starting_frame_index+100, True)
+        frames, indices = process_video(paths[video_number], False, current_starting_frame_index+100, True)
         new_db[current_video]["frame_indices"] = indices
         frame_number = 0
         sticker_number = 0
@@ -218,6 +256,13 @@ def annotate_videos():  # contains GUI mainloop
         canvas.delete("cross")
         for widget in frame2.winfo_children():
             widget.destroy()
+    def test():
+        global new_db
+        data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False)
+        new_db[paths[video_number].name] = {"data": data,
+                                            "label": np.array([0, 0, 0]),
+                                            "frame_indices": indices}
+        updateLabels()
     canvas = tk.Canvas(root, height=frames[0].size[1], width=frames[0].size[0], bg="#263D42")
     canvas.pack(side="left")
     img = ImageTk.PhotoImage(image=frames[0])
@@ -244,11 +289,34 @@ def annotate_videos():  # contains GUI mainloop
     saveSession.pack(fill="x")
     doneButton = tk.Button(frame1, text="Done", padx=10, pady=5, fg="white", bg="#263D42", command=root.destroy)
     doneButton.pack(fill="x")
+    testButton = tk.Button(frame1, text="Test", padx=10, pady=5, fg="white", bg="#263D42", command=test)
+    testButton.pack(fill="x")
     frame2 = tk.Frame(frame1, bg="white")
     frame2.pack(side="bottom")
     updateLabels()
     root.mainloop()
     return new_db
 
-new_db = annotate_videos()
-save_full_db(new_db)
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Automatically annotates FNIRS videos on disk.')
+    parser.add_argument("video_folder", help="The path to the video folder.")
+    parser.add_argument("model_file", help="The base model file path.")
+    parser.add_argument("-g", "--gui", action='store_true', help="Shows GUI")
+    # if len(sys.argv) == 1:
+    #     parser.print_help(sys.stderr)
+    #     sys.exit(1)
+    # cmd_line = 'E:/University/masters/CapTracking/videos/openPos43 E:/University/masters/CapTracking/videos/openPos40'.split()
+    args = parser.parse_args()  # cmd_line
+    args.video_folder = Path(args.video_folder)
+    args.model_file = Path(args.model_file)
+    if Path.is_dir(args.model_file):
+        args.model_file = args.model_file.glob("*.txt").__next__()
+    return args
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    auto_annotate_videos(args.video_folder, args.model_file)
+    if args.gui:
+        annotate_videos(args.video_folder)

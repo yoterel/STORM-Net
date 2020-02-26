@@ -3,6 +3,9 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import pickle
 from pathlib import Path
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
+os.environ["CUDA_VISIBLE_DEVICES"] = "4";
 import keras
 from keras.models import Sequential
 from keras.layers import Dense
@@ -23,7 +26,7 @@ def load_semantic_seg_model(weights_loc):
     old_model = keras.models.load_model(weights_loc,
                                         custom_objects={'iou': iou, 'iou_thresholded': iou_thresholded})
     old_model.layers.pop(0)
-    input_shape = (512, 1024, 3)
+    input_shape = (512, 1024, 3)  # replace input layer with this shape so unet forward will work
     new_input = keras.layers.Input(input_shape)
     new_outputs = old_model(new_input)
     new_model = keras.engine.Model(new_input, new_outputs)
