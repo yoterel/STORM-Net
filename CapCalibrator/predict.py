@@ -137,17 +137,15 @@ def get_puppet_landmarks(frames, v):
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
     key_points_list = []
-    for frame in frames:
-        # plt.imshow(frame)
-        # plt.show()
+    for i, frame in enumerate(frames):
         frame_HSV = cv2.cvtColor(np.array(frame), cv2.COLOR_RGB2HSV)
         purp1 = (140, 138, 84)
         purp2 = (160, 158, 164)
         mask = cv2.inRange(frame_HSV, purp1, purp2)
-        key_points = get_blob_keypoints(mask, 3, 1)
+        key_points = get_blob_keypoints(mask, 3, True, 1)
         if key_points.tolist() != []:
             key_points = key_points[np.argsort(key_points, axis=0)[:, 0]][::-1]  # sort key points according to x value
-            if len(key_points.flatten()) == 6:
+            if len(key_points.flatten()) == 6 and i <= 5:  # last frames can't possibly contain facial landmarks.
                 key_points[:, 1] = 540 - key_points[:, 1]
             else:
                 key_points = np.zeros(6)
@@ -158,22 +156,24 @@ def get_puppet_landmarks(frames, v):
     return np_kp
 
 
-def get_blob_keypoints(mask, max_key_points, v):
+def get_blob_keypoints(mask, max_key_points, facial_landmarks=False, v=0):
     """
     finds blobs in a binary mask image
     :param mask: the mask image
+    :param facial_landmarks: if true, will slightly dilate and erode image
     :param v: verbosity
     :return: numpy array of locations of center of blobs obeying some heuristics
     """
-    kernel = np.ones((5, 5), np.uint8)
-    # plt.imshow(mask)
-    # plt.show()
-    mask = cv2.dilate(mask, kernel, iterations=1)
-    # plt.imshow(mask)
-    # plt.show()
-    mask = cv2.erode(mask, kernel, iterations=1)
-    # plt.imshow(mask)
-    # plt.show()
+    if facial_landmarks:
+        kernel = np.ones((5, 5), np.uint8)
+        # plt.imshow(mask)
+        # plt.show()
+        mask = cv2.dilate(mask, kernel, iterations=2)
+        # plt.imshow(mask)
+        # plt.show()
+        mask = cv2.erode(mask, kernel, iterations=2)
+        # plt.imshow(mask)
+        # plt.show()
     contours, hierarchy = cv2.findContours(mask.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     img = np.zeros((mask.shape[0], mask.shape[1], 3), np.uint8)
     cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
@@ -189,7 +189,7 @@ def get_blob_keypoints(mask, max_key_points, v):
     keypoints = [x for x in keypoints if 300 < x[0] < 700]  # filter by location
     if len(keypoints) > max_key_points:
         if v:
-            print("Warning: found more than 4 blobs.")
+            print("Warning: found more than {} blobs.".format(max_key_points))
         keypoints = keypoints[0:max_key_points]
     return np.array(keypoints)
 
@@ -229,7 +229,7 @@ def get_sticker_locations(frames, preloaded_model, v):
     if v:
         print("Filtering & extracting blobs.")
     for i in range(len(y_pred_np)):
-        key_points = get_blob_keypoints(y_pred_np[i], 4, v)
+        key_points = get_blob_keypoints(y_pred_np[i], 4, False, v)
         key_points_list.append(key_points.flatten())
     # pad with zeros until we reach 2x4 numbers
     for i in range(len(key_points_list)):

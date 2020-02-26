@@ -89,11 +89,12 @@ def auto_annotate_videos(vid_folder, gt_digi_file):
         print("processing video:", path)
         if path.name not in my_db.keys():
             frames, indices = process_video(path)
-            data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False, my_model, 1)
-            new_db[paths[video_number].name] = {"data": data,
-                                                "label": np.array(label),
-                                                "frame_indices": indices}
-            save_full_db(new_db, db_path)
+            data = predict.predict_keypoints_locations(frames, path.name, True, False, my_model, 1)
+            my_db[path.name] = {"data": data,
+                                 "label": np.array(label),
+                                 "frame_indices": indices}
+            save_full_db(my_db, db_path)
+    return my_db
 
 
 def annotate_videos(video_folder):  # contains GUI mainloop
@@ -306,7 +307,8 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    # cmd_line = 'E:/University/masters/CapTracking/videos/openPos43 E:/University/masters/CapTracking/videos/openPos40'.split()
+    # cmd_line = '/disk1/yotam/capnet/openPos/openPos/openPos49/ /disk1/yotam/capnet/openPos/openPos/openPos46/ '.split()
+    # cmd_line = 'E:/University/masters/CapTracking/videos/openPos49 E:/University/masters/CapTracking/videos/openPos46 -g'.split()
     args = parser.parse_args()  # cmd_line
     args.video_folder = Path(args.video_folder)
     args.model_file = Path(args.model_file)
@@ -317,6 +319,6 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    auto_annotate_videos(args.video_folder, args.model_file)
+    new_db = auto_annotate_videos(args.video_folder, args.model_file)
     if args.gui:
         annotate_videos(args.video_folder)
