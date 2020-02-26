@@ -184,13 +184,19 @@ def get_blob_keypoints(mask, max_key_points, facial_landmarks=False, v=0):
             cx = int(M['m10'] / M['m00'])
             cy = int(M['m01'] / M['m00'])
             area = cv2.contourArea(contour)
-            if area > 10:  # filter by area
+            if facial_landmarks:
                 keypoints.append(np.array([cx, cy]))
+            else:
+                if area > 10:  # filter by area
+                    keypoints.append(np.array([cx, cy]))
     keypoints = [x for x in keypoints if 300 < x[0] < 700]  # filter by location
     if len(keypoints) > max_key_points:
         if v:
             print("Warning: found more than {} blobs.".format(max_key_points))
         keypoints = keypoints[0:max_key_points]
+    if len(keypoints) != max_key_points and facial_landmarks:
+        if v:
+            print("Warning: found {} blobs, expected {}.".format(len(keypoints), max_key_points))
     return np.array(keypoints)
 
 

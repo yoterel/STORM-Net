@@ -88,7 +88,7 @@ def auto_annotate_videos(vid_folder, gt_digi_file):
     for path in paths:
         print("processing video:", path)
         if path.name not in my_db.keys():
-            frames, indices = process_video(path)
+            frames, indices = process_video(path, dump_frames=True)
             data = predict.predict_keypoints_locations(frames, path.name, True, False, my_model, 1)
             my_db[path.name] = {"data": data,
                                  "label": np.array(label),
@@ -102,7 +102,7 @@ def annotate_videos(video_folder):  # contains GUI mainloop
     paths = []
     for file in video_folder.glob("*.MP4"):
         paths.append(file)
-    frames, indices = process_video(paths[video_number])
+    frames, indices = process_video(paths[video_number], dump_frames=True)
     new_db = load_full_db()
     if paths[video_number].name not in new_db.keys():
         data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False)
@@ -166,7 +166,7 @@ def annotate_videos(video_folder):  # contains GUI mainloop
         global frames, new_db, video_number, frame_number, sticker_number
         if video_number < (len(paths)-1):
             video_number += 1
-            frames, indices = process_video(paths[video_number])
+            frames, indices = process_video(paths[video_number], dump_frames=True)
             if paths[video_number].name not in new_db.keys():
                 data = predict.predict_keypoints_locations(frames, is_puppet=True, vid_name=paths[video_number].name)
                 new_db[paths[video_number].name] = {"data": data,
@@ -184,7 +184,7 @@ def annotate_videos(video_folder):  # contains GUI mainloop
         global frames, new_db, video_number, frame_number, sticker_number
         if video_number > 0:
             video_number -= 1
-            frames, indices = process_video(paths[video_number])
+            frames, indices = process_video(paths[video_number], dump_frames=True)
             if paths[video_number].name not in new_db.keys():
                 data = predict.predict_keypoints_locations(frames, is_puppet=True, vid_name=paths[video_number].name)
                 new_db[paths[video_number].name] = {"data": data,
@@ -202,7 +202,10 @@ def annotate_videos(video_folder):  # contains GUI mainloop
         global frames, new_db, frame_number, sticker_number
         current_video = paths[video_number].name
         current_starting_frame_index = new_db[current_video]["frame_indices"][0]
-        frames, indices = process_video(paths[video_number], False, current_starting_frame_index+100, True)
+        frames, indices = process_video(paths[video_number],
+                                        dump_frames=True,
+                                        starting_frame=current_starting_frame_index+100,
+                                        force_reselect=True)
         new_db[current_video]["frame_indices"] = indices
         frame_number = 0
         sticker_number = 0
