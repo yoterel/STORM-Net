@@ -58,6 +58,8 @@ def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0):
             if i % (frames_to_use // steps_per_datapoint) == starting_frame:
                 frames.append(Image.fromarray(im).resize((960, 540)))
                 indices.append(i)
+                if len(frames) >= steps_per_datapoint:
+                    break
     return frames, indices
 
 

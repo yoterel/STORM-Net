@@ -88,7 +88,7 @@ def auto_annotate_videos(vid_folder, gt_digi_file):
     for path in paths:
         print("processing video:", path)
         if path.name not in my_db.keys():
-            frames, indices = process_video(path, dump_frames=True)
+            frames, indices = process_video(path, dump_frames=False)
             data = predict.predict_keypoints_locations(frames, path.name, True, False, my_model, 1)
             my_db[path.name] = {"data": data,
                                  "label": np.array(label),
@@ -260,13 +260,6 @@ def annotate_videos(video_folder):  # contains GUI mainloop
         canvas.delete("cross")
         for widget in frame2.winfo_children():
             widget.destroy()
-    def test():
-        global new_db
-        data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False)
-        new_db[paths[video_number].name] = {"data": data,
-                                            "label": np.array([0, 0, 0]),
-                                            "frame_indices": indices}
-        updateLabels()
     canvas = tk.Canvas(root, height=frames[0].size[1], width=frames[0].size[0], bg="#263D42")
     canvas.pack(side="left")
     img = ImageTk.PhotoImage(image=frames[0])
@@ -293,8 +286,6 @@ def annotate_videos(video_folder):  # contains GUI mainloop
     saveSession.pack(fill="x")
     doneButton = tk.Button(frame1, text="Done", padx=10, pady=5, fg="white", bg="#263D42", command=root.destroy)
     doneButton.pack(fill="x")
-    testButton = tk.Button(frame1, text="Test", padx=10, pady=5, fg="white", bg="#263D42", command=test)
-    testButton.pack(fill="x")
     frame2 = tk.Frame(frame1, bg="white")
     frame2.pack(side="bottom")
     updateLabels()
@@ -311,8 +302,8 @@ def parse_arguments():
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
     # cmd_line = '/disk1/yotam/capnet/openPos/openPos/openPos49/ /disk1/yotam/capnet/openPos/openPos/openPos46/ '.split()
-    # cmd_line = 'E:/University/masters/CapTracking/videos/openPos49 E:/University/masters/CapTracking/videos/openPos46 -g'.split()
-    args = parser.parse_args()  # cmd_line
+    cmd_line = 'E:/University/masters/CapTracking/videos/openPos52 E:/University/masters/CapTracking/videos/openPos50 -g'.split()
+    args = parser.parse_args(cmd_line)  # cmd_line
     args.video_folder = Path(args.video_folder)
     args.model_file = Path(args.model_file)
     if Path.is_dir(args.model_file):
@@ -321,6 +312,8 @@ def parse_arguments():
 
 
 if __name__ == "__main__":
+    blacklist = ["GX011543.MP4", "GX011544.MP4", "GX011547.MP4", "GX011549.MP4",
+                 "GX011537.MP4", "GX011538.MP4"]
     args = parse_arguments()
     new_db = auto_annotate_videos(args.video_folder, args.model_file)
     if args.gui:

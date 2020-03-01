@@ -143,6 +143,8 @@ def get_puppet_landmarks(frames, v):
         purp2 = (160, 158, 164)
         mask = cv2.inRange(frame_HSV, purp1, purp2)
         key_points = get_blob_keypoints(mask, 3, True, 1)
+        if v:
+            print("Found {} blobs in frame {}.".format(len(key_points), i))
         if key_points.tolist() != []:
             key_points = key_points[np.argsort(key_points, axis=0)[:, 0]][::-1]  # sort key points according to x value
             if len(key_points.flatten()) == 6 and i <= 5:  # last frames can't possibly contain facial landmarks.
@@ -166,14 +168,10 @@ def get_blob_keypoints(mask, max_key_points, facial_landmarks=False, v=0):
     """
     if facial_landmarks:
         kernel = np.ones((5, 5), np.uint8)
-        # plt.imshow(mask)
-        # plt.show()
         mask = cv2.dilate(mask, kernel, iterations=2)
         # plt.imshow(mask)
         # plt.show()
-        mask = cv2.erode(mask, kernel, iterations=2)
-        # plt.imshow(mask)
-        # plt.show()
+        mask = cv2.erode(mask, kernel, iterations=1)
     contours, hierarchy = cv2.findContours(mask.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     img = np.zeros((mask.shape[0], mask.shape[1], 3), np.uint8)
     cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
@@ -184,20 +182,17 @@ def get_blob_keypoints(mask, max_key_points, facial_landmarks=False, v=0):
             cx = int(M['m10'] / M['m00'])
             cy = int(M['m01'] / M['m00'])
             area = cv2.contourArea(contour)
-            if facial_landmarks:
-                keypoints.append(np.array([cx, cy]))
-            else:
-                if area > 10:  # filter by area
-                    keypoints.append(np.array([cx, cy]))
-    keypoints = [x for x in keypoints if 300 < x[0] < 700]  # filter by location
+            keypoints.append((cx, cy, area))
+    keypoints.sort(key=lambda tup: tup[2], reverse=True)
+    if not facial_landmarks:
+        keypoints = [x for x in keypoints if x[2] > 10]  # area filter
+    keypoints = [x for x in keypoints if 300 < x[0] < 700] # location filter
     if len(keypoints) > max_key_points:
         if v:
-            print("Warning: found more than {} blobs.".format(max_key_points))
+            print("Warning: found more than {} blobs, reducing...".format(max_key_points))
         keypoints = keypoints[0:max_key_points]
-    if len(keypoints) != max_key_points and facial_landmarks:
-        if v:
-            print("Warning: found {} blobs, expected {}.".format(len(keypoints), max_key_points))
-    return np.array(keypoints)
+    keypoints = np.array([np.array([x[0], x[1]]) for x in keypoints])
+    return keypoints
 
 
 def get_sticker_locations(frames, preloaded_model, v):
