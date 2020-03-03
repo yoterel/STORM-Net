@@ -12,8 +12,8 @@ from tensorflow.python.keras.callbacks import TensorBoard
 from sklearn.metrics import mean_squared_error
 
 # set paths
-model_name = 'scene3_batch16_lr1e4_supershuffle_noise4'
-pretrained_model_name = 'scene3_batch16_lr1e4_supershuffle_noise3'
+model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
+pretrained_model_name = 'scene3_batch16_lr1e4_supershuffle_noise5'
 root_dir = Path("/disk1/yotam/capnet")
 data_dir = Path.joinpath(root_dir, "scene3_100k")
 model_dir = Path.joinpath(root_dir, "models")
@@ -32,7 +32,7 @@ batch_size = 16
 learning_rate = 1e-4
 early_stopping_patience = 20
 reduce_lr_patience = 3
-epochs = 1000
+epochs = 2000
 verbosity = 1  # set verbosity of fit
 
 # ------------------------------------- START ---------------------------------------------- #
@@ -87,7 +87,7 @@ tensor_board = TensorBoard(log_dir=my_log_dir,
                            write_images=True)
 dim = x_train.shape[1:]
 training_generator = utils.DataGenerator(x_train, y_train, batch_size=batch_size, dim=dim)
-validation_generator = utils.DataGenerator(x_val, y_val, batch_size=batch_size, dim=dim)
+validation_generator = utils.DataGenerator(x_val, y_val, batch_size=batch_size, dim=dim, mask_stickers=False)
 callbacks = [checkpoint, tensor_board]
 # start training
 H = model.fit_generator(generator=training_generator,

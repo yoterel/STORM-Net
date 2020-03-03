@@ -65,7 +65,6 @@ def load_full_db(db_path=None):
 
 
 def auto_annotate_videos(vid_folder, gt_digi_file):
-
     model_dir = Path("models")
     data_dir = Path("data")
     db_path = Path.joinpath(data_dir, "full_db.pickle")
@@ -97,15 +96,23 @@ def auto_annotate_videos(vid_folder, gt_digi_file):
     return my_db
 
 
-def annotate_videos(video_folder):  # contains GUI mainloop
-    global new_db, frames
+def annotate_videos(video_path, automation_level="auto", v=0):  # contains GUI mainloop
+    global new_db, frames, video_number
     paths = []
-    for file in video_folder.glob("*.MP4"):
-        paths.append(file)
+    if Path.is_file(video_path):
+        paths.append(video_path)
+        video_name = video_path.name
+        video_number = [x.name for x in paths].index(video_name)
+    else:
+        for file in video_path.glob("*.MP4"):
+            paths.append(file)
     frames, indices = process_video(paths[video_number], dump_frames=True)
     new_db = load_full_db()
     if paths[video_number].name not in new_db.keys():
-        data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False)
+        if automation_level == "semi-auto" or automation_level == "auto":
+            data = predict.predict_keypoints_locations(frames, paths[video_number].name, True, False)
+        else:
+            data = np.zeros((1, 10, 14))
         new_db[paths[video_number].name] = {"data": data,
                                             "label": np.array([0, 0, 0]),
                                             "frame_indices": indices}
@@ -297,12 +304,13 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Automatically annotates FNIRS videos on disk.')
     parser.add_argument("video_folder", help="The path to the video folder.")
     parser.add_argument("model_file", help="The base model file path.")
+    parser.add_argument("-a", "--auto_annotate", action='store_true', help="Automatically annotates videos in folder")
     parser.add_argument("-g", "--gui", action='store_true', help="Shows GUI")
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
     # cmd_line = '/disk1/yotam/capnet/openPos/openPos/openPos49/ /disk1/yotam/capnet/openPos/openPos/openPos46/ '.split()
-    cmd_line = 'E:/University/masters/CapTracking/videos/openPos52 E:/University/masters/CapTracking/videos/openPos50 -g'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/openPos55 E:/University/masters/CapTracking/videos/openPos50 -g'.split()
     args = parser.parse_args(cmd_line)  # cmd_line
     args.video_folder = Path(args.video_folder)
     args.model_file = Path(args.model_file)
@@ -315,6 +323,7 @@ if __name__ == "__main__":
     blacklist = ["GX011543.MP4", "GX011544.MP4", "GX011547.MP4", "GX011549.MP4",
                  "GX011537.MP4", "GX011538.MP4"]
     args = parse_arguments()
-    new_db = auto_annotate_videos(args.video_folder, args.model_file)
+    if args.auto_annotate:
+        new_db = auto_annotate_videos(args.video_folder, args.model_file)
     if args.gui:
         annotate_videos(args.video_folder)

@@ -24,11 +24,11 @@ def parse_arguments():
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos19/GX011433.MP4 E:/University/masters/CapTracking/videos/openpos18/openPos18.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos19/openPos19.txt'.split()
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos26/GoPro.MP4 E:/University/masters/CapTracking/videos/openpos25/openPos25.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos26/openPos26.txt'.split()
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos28/GX011444_Trim.mp4 E:/University/masters/CapTracking/videos/openpos27/openPos27.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos28/openPos28.txt'.split()
-    cmd_line = 'E:/University/masters/CapTracking/videos/openpos44 E:/University/masters/CapTracking/videos/openpos44 -a manual -gt E:/University/masters/CapTracking/videos/openpos40'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/openpos55 E:/University/masters/CapTracking/videos/openpos55 -a manual -gt E:/University/masters/CapTracking/videos/openpos50'.split()
     args = parser.parse_args(cmd_line)
     args.video = Path(args.video)
-    if Path.is_dir(args.video):
-        args.video = args.video.glob("*.MP4").__next__()
+    # if Path.is_dir(args.video):
+    #     args.video = args.video.glob("*.MP4").__next__()
     args.model = Path(args.model)
     if Path.is_dir(args.model):
         args.model = args.model.glob("*.txt").__next__()

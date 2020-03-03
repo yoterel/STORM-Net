@@ -258,21 +258,21 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, v):
                      gt_data.T,
                      ["Cz", "FP1", "FPZ", "FP2"],
                      title="Horn's(baseline) & Ground Truth data in real-space")
-        test_rotation = [10, 8.3, 3]
-        # test_scale = np.identity(3)
-        rot = R.from_euler('xyz', test_rotation, degrees=True)
-        rot_m = rot.as_matrix()
-        transformed_base_model_data = rot_m * base_model_data_in_sim_space
-        transformed_base_model_data_in_real_space = r_fit.T * (
-                    transformed_base_model_data - np.tile(t_fit, (1, len(base_model_data))))
-        transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
-        # # correct for translation (useful for viz)
-        transformed_sticker_data = align_centroids(from_data=transformed_sticker_data, to_data=gt_sticker_data)
-        visualize_pc(points_blue=transformed_sticker_data,
-                     names_blue=["Cz", "FP1", "FPZ", "FP2"],
-                     points_red=gt_sticker_data,
-                     names_red=["Cz", "FP1", "FPZ", "FP2"],
-                     title="test")
+        # test_rotation = [10, 8.3, 3]
+        # # test_scale = np.identity(3)
+        # rot = R.from_euler('xyz', test_rotation, degrees=True)
+        # rot_m = rot.as_matrix()
+        # transformed_base_model_data = rot_m * base_model_data_in_sim_space
+        # transformed_base_model_data_in_real_space = r_fit.T * (
+        #             transformed_base_model_data - np.tile(t_fit, (1, len(base_model_data))))
+        # transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
+        # # # correct for translation (useful for viz)
+        # transformed_sticker_data = align_centroids(from_data=transformed_sticker_data, to_data=gt_sticker_data)
+        # visualize_pc(points_blue=transformed_sticker_data,
+        #              names_blue=["Cz", "FP1", "FPZ", "FP2"],
+        #              points_red=gt_sticker_data,
+        #              names_red=["Cz", "FP1", "FPZ", "FP2"],
+        #              title="test")
         # print("test_rmse:", calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T))
     return transformed_base_model_data_in_real_space
 

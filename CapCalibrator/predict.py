@@ -1,7 +1,7 @@
 import utils
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
-os.environ["CUDA_VISIBLE_DEVICES"] = "4";
+os.environ["CUDA_VISIBLE_DEVICES"] = "5";
 import keras
 from pathlib import Path
 
@@ -27,48 +27,60 @@ ftypes = [
     ('GIF', '*.gif;*.GIF'),
 ]
 
-def pick_color(event,x,y,flags,param):
+
+def pick_color(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
-        pixel = image_hsv[y,x]
+        pixel = image_hsv[y, x]
 
         #HUE, SATURATION, AND VALUE (BRIGHTNESS) RANGES. TOLERANCE COULD BE ADJUSTED.
-        upper =  np.array([pixel[0] + 10, pixel[1] + 10, pixel[2] + 40])
-        lower =  np.array([pixel[0] - 10, pixel[1] - 10, pixel[2] - 40])
+        upper = np.array([pixel[0] + 10, pixel[1] + 10, pixel[2] + 40])
+        lower = np.array([pixel[0] - 10, pixel[1] - 10, pixel[2] - 40])
         print(lower, upper)
 
         #A MONOCHROME MASK FOR GETTING A BETTER VISION OVER THE COLORS
-        image_mask = cv2.inRange(image_hsv,lower,upper)
-        cv2.imshow("Mask",image_mask)
+        image_mask = cv2.inRange(image_hsv, lower, upper)
+        cv2.imshow("Mask", image_mask)
 
 
 def predict_rigid_transform(sticker_locations, v):
     """
     predicts rigid transformation of cap object using 2d sticker locations
-    :param sticker_locations: 2d array of sticker locations
+    :param sticker_locations: a batch of 2d array of sticker locations
     :param v: verbosity
-    :return: rotation and scale matrices
+    :return: rotation and scale matrices list
     """
     if v:
         print("Predicting rotation and scale transforms from key points.")
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
-    model_name = 'scene3_batch16_lr1e4_supershuffle_noise5'
+    # utils.shuffle_timeseries(sticker_locations)
+    # utils.shuffle_data(sticker_locations)
+    # utils.mask_data(sticker_locations)
+    model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
     model_dir = Path("models")
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     model = keras.models.load_model(str(model_full_name))
     y_predict = model.predict(sticker_locations)
-    # simulation uses left hand rule (as oposed to scipy rotation that uses right hand rule)
+    if len(y_predict) > 1:
+        print(y_predict)
+        exit()
+    # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
     # notice x is not negated - the positive direction in simulation is flipped.
-    rot = R.from_euler('xyz', [y_predict[0][0], -y_predict[0][1], -y_predict[0][2]], degrees=True)
-    # if v:
-        # print("Network Euler angels:", [y_predict[0][0], -y_predict[0][2], -y_predict[0][1]])
-        # print("Network scale:", y_predict[0][3], y_predict[0][4])
-    scale_mat = np.identity(3)
-    # scale_mat[0, 0] = y_predict[0][3]  # xscale
-    # scale_mat[1, 1] = y_predict[0][4]  # yscale
-    rotation_mat = rot.as_matrix()
-    return rotation_mat, scale_mat
+    rs = []
+    sc = []
+    for i in range(len(y_predict)):
+        rot = R.from_euler('xyz', [y_predict[0][0], -y_predict[0][1], -y_predict[0][2]], degrees=True)
+        # if v:
+            # print("Network Euler angels:", [y_predict[0][0], -y_predict[0][2], -y_predict[0][1]])
+            # print("Network scale:", y_predict[0][3], y_predict[0][4])
+        scale_mat = np.identity(3)
+        # scale_mat[0, 0] = y_predict[0][3]  # xscale
+        # scale_mat[1, 1] = y_predict[0][4]  # yscale
+        rotation_mat = rot.as_matrix()
+        rs.append(rotation_mat)
+        sc.append(scale_mat)
+    return rs[0], sc[0]
 
 
 def get_facial_landmarks(frames, v):
@@ -318,6 +330,15 @@ def visualize_network_performance(model_name, root_dir):
     model = keras.models.load_model(str(best_weight_location))
     pickle_file_path = Path.joinpath(data_dir, "data.pickle")
     x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
+    fig = plt.figure()
+    ax = plt.axes()
+    n, bins, patches = ax.hist(y_train[:, 0], 50, density=True, facecolor='r', alpha=0.75)
+    n, bins, patches = ax.hist(y_train[:, 1], 50, density=True, facecolor='b', alpha=0.75)
+    n, bins, patches = ax.hist(y_train[:, 2], 50, density=True, facecolor='g', alpha=0.75)
+    ax.set_xlabel('Angle')
+    ax.set_ylabel('# of instances')
+    ax.set_title("Histogram of angle distribution in training set")
+    plt.savefig('plots/angle_dist.png')
     y_predict = model.predict(x_test)
     mean_results = np.mean(abs(y_predict - y_test), 0)
     print("err_x:", mean_results[0])
@@ -381,7 +402,7 @@ def visualize_network_performance(model_name, root_dir):
 
 
 if __name__ == "__main__":
-    model_name = 'scene3_batch16_lr1e4_supershuffle_noise4'
+    model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
     root_dir = Path("/disk1/yotam/capnet")
 
     visualize_network_performance(model_name, root_dir)

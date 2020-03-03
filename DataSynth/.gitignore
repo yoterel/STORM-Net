@@ -64,3 +64,4 @@ build2/
 *.json
 build3/
 captures/
+build_special/
