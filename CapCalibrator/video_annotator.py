@@ -64,7 +64,7 @@ def load_full_db(db_path=None):
     return db
 
 
-def auto_annotate_videos(vid_folder, gt_digi_file):
+def auto_annotate_videos(vid_folder, model_digi_file):
     model_dir = Path("models")
     data_dir = Path("data")
     db_path = Path.joinpath(data_dir, "full_db.pickle")
@@ -72,12 +72,12 @@ def auto_annotate_videos(vid_folder, gt_digi_file):
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     my_model = utils.load_semantic_seg_model(str(model_full_name))
     # get label
-    my_digi_file = vid_folder.glob("*.txt").__next__()
-    names, data = geometry.get_data_from_model_file(my_digi_file)
-    sticker_data = geometry.get_sticker_data(names, data)
+    gt_digi_file = vid_folder.glob("*.txt").__next__()
     names, data = geometry.get_data_from_model_file(gt_digi_file)
     gt_sticker_data = geometry.get_sticker_data(names, data)
-    label = geometry.get_euler_angles(gt_sticker_data, sticker_data)  # obtain the angels needed to turn gt into my data
+    names, data = geometry.get_data_from_model_file(model_digi_file)
+    model_sticker_data = geometry.get_sticker_data(names, data)
+    label = geometry.get_euler_angles(gt_sticker_data, model_sticker_data)  # obtain the angels needed to turn gt into my data
     label = np.array([1, -1, -1])*label  # flip y and z for network label
     # get data
     paths = []
@@ -310,7 +310,7 @@ def parse_arguments():
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
     # cmd_line = '/disk1/yotam/capnet/openPos/openPos/openPos49/ /disk1/yotam/capnet/openPos/openPos/openPos46/ '.split()
-    cmd_line = 'E:/University/masters/CapTracking/videos/openPos55 E:/University/masters/CapTracking/videos/openPos50 -g'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/openPos53/GX011577.MP4 E:/University/masters/CapTracking/videos/openPos53 -g'.split()
     args = parser.parse_args(cmd_line)  # cmd_line
     args.video_folder = Path(args.video_folder)
     args.model_file = Path(args.model_file)

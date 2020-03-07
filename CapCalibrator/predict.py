@@ -1,11 +1,9 @@
 import utils
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
-os.environ["CUDA_VISIBLE_DEVICES"] = "5";
+os.environ["CUDA_VISIBLE_DEVICES"] = "4";
 import keras
 from pathlib import Path
-
-import numpy as np
 from sklearn.metrics import mean_squared_error
 import scipy.io as sio
 import cv2
@@ -18,8 +16,10 @@ import numpy as np
 import sys
 import tkinter as tk
 from tkinter import filedialog
+import geometry
 image_hsv = None
 pixel = (0,0,0) #RANDOM DEFAULT VALUE
+
 
 ftypes = [
     ('JPG', '*.jpg;*.JPG;*.JPEG'),
@@ -42,14 +42,14 @@ def pick_color(event, x, y, flags, param):
         cv2.imshow("Mask", image_mask)
 
 
-def predict_rigid_transform(sticker_locations, v):
+def predict_rigid_transform(sticker_locations, args):
     """
     predicts rigid transformation of cap object using 2d sticker locations
     :param sticker_locations: a batch of 2d array of sticker locations
     :param v: verbosity
     :return: rotation and scale matrices list
     """
-    if v:
+    if args.verbosity:
         print("Predicting rotation and scale transforms from key points.")
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
@@ -62,15 +62,12 @@ def predict_rigid_transform(sticker_locations, v):
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     model = keras.models.load_model(str(model_full_name))
     y_predict = model.predict(sticker_locations)
-    if len(y_predict) > 1:
-        print(y_predict)
-        exit()
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
     # notice x is not negated - the positive direction in simulation is flipped.
     rs = []
     sc = []
     for i in range(len(y_predict)):
-        rot = R.from_euler('xyz', [y_predict[0][0], -y_predict[0][1], -y_predict[0][2]], degrees=True)
+        rot = R.from_euler('xyz', [y_predict[i][0], y_predict[i][1], y_predict[i][2]], degrees=True)
         # if v:
             # print("Network Euler angels:", [y_predict[0][0], -y_predict[0][2], -y_predict[0][1]])
             # print("Network scale:", y_predict[0][3], y_predict[0][4])
@@ -80,6 +77,15 @@ def predict_rigid_transform(sticker_locations, v):
         rotation_mat = rot.as_matrix()
         rs.append(rotation_mat)
         sc.append(scale_mat)
+    if len(rs) > 1:
+        for i in range(len(rs)):
+            geometry.apply_rigid_transform(rs[i],
+                                           sc[i],
+                                           args.model,
+                                           args.ground_truth,
+                                           plot=False,
+                                           v=1)
+        exit()
     return rs[0], sc[0]
 
 
@@ -321,88 +327,3 @@ def predict_from_mat(model_name, root_dir):
     rot = R.from_euler('xyz', [y_predict[0][0], y_predict[0][1], y_predict[0][2]], degrees=True)
     print(rot.as_matrix())
     print(y_predict)
-
-
-def visualize_network_performance(model_name, root_dir):
-    data_dir = Path.joinpath(root_dir, "scene3_100k")
-    model_dir = Path.joinpath(root_dir, "models")
-    best_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
-    model = keras.models.load_model(str(best_weight_location))
-    pickle_file_path = Path.joinpath(data_dir, "data.pickle")
-    x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
-    fig = plt.figure()
-    ax = plt.axes()
-    n, bins, patches = ax.hist(y_train[:, 0], 50, density=True, facecolor='r', alpha=0.75)
-    n, bins, patches = ax.hist(y_train[:, 1], 50, density=True, facecolor='b', alpha=0.75)
-    n, bins, patches = ax.hist(y_train[:, 2], 50, density=True, facecolor='g', alpha=0.75)
-    ax.set_xlabel('Angle')
-    ax.set_ylabel('# of instances')
-    ax.set_title("Histogram of angle distribution in training set")
-    plt.savefig('plots/angle_dist.png')
-    y_predict = model.predict(x_test)
-    mean_results = np.mean(abs(y_predict - y_test), 0)
-    print("err_x:", mean_results[0])
-    print("err_y:", mean_results[1])
-    print("err_z:", mean_results[2])
-    ############################################################################
-    # index = np.argmin(np.mean(abs(y_predict-y_test), axis=1))
-    # baseline_data = x_test[index, :, :]
-    # gt = y_test[index, :]
-    preds = []
-    for i in range(x_test.shape[1]):
-        baseline = np.copy(x_test)
-        baseline[:, i, :] = np.zeros((x_test.shape[0], x_test.shape[2]))
-        pred = model.predict(baseline)
-        result = np.mean(np.mean(abs(pred - y_test), axis=1))
-        preds.append(result)
-    fig = plt.figure()
-    ax = plt.axes()
-    x = list(range(10))
-    ax.plot(x, preds)
-    ax.set_xlabel('Index of missing frame')
-    ax.set_ylabel('Error')
-    ax.set_title("Error as a function of index of missing frame")
-    # plt.show()
-    plt.savefig('plots/frames_err.png')
-    ############################################################################
-    preds = []
-    gt = y_test
-    for i in range(0, x_test.shape[2], 2):
-        baseline = np.copy(x_test)
-        baseline[:, :, i:i+2] = np.zeros((baseline.shape[0], baseline.shape[1], 2))
-        pred = model.predict(baseline)
-        result = np.mean(np.mean(abs(pred - gt), axis=1))
-        preds.append(result)
-    fig = plt.figure()
-    ax = plt.axes()
-    x = list(range(x_test.shape[2] // 2))
-    ax.plot(x, preds)
-    ax.set_xlabel('Index of missing sticker')
-    ax.set_ylabel('Error')
-    ax.set_title("Error as a function of index of missing sticker")
-    # plt.show()
-    plt.savefig('plots/sticker_err.png')
-    ############################################################################
-    sticker_occurrences = []
-    for i in range(0, x_test.shape[2], 2):
-        occurrence = np.count_nonzero(x_test[:, :, i:i+2]) // 2
-        sticker_occurrences.append(occurrence / (x_test.shape[0]*x_test.shape[1]))
-    fig = plt.figure()
-    ax = plt.axes()
-    x = list(range(x_test.shape[2] // 2))
-    ax.plot(x, sticker_occurrences)
-    ax.set_xlabel('Index of sticker')
-    ax.set_ylabel('Occurrences percentage')
-    ax.set_title("Occurrences percentage of every sticker")
-    # plt.show()
-    plt.savefig('plots/sticker_percent.png')
-    print("done")
-
-
-
-
-if __name__ == "__main__":
-    model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
-    root_dir = Path("/disk1/yotam/capnet")
-
-    visualize_network_performance(model_name, root_dir)

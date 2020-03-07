@@ -16,7 +16,7 @@ def parse_arguments():
                         default="semi-auto",
                         help="Controls whether to automatically or manually annotate the stickers in the video.")
     parser.add_argument("-o", "--output_file", help="The output csv file with calibrated results (given in MNI coordinates)")
-    parser.add_argument("-v", "--verbosity", type=int, choices=[0, 1], default=1, help="Selects verbosity level")
+    parser.add_argument("-v", "--verbosity", type=int, choices=[0, 1, 2], default=2, help="Selects verbosity level")
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
@@ -24,7 +24,8 @@ def parse_arguments():
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos19/GX011433.MP4 E:/University/masters/CapTracking/videos/openpos18/openPos18.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos19/openPos19.txt'.split()
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos26/GoPro.MP4 E:/University/masters/CapTracking/videos/openpos25/openPos25.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos26/openPos26.txt'.split()
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos28/GX011444_Trim.mp4 E:/University/masters/CapTracking/videos/openpos27/openPos27.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos28/openPos28.txt'.split()
-    cmd_line = 'E:/University/masters/CapTracking/videos/openpos55 E:/University/masters/CapTracking/videos/openpos55 -a manual -gt E:/University/masters/CapTracking/videos/openpos50'.split()
+    # cmd_line = 'E:/University/masters/CapTracking/videos/openpos54 E:/University/masters/CapTracking/videos/openpos50 -a manual -gt E:/University/masters/CapTracking/videos/openpos54'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/test/GX011559.MP4 E:/University/masters/CapTracking/videos/test_model -a manual -gt E:/University/masters/CapTracking/videos/test'.split()
     args = parser.parse_args(cmd_line)
     args.video = Path(args.video)
     # if Path.is_dir(args.video):
@@ -49,8 +50,13 @@ def save_results(projected_data, output_file, v):
 if __name__ == "__main__":
     args = parse_arguments()
     sticker_locations = video.process_video(args.video, args.automation_level, args.verbosity)  # nx10x14 floats
-    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, args.verbosity)
-    sensor_locations = geometry.apply_rigid_transform(r_matrix, s_matrix, args.model, args.ground_truth, args.verbosity)
+    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, args)
+    sensor_locations = geometry.apply_rigid_transform(r_matrix,
+                                                      s_matrix,
+                                                      args.model,
+                                                      args.ground_truth,
+                                                      plot=True,
+                                                      v=args.verbosity)
     projected_data = geometry.project_sensors_to_MNI(sensor_locations, args.verbosity)
     save_results(projected_data, args.output_file, args.verbosity)
     if args.verbosity:
