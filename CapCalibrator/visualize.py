@@ -133,7 +133,7 @@ def load_gt_db(db_path, format="pickle", filter=None):
             db = new_db
     else:
         if format == "json":
-            number_of_samples = 20
+            number_of_samples = 15
             skip_files = 0
             count = 0
             for i, file in enumerate(db_path.glob("*.json")):
@@ -183,10 +183,7 @@ def visualize_data(db_path, filter=None):
         ax = fig.add_subplot(111)
         data = db[key]["data"][0]
         # s_linear = [n for n in range(len(data))]
-        if my_format == "pickle":
-            c = ['b', 'b', 'b', 'r', 'r', 'r', 'g']
-        else:
-            c = ['b', 'b', 'b', 'g', 'r', 'r', 'r']
+        c = ['b', 'b', 'b', 'r', 'r', 'r', 'g']
         for t in range(0, data.shape[1], 2):
             x = data[:, t]
             y = data[:, t+1]
@@ -253,15 +250,15 @@ def visualize_pc(points_blue, names_blue, points_red=None, names_red=None, title
 
 
 if __name__ == "__main__":
-    model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
-    root_dir = Path("/disk1/yotam/capnet")
-
-    visualize_network_performance(model_name, root_dir)
+    # model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
+    # root_dir = Path("/disk1/yotam/capnet")
+    #
+    # visualize_network_performance(model_name, root_dir)
 
     # filter_files = ["GX011577.MP4", "GX011578.MP4", "GX011579.MP4", "GX011580.MP4",
     #                 "GX011581.MP4", "GX011582.MP4", "GX011572.MP4", "GX011573.MP4",
     #                 "GX011574.MP4", "GX011575.MP4", "GX011576.MP4", "GX011566.MP4",
     #                 "GX011567.MP4", "GX011568.MP4", "GX011569.MP4", "GX011570.MP4"]
-    # # db_path = Path("data", "full_db.pickle")
-    # db_path = Path("E:/Src/CapCalibrator/DataSynth/captures")
-    # visualize_data(db_path, filter=filter_files)
+    # db_path = Path("data", "full_db.pickle")
+    db_path = Path("E:/Src/CapCalibrator/DataSynth/captures")
+    visualize_data(db_path, filter=None)

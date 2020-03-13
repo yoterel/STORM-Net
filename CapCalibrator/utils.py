@@ -111,7 +111,7 @@ def load_db(root_dir):
     X = []
     Y = []
     for file in sorted(root_dir.glob("*.json")):
-        x, y = extract_session_data(file, use_scale=False)
+        x, y = extract_session_data(file, use_scale=True)
         if x is not None:
             X.append(x)
             Y.append(y)
@@ -160,8 +160,8 @@ def extract_session_data(file, use_scale=True):
             # cap_scalex = (cap_scalex - cap_scale_min) / (cap_scale_max - cap_scale_min)
             # cap_scalez = (cap_scalez - cap_scale_min) / (cap_scale_max - cap_scale_min)
             cap_scalex = my_dict["scalex"]
-            cap_scaley = my_dict["scaley"]
-            cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley)
+            # cap_scaley = my_dict["scaley"]
+            cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex) #, cap_scaley)
         else:
             cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'])
         x_session.append(sticker_2d_locs)
@@ -242,6 +242,13 @@ def shuffle_data(x):
     return
 
 
+def center_data(x):
+    """
+    centers the stickers in place to create centered data
+    :param x:
+    :return:
+    """
+    return x
 def perturb_data(x):
     """
     NOTE: doesn't work - results aren't normalized, scaled, or clamped to [0-1]
@@ -277,8 +284,9 @@ class DataGenerator(keras.utils.Sequence):
                  shuffle_batches=True,
                  shuffle_timestamps=True,
                  shuffle_stickers=True,
-                 perturb_stickers=False,
-                 mask_stickers=True):
+                 mask_stickers=True,
+                 center_stickers=True,
+                 perturb_stickers=False):
         """Initialization"""
         self.dim = dim
         self.batch_size = batch_size
@@ -288,6 +296,7 @@ class DataGenerator(keras.utils.Sequence):
         self.shuffle_timestamps = shuffle_timestamps
         self.shuffle_stickers = shuffle_stickers
         self.perturb_stickers = perturb_stickers
+        self.center_stickers = center_stickers
         self.mask_stickers = mask_stickers
         self.on_epoch_end()
         self.indexes = np.arange(len(self.X))
@@ -336,6 +345,8 @@ class DataGenerator(keras.utils.Sequence):
             perturb_data(X)
         if self.mask_stickers:
             mask_data(X)
+        if self.center_stickers:
+            center_data(X)
         return X, y
 
 

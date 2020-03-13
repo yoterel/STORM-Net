@@ -261,7 +261,7 @@ public class ImageSynthesis : MonoBehaviour {
     void saveJson(string filename, Camera cam, bool[] valid_stickers, int width, int height)
     {
         Vector3[] stickers_locs = new Vector3[7];
-        string[] names = new string[] { "AL", "NZ", "AR", "CZ", "FP1", "FPZ", "FP2" };
+        string[] names = new string[] { "AL", "NZ", "AR", "FP1", "FPZ", "FP2", "CZ"};
         for (int i = 0; i < 7; i++)
         {
             Vector3 sticker_3dloc = GameObject.Find(names[i]).transform.position;
@@ -270,13 +270,13 @@ public class ImageSynthesis : MonoBehaviour {
                 valid_stickers[i] = false; //center of object is out of screen
             stickers_locs[i] = sticker_2dloc;
         }
-        Vector3 cap_rot = GameObject.Find("mask").transform.localRotation.eulerAngles;
+        Vector3 cap_rot = GameObject.Find("mask").transform.rotation.eulerAngles;
         Vector3 scale = GameObject.Find("mask").transform.localScale;
-        SaveObject obj = new SaveObject { valid_stickers = valid_stickers, stickers_locs = stickers_locs , cap_rot = cap_rot, scalex = scale.x, scaley = scale.y};
+        SaveObject obj = new SaveObject { valid_stickers = valid_stickers, stickers_locs = stickers_locs , cap_rot = cap_rot, scalex = scale.x, scaley = scale.y, scalez = scale.z};
         string json = JsonUtility.ToJson(obj);
         //Debug.Log(json);
         var filenameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
-        filenameWithoutExtension = filenameWithoutExtension.Substring(0, 11);
+        filenameWithoutExtension = filenameWithoutExtension.Substring(0, 12);
         File.AppendAllText("captures/" + filenameWithoutExtension + ".json",
                    json + System.Environment.NewLine);
         //File.WriteAllText("captures/" + filenameWithoutExtension + ".json", json);
@@ -288,6 +288,7 @@ public class ImageSynthesis : MonoBehaviour {
         public Vector3 cap_rot;
         public float scalex;
         public float scaley;
+		public float scalez;
     }
 #if UNITY_EDITOR
     private GameObject lastSelectedGO;
