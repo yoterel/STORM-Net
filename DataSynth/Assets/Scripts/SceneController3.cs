@@ -151,7 +151,7 @@ public class SceneController3 : MonoBehaviour
         float randx = Random.Range(-10f, 10f);
         float randy = Random.Range(-15f, 15f);
         float randz = Random.Range(-20f, 20f);
-        mask.transform.rotation = Quaternion.Euler(randx, randy, randz);
+        mask.transform.localRotation = Quaternion.Euler(randx, randy, randz);
     }
 
     float map_range(float s_range_low, float s_range_high, float d_range_low, float d_range_high, float value)

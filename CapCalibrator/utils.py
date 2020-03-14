@@ -5,7 +5,7 @@ import pickle
 from pathlib import Path
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
-os.environ["CUDA_VISIBLE_DEVICES"] = "4";
+os.environ["CUDA_VISIBLE_DEVICES"] = "5";
 import keras
 from keras.models import Sequential
 from keras.layers import Dense
@@ -160,8 +160,9 @@ def extract_session_data(file, use_scale=True):
             # cap_scalex = (cap_scalex - cap_scale_min) / (cap_scale_max - cap_scale_min)
             # cap_scalez = (cap_scalez - cap_scale_min) / (cap_scale_max - cap_scale_min)
             cap_scalex = my_dict["scalex"]
-            # cap_scaley = my_dict["scaley"]
-            cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex) #, cap_scaley)
+            cap_scaley = my_dict["scaley"]
+            cap_scalez = my_dict["scalez"]
+            cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley, cap_scalez)
         else:
             cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'])
         x_session.append(sticker_2d_locs)
@@ -245,10 +246,19 @@ def shuffle_data(x):
 def center_data(x):
     """
     centers the stickers in place to create centered data
-    :param x:
-    :return:
     """
-    return x
+    b = x
+    zero_indices = np.copy(b == 0)
+    for ndx in range(b.shape[0]):
+        xvec_cent = np.true_divide(b[ndx, :, ::2].sum(1), (b[ndx, :, ::2] != 0).sum(1))
+        xvec_cent = np.nan_to_num(xvec_cent)
+        yvec_cent = np.true_divide(b[ndx, :, 1::2].sum(1), (b[ndx, :, 1::2] != 0).sum(1))
+        yvec_cent = np.nan_to_num(yvec_cent)
+        b[ndx, :, ::2] += np.expand_dims(0.5 - xvec_cent, axis=1)
+        b[ndx, :, 1::2] += np.expand_dims(0.5 - yvec_cent, axis=1)
+    b[zero_indices] = 0
+    return
+
 def perturb_data(x):
     """
     NOTE: doesn't work - results aren't normalized, scaled, or clamped to [0-1]

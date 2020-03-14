@@ -270,7 +270,7 @@ public class ImageSynthesis : MonoBehaviour {
                 valid_stickers[i] = false; //center of object is out of screen
             stickers_locs[i] = sticker_2dloc;
         }
-        Vector3 cap_rot = GameObject.Find("mask").transform.rotation.eulerAngles;
+        Vector3 cap_rot = GameObject.Find("mask").transform.localEulerAngles;
         Vector3 scale = GameObject.Find("mask").transform.localScale;
         SaveObject obj = new SaveObject { valid_stickers = valid_stickers, stickers_locs = stickers_locs , cap_rot = cap_rot, scalex = scale.x, scaley = scale.y, scalez = scale.z};
         string json = JsonUtility.ToJson(obj);

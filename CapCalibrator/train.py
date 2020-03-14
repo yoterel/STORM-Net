@@ -6,14 +6,14 @@ from time import time
 import numpy as np
 import math
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 import keras
 from tensorflow.python.keras.callbacks import TensorBoard
 from sklearn.metrics import mean_squared_error
 
 # set paths
-model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
-pretrained_model_name = 'scene3_batch16_lr1e4_supershuffle_noise5'
+model_name = 'scene3_batch16_lr1e4_supershuffle_noise7'
+pretrained_model_name = None
 root_dir = Path("/disk1/yotam/capnet")
 data_dir = Path.joinpath(root_dir, "scene3_100k")
 model_dir = Path.joinpath(root_dir, "models")
