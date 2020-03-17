@@ -1,7 +1,7 @@
 import utils
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
-os.environ["CUDA_VISIBLE_DEVICES"] = "4";
+os.environ["CUDA_VISIBLE_DEVICES"] = "5";
 import keras
 from pathlib import Path
 from sklearn.metrics import mean_squared_error
@@ -18,7 +18,7 @@ import tkinter as tk
 from tkinter import filedialog
 import geometry
 image_hsv = None
-pixel = (0,0,0) #RANDOM DEFAULT VALUE
+pixel = (0, 0, 0) #RANDOM DEFAULT VALUE
 
 
 ftypes = [
@@ -54,10 +54,11 @@ def predict_rigid_transform(sticker_locations, args):
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
+    utils.center_data(sticker_locations)
     # utils.shuffle_timeseries(sticker_locations)
     # utils.shuffle_data(sticker_locations)
     # utils.mask_data(sticker_locations)
-    model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
+    model_name = 'scene3_batch16_lr1e4_supershuffle_noise7'
     model_dir = Path("models")
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     model = keras.models.load_model(str(model_full_name))
@@ -67,13 +68,15 @@ def predict_rigid_transform(sticker_locations, args):
     rs = []
     sc = []
     for i in range(len(y_predict)):
-        rot = R.from_euler('xyz', [y_predict[i][0], y_predict[i][1], y_predict[i][2]], degrees=True)
+        rot = R.from_euler('xyz', [y_predict[i][0], -y_predict[i][1], -y_predict[i][2]], degrees=True)
         # if v:
             # print("Network Euler angels:", [y_predict[0][0], -y_predict[0][2], -y_predict[0][1]])
             # print("Network scale:", y_predict[0][3], y_predict[0][4])
         scale_mat = np.identity(3)
-        # scale_mat[0, 0] = y_predict[0][3]  # xscale
-        # scale_mat[1, 1] = y_predict[0][4]  # yscale
+        if y_predict.shape[-1] > 3:
+            scale_mat[0, 0] = y_predict[0][3]  # xscale
+            scale_mat[1, 1] = y_predict[0][4]  # yscale
+            scale_mat[2, 2] = y_predict[0][5]  # zscale
         rotation_mat = rot.as_matrix()
         rs.append(rotation_mat)
         sc.append(scale_mat)
@@ -307,6 +310,7 @@ def predict(model_name, root_dir):
     model = keras.models.load_model(str(best_weight_location))
     pickle_file_path = Path.joinpath(data_dir, "data.pickle")
     x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
+    utils.center_data(x_test)
     y_predict = model.predict(x_test)
     total_error = mean_squared_error(y_test, y_predict, squared=False)
     angel_error = mean_squared_error(y_test[:, :-2], y_predict[:, :-2], squared=False)
@@ -327,3 +331,8 @@ def predict_from_mat(model_name, root_dir):
     rot = R.from_euler('xyz', [y_predict[0][0], y_predict[0][1], y_predict[0][2]], degrees=True)
     print(rot.as_matrix())
     print(y_predict)
+
+
+# model_name = 'scene3_batch16_lr1e4_supershuffle_noise7'
+# model_dir = Path("models")
+# predict()

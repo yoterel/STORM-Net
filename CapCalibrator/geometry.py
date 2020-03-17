@@ -93,19 +93,20 @@ def calc_rmse_error(A1, A2):
     return math.sqrt(err/len(A1.T))
 
 
-def get_sim_data(ed, n):
+def get_sim_data(ed, n_len, n_dep):
     """
     :param ed: distance between eyes in cm
-    :param n: nose tip distance from its origin
+    :param n_len: nose tip distance from its origin
+    :param n_dep: nose tip depth compared to eyes
     :return: base-line simulation data with x axis flipped
     """
-    my_sim_data = np.array([[0, 7.21, n],  # NZ
-                            [ed / 2, 6, -4.16],  # AL
-                            [-ed / 2, 6, -4.16],  # AR
-                            [0, 0, 6.84],  # CZ
-                            [3, 8, -1.03],  # FP1
-                            [0, 8, 0.84],  # FPZ
-                            [-3, 8, -1.03]  # FP2
+    my_sim_data = np.array([[0, 7.21+n_dep, n_len],  # NZ
+                            [ed / 2, 6, 0],  # AL
+                            [-ed / 2, 6, 0],  # AR
+                            [0, 0, 10],  # CZ
+                            [3, 8, 3.13],  # FP1
+                            [0, 8, 5],  # FPZ
+                            [-3, 8, 3.13]  # FP2
                             ])
     my_sim_data[:, 0] *= -1  # flip x axis, simulator uses right hand rule
     return my_sim_data
@@ -116,18 +117,20 @@ def find_best_params(data):
     best_R = np.zeros((3, 3))
     best_T = np.zeros((1, 3))
     eye_distances = np.linspace(3.8, 5.4, num=10)
-    nose_sizes = np.linspace(-5.55, -6.05, num=10)
+    nose_lengths = np.linspace(-1.74, -2.24, num=10)
+    nose_depths = np.linspace(-0.5, 0.5, num=10)
     for ed in eye_distances:
-        for n in nose_sizes:
-            sim_data = get_sim_data(ed, n)
-            A = np.mat(np.transpose(data))
-            B = np.mat(np.transpose(sim_data))
-            ret_R, ret_t = rigid_transform_3d(A, B)
-            recovered_B = (ret_R * A) + np.tile(ret_t, (1, len(sim_data)))
-            rmse = calc_rmse_error(recovered_B, B)
-            if rmse < min_rmse:
-                min_rmse, best_R, best_T, best_ed, best_n = rmse, ret_R, ret_t, ed, n
-    return best_R, best_T, best_ed, best_n, min_rmse
+        for nl in nose_lengths:
+            for nd in nose_depths:
+                sim_data = get_sim_data(ed, nl, nd)
+                A = np.mat(np.transpose(data))
+                B = np.mat(np.transpose(sim_data))
+                ret_R, ret_t = rigid_transform_3d(A, B)
+                recovered_B = (ret_R * A) + np.tile(ret_t, (1, len(sim_data)))
+                rmse = calc_rmse_error(recovered_B, B)
+                if rmse < min_rmse:
+                    min_rmse, best_R, best_T, best_ed, best_nl, best_nd = rmse, ret_R, ret_t, ed, nl, nd
+    return best_R, best_T, best_ed, best_nl, best_nd, min_rmse
 
 
 def get_sticker_data(names, data):
@@ -165,8 +168,8 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
     sticker_data = get_sticker_data(names, base_model_data)
     # sensor_indices = [i for i in range(len(base_model_data)) if i not in face_indices]
     # sensor_data = base_model_data[sensor_indices, :]
-    r_fit, t_fit, ed_fit, n_fit, rmse = find_best_params(np.vstack((face_data, sticker_data)))
-    sim_data = get_sim_data(ed_fit, n_fit)
+    r_fit, t_fit, ed_fit, nl_fit, nd_fit, rmse = find_best_params(np.vstack((face_data, sticker_data)))
+    sim_data = get_sim_data(ed_fit, nl_fit, nd_fit)
     # rot_m = R.from_matrix(r_fit)
     # rot_e = rot_m.as_euler('xyz', degrees=True)
 

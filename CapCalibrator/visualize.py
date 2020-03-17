@@ -1,6 +1,6 @@
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
-os.environ["CUDA_VISIBLE_DEVICES"] = "4";
+os.environ["CUDA_VISIBLE_DEVICES"] = "5";
 import keras
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -133,8 +133,8 @@ def load_gt_db(db_path, format="pickle", filter=None):
             db = new_db
     else:
         if format == "json":
-            number_of_samples = 15
-            skip_files = 0
+            number_of_samples = 50
+            skip_files = 1000
             count = 0
             for i, file in enumerate(db_path.glob("*.json")):
                 if filter:
@@ -182,6 +182,12 @@ def visualize_data(db_path, filter=None):
         fig = plt.figure()
         ax = fig.add_subplot(111)
         data = db[key]["data"][0]
+        if len(db[key]["data"][0].shape) < 3:
+            data = np.expand_dims(data, axis=0)
+        data[:, :, 0::2] /= 960
+        data[:, :, 1::2] /= 540
+        utils.center_data(data)
+        data = np.squeeze(data)
         # s_linear = [n for n in range(len(data))]
         c = ['b', 'b', 'b', 'r', 'r', 'r', 'g']
         for t in range(0, data.shape[1], 2):
@@ -202,8 +208,8 @@ def visualize_data(db_path, filter=None):
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_title(key)
-        ax.set_xlim([0, 960])
-        ax.set_ylim([0, 540])
+        ax.set_xlim([0, 1])
+        ax.set_ylim([0, 1])
         # plt.show()
         plt.savefig(Path("plots", "visualize_data", key+".png"))
 
@@ -260,5 +266,5 @@ if __name__ == "__main__":
     #                 "GX011574.MP4", "GX011575.MP4", "GX011576.MP4", "GX011566.MP4",
     #                 "GX011567.MP4", "GX011568.MP4", "GX011569.MP4", "GX011570.MP4"]
     # db_path = Path("data", "full_db.pickle")
-    db_path = Path("E:/Src/CapCalibrator/DataSynth/captures")
+    db_path = Path("E:/Src/CapCalibrator/DataSynth/build/captures")
     visualize_data(db_path, filter=None)
