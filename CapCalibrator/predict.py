@@ -58,7 +58,7 @@ def predict_rigid_transform(sticker_locations, args):
     # utils.shuffle_timeseries(sticker_locations)
     # utils.shuffle_data(sticker_locations)
     # utils.mask_data(sticker_locations)
-    model_name = 'scene3_batch16_lr1e4_supershuffle_noise7'
+    model_name = 'scene3_batch16_lr1e4_openpos50'
     model_dir = Path("models")
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     model = keras.models.load_model(str(model_full_name))

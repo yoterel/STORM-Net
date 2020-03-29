@@ -43,8 +43,10 @@ def process_video(vid_path, automation_level, v):  # contains GUI mainloop
         new_db = video_annotator.annotate_videos(vid_path, automation_level, v)
     if Path.is_dir(vid_path):
         vid_names = []
-        for file in vid_path.glob("*.MP4"):
+        for file in sorted(vid_path.glob("*.MP4")):
             vid_names.append(file.name)
+        if v:
+            print("Found following video files:", vid_names)
         data = np.zeros((len(vid_names), 10, 14))
         for i, vid in enumerate(vid_names):
             data[i] = new_db[vid]["data"]

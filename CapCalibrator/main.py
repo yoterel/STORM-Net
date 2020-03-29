@@ -24,7 +24,7 @@ def parse_arguments():
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos19/GX011433.MP4 E:/University/masters/CapTracking/videos/openpos18/openPos18.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos19/openPos19.txt'.split()
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos26/GoPro.MP4 E:/University/masters/CapTracking/videos/openpos25/openPos25.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos26/openPos26.txt'.split()
     # cmd_line = 'E:/University/masters/CapTracking/videos/openpos28/GX011444_Trim.mp4 E:/University/masters/CapTracking/videos/openpos27/openPos27.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos28/openPos28.txt'.split()
-    cmd_line = 'E:/University/masters/CapTracking/videos/openpos53/GX011581.MP4 E:/University/masters/CapTracking/videos/openpos50 -a manual -gt E:/University/masters/CapTracking/videos/openpos53'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/openpos55 E:/University/masters/CapTracking/videos/openpos50 -a manual -gt E:/University/masters/CapTracking/videos/openpos55'.split()
     # cmd_line = 'E:/University/masters/CapTracking/videos/test/GXtest.MP4 E:/University/masters/CapTracking/videos/test_model -a manual -gt E:/University/masters/CapTracking/videos/test'.split()
     args = parser.parse_args(cmd_line)
     args.video = Path(args.video)

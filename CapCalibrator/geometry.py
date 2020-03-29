@@ -74,7 +74,6 @@ def test():
     ])
     #a2 *= 2  # for testing the scale calculation
     a2 += 3  # for testing the translation calculation
-    np.set_printoptions(precision=3)
     t, s, r, sr = last_rt(a1, a2)
     print("R =\n", r)
     print("c =", s)
@@ -160,44 +159,64 @@ def calc_rmse_error(A1, A2):
     return math.sqrt(err/max(A1.shape))
 
 
-def get_sim_data(ed, n_len, n_dep):
+def get_sim_data():##ed=0, n_len=0, n_dep=0, new=False):
     """
     :param ed: distance between eyes in cm
     :param n_len: nose tip distance from its origin
     :param n_dep: nose tip depth compared to eyes
     :return: base-line simulation data with x axis flipped
     """
-    my_sim_data = np.array([[ed / 2, 6, 0],  # AL
-                            [0, 7.21 + n_dep, n_len],  # NZ
-                            [-ed / 2, 6, 0],  # AR
-                            [3, 8, 3.13],  # FP1
-                            [0, 8, 5],  # FPZ
-                            [-3, 8, 3.13],  # FP2
-                            [0, 0, 10]  # CZ
-                            ])
+    # my_sim_data = np.array([[ed / 2, 6, 0],  # AL
+    #                         [0, 7.21 + n_dep, n_len],  # NZ
+    #                         [-ed / 2, 6, 0],  # AR
+    #                         [3, 8, 3.13],  # FP1
+    #                         [0, 8, 5],  # FPZ
+    #                         [-3, 8, 3.13],  # FP2
+    #                         [0, 0, 10]  # CZ
+    #                         ])
+    my_new_sim_data = np.array([[2.44, 5.69, 0],
+                                [0.13, 7.34, -1.21],
+                                [-2.2, 6.12, 0.02],
+                                [3.5, 9.75, 4.66],
+                                [0.36, 9.33, 6.68],
+                                [-3.77, 9.74, 4.87],
+                                [-0.53, 0, 10.98]])
+    my_new_sim_data += [-0.16, -2.11, 0]  # lazy to subtract mask position
+    my_sim_data = my_new_sim_data
     my_sim_data[:, 0] *= -1  # flip x axis, simulator uses right hand rule
     return my_sim_data
 
 
 def find_best_params(data):
-    min_rmse = np.inf
-    best_R = np.zeros((3, 3))
-    best_T = np.zeros((1, 3))
-    eye_distances = np.linspace(3.8, 5.4, num=10)
-    nose_lengths = np.linspace(-1.74, -2.24, num=10)
-    nose_depths = np.linspace(-0.5, 0.5, num=10)
-    for ed in eye_distances:
-        for nl in nose_lengths:
-            for nd in nose_depths:
-                sim_data = get_sim_data(ed, nl, nd)
-                data_t = np.mat(np.transpose(data))
-                sim_data_t = np.mat(np.transpose(sim_data))
-                r, t = rigid_transform_3d(data_t, sim_data_t)
-                recovered_sim_data_t = (r * data_t) + np.tile(t, (1, len(sim_data)))
-                rmse = calc_rmse_error(recovered_sim_data_t, recovered_sim_data_t)
-                if rmse < min_rmse:
-                    min_rmse, best_R, best_T, best_ed, best_nl, best_nd = rmse, r, t, ed, nl, nd
-    return best_R, best_T, best_ed, best_nl, best_nd, min_rmse
+    """
+    :param data: locations of face & cap stickers nx3
+    :return: estimated rotation & translation, and rmse error of estimation between data and simulation data
+    """
+    short_sim_data = get_sim_data()
+    data_t = np.mat(np.transpose(data[3:]))
+    sim_data_t = np.mat(np.transpose(short_sim_data[3:]))
+    r, t = rigid_transform_3d(data_t, sim_data_t)
+    recovered_sim_data_t = (r * data_t) + np.tile(t, (1, len(short_sim_data[3:])))
+    short_rmse = calc_rmse_error(recovered_sim_data_t, sim_data_t)
+    return r, t, short_rmse
+    # min_rmse = np.inf
+    # best_R = np.zeros((3, 3))
+    # best_T = np.zeros((1, 3))
+    # eye_distances = np.linspace(3.8, 5.4, num=10)
+    # nose_lengths = np.linspace(-1.74, -2.24, num=10)
+    # nose_depths = np.linspace(-0.5, 0.5, num=10)
+    # for ed in eye_distances:
+    #     for nl in nose_lengths:
+    #         for nd in nose_depths:
+    #             sim_data = get_sim_data(ed, nl, nd)
+    #             data_t = np.mat(np.transpose(data))
+    #             sim_data_t = np.mat(np.transpose(sim_data))
+    #             r, t = rigid_transform_3d(data_t, sim_data_t)
+    #             recovered_sim_data_t = (r * data_t) + np.tile(t, (1, len(sim_data)))
+    #             rmse = calc_rmse_error(recovered_sim_data_t, sim_data_t)
+    #             if rmse < min_rmse:
+    #                 min_rmse, best_R, best_T, best_ed, best_nl, best_nd = rmse, r, t, ed, nl, nd
+    # return best_R, best_T, best_ed, best_nl, best_nd, min_rmse
 
 
 def get_sticker_data(names, data):
@@ -235,8 +254,8 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
     sticker_data = get_sticker_data(names, base_model_data)
     # sensor_indices = [i for i in range(len(base_model_data)) if i not in face_indices]
     # sensor_data = base_model_data[sensor_indices, :]
-    r_fit, t_fit, ed_fit, nl_fit, nd_fit, rmse = find_best_params(np.vstack((face_data, sticker_data)))
-    sim_data = get_sim_data(ed_fit, nl_fit, nd_fit)
+    r_fit, t_fit, rmse = find_best_params(np.vstack((face_data, sticker_data)))
+    sim_data = get_sim_data()
     # rot_m = R.from_matrix(r_fit)
     # rot_e = rot_m.as_euler('xyz', degrees=True)
 
@@ -273,12 +292,11 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
                          names_red=["FP1", "FPZ", "FP2", "Cz"],
                          title="Prediction(base model) & gt in real-space - translation corrected")
         rmse_1 = calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T)
-        if v:
-            print("Stickers RMSE error (prediction, gt):", rmse_1)
         base_data = np.mat(np.transpose(sticker_data))
         gt_data = np.mat(np.transpose(gt_sticker_data))
         ret_R, ret_t = rigid_transform_3d(base_data, gt_data)
         if v > 1:
+            print("Stickers RMSE error (prediction, gt):", rmse_1)
             print("Here is the translation between GT and base model:", ret_t)
         recovered_gt = (ret_R * base_data) + np.tile(ret_t, (1, len(base_data.T)))
         rmse_2 = calc_rmse_error(recovered_gt, gt_data)
@@ -287,11 +305,11 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
         pred_rot_m = R.from_matrix(r_matrix)
         pred_rot_e = pred_rot_m.as_euler('xyz', degrees=True)
         if v:
+            print("Euler Angles RMSE (Horns, Network):", mean_squared_error(gt_rot_e, pred_rot_e, squared=False))
+        if v > 1:
             print("Horns Euler angels:", gt_rot_e)
             print("Network Euler angels:", pred_rot_e)
-        if v > 1:
             print("RMSE error (horn's(baseline), gt):", rmse_2)
-            print("Euler Angles RMSE (Horns, Network):", mean_squared_error(gt_rot_e, pred_rot_e, squared=False))
         if plot:
             visualize.visualize_pc(recovered_gt.T,
                          ["FP1", "FPZ", "FP2", "Cz"],

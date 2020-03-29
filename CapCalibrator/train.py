@@ -12,8 +12,8 @@ from tensorflow.python.keras.callbacks import TensorBoard
 from sklearn.metrics import mean_squared_error
 
 # set paths
-model_name = 'scene3_batch16_lr1e4_supershuffle_noise7'
-pretrained_model_name = None
+model_name = 'scene3_batch16_lr1e4_openpos50'
+pretrained_model_name = 'scene3_batch16_lr1e4_supershuffle_noise5'
 root_dir = Path("/disk1/yotam/capnet")
 data_dir = Path.joinpath(root_dir, "scene3_100k")
 model_dir = Path.joinpath(root_dir, "models")

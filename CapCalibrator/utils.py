@@ -111,7 +111,7 @@ def load_db(root_dir):
     X = []
     Y = []
     for file in sorted(root_dir.glob("*.json")):
-        x, y = extract_session_data(file, use_scale=True)
+        x, y = extract_session_data(file, use_scale=False)
         if x is not None:
             X.append(x)
             Y.append(y)
