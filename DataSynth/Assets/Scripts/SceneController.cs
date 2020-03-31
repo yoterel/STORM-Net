@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SceneController3 : MonoBehaviour
+public class SceneController : MonoBehaviour
 {
     public ImageSynthesis synth;
     private Camera cam;
@@ -122,25 +122,41 @@ public class SceneController3 : MonoBehaviour
     }
     void setFaceStickersProperties()
     {
+        //set face stickers to initial position
         string[] names = new string[] {"AL", "NZ", "AR"};
         for (int i = 0; i < names.Length; i++)
         {
             GameObject sticker = GameObject.Find(names[i]);
-            sticker.transform.localPosition = initial_sticker_positions[i];
+            sticker.transform.position = initial_sticker_positions[i];
         }
-        //set eye distance
-        //float eye_dist = Random.Range(3.8f, 5.4f);
-        //float eye_dist = Random.Range(2f, 8f);
-        //GameObject AR = GameObject.Find("AR");
-        //GameObject AL = GameObject.Find("AL");
-        //AR.transform.position = new Vector3(-eye_dist / 2, AR.transform.position.y, AR.transform.position.z);
-        //AL.transform.position = new Vector3(eye_dist / 2, AL.transform.position.y, AL.transform.position.z);
-        //set nose distance
-        float nose_drop = Random.Range(0f, 0.5f);
-        float nose_depth = Random.Range(-0.5f, 0.5f);
+        //set eye distance randomly but keep them in same plane
+        GameObject AR = GameObject.Find("AR");
+        GameObject AL = GameObject.Find("AL");
+        Vector3 diff = AR.transform.position - AL.transform.position;
+        Vector3 add = AR.transform.position + AL.transform.position;
+        Vector3 direction = diff.normalized;
+        Vector3 middle_point = add / 2;
+        float eye_dist = Random.Range(4f, 5.5f); //hard coded pupilary distance range
+        AR.transform.position = middle_point + (direction * eye_dist / 2);
+        AL.transform.position = middle_point - (direction * eye_dist / 2);
+        //set nose exactly between the 2 eyes in x axis
         GameObject NZ = GameObject.Find("NZ");
+        Vector3 temp = NZ.transform.position;
+        temp.x = middle_point.x;
+        NZ.transform.position = temp;
+        //set additional nose parameters ("drop" & "depth")
+        float nose_drop = Random.Range(0f, 1f);
+        float nose_depth = Random.Range(-0.5f, 0.5f);
+        
         NZ.transform.position += NZ.transform.TransformDirection(Vector3.back) * nose_drop;
         NZ.transform.position += NZ.transform.TransformDirection(Vector3.up) * nose_depth;
+        //sanity check: if nose passes eye depth, clip it to eye depth.
+        if (NZ.transform.position.y < AR.transform.position.y)
+        {
+            temp = NZ.transform.position;
+            temp.y = AR.transform.position.y;
+            NZ.transform.position = temp;
+        }
     }
     void setMaskProperties()
     {

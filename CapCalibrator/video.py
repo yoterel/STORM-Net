@@ -5,7 +5,6 @@ import video_annotator
 from pathlib import Path
 
 def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0):
-
     # Read an image, a window and bind the function to window
     # cap = cv2.VideoCapture(str(video_path))
     reader = imageio.get_reader(vid_path, 'ffmpeg')

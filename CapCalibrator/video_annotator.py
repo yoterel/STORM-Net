@@ -22,13 +22,15 @@ frames =[]
 ### GLOBALS FOR GUI ###
 
 
-def process_video(vid_path, dump_frames=False, starting_frame=0, force_reselect=False):
+def process_video(vid_path, dump_frames=False, starting_frame=0, force_reselect=False, v=0):
     pickle_path = Path.joinpath(Path("data"), vid_path.name+"_frames.pickle")
     if pickle_path.is_file() and not force_reselect:
         f = open(pickle_path, 'rb')
         frames, indices = pickle.load(f)
         f.close()
     else:
+        if v:
+            print("Selecting frames for video:", vid_path)
         frames, indices = video.select_frames(vid_path, steps_per_datapoint=10, starting_frame=starting_frame)
         if dump_frames:
             f = open(pickle_path, 'wb')
@@ -106,7 +108,7 @@ def annotate_videos(video_path, automation_level="auto", v=0):  # contains GUI m
     else:
         for file in video_path.glob("*.MP4"):
             paths.append(file)
-    frames, indices = process_video(paths[video_number], dump_frames=True)
+    frames, indices = process_video(paths[video_number], dump_frames=True, v=v)
     new_db = load_full_db()
     if paths[video_number].name not in new_db.keys():
         if automation_level == "semi-auto" or automation_level == "auto":
@@ -211,7 +213,7 @@ def annotate_videos(video_path, automation_level="auto", v=0):  # contains GUI m
         current_starting_frame_index = new_db[current_video]["frame_indices"][0]
         frames, indices = process_video(paths[video_number],
                                         dump_frames=True,
-                                        starting_frame=current_starting_frame_index+100,
+                                        starting_frame=current_starting_frame_index+60,
                                         force_reselect=True)
         new_db[current_video]["frame_indices"] = indices
         frame_number = 0
