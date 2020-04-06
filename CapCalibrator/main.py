@@ -12,7 +12,7 @@ def parse_arguments():
     parser.add_argument("video", help="The path to the video file to calibrate sensors with.")
     parser.add_argument("model", help="The base model file path given in space delimited csv format of size nx3.")
     parser.add_argument("-gt", "--ground_truth", help="The ground truth file path to compare results to given in space delimited csv format of size nx3.")
-    parser.add_argument("-a", "--automation_level", type=str, choices=["manual", "semi-auto", "auto"],
+    parser.add_argument("-m", "--mode", type=str, choices=["manual", "semi-auto", "auto", "special"],
                         default="semi-auto",
                         help="Controls whether to automatically or manually annotate the stickers in the video.")
     parser.add_argument("-o", "--output_file", help="The output csv file with calibrated results (given in MNI coordinates)")
@@ -20,12 +20,9 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    # cmd_line = 'E:/University/masters/CapTracking/videos/openpos20/GX011434.MP4 E:/University/masters/CapTracking/videos/openpos18/openPos18.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos20/openPos20.txt'.split()
-    # cmd_line = 'E:/University/masters/CapTracking/videos/openpos19/GX011433.MP4 E:/University/masters/CapTracking/videos/openpos18/openPos18.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos19/openPos19.txt'.split()
-    # cmd_line = 'E:/University/masters/CapTracking/videos/openpos26/GoPro.MP4 E:/University/masters/CapTracking/videos/openpos25/openPos25.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos26/openPos26.txt'.split()
-    # cmd_line = 'E:/University/masters/CapTracking/videos/openpos28/GX011444_Trim.mp4 E:/University/masters/CapTracking/videos/openpos27/openPos27.txt -a manual -gt E:/University/masters/CapTracking/videos/openpos28/openPos28.txt'.split()
-    # cmd_line = 'E:/University/masters/CapTracking/videos/openpos55 E:/University/masters/CapTracking/videos/openpos50 -a manual -gt E:/University/masters/CapTracking/videos/openpos55'.split()
-    cmd_line = 'E:/University/masters/CapTracking/videos/1809b/GX011446.MP4 E:/University/masters/CapTracking/videos/openpos50 -a manual'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/3911a/GX011635.MP4 E:/University/masters/CapTracking/videos/openpos50 -m manual -v 1'.split()
+    # cmd_line = '/disk1/yotam/capnet/openPos/openPos55/GX011592.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m special -gt /disk1/yotam/capnet/openPos/openPos55'.split()
+    # cmd_line = '/disk1/yotam/capnet/openPos/real_babies/1778b/GX011447.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m manual -v 1'.split()
     args = parser.parse_args(cmd_line)
     args.video = Path(args.video)
     # if Path.is_dir(args.video):
@@ -50,7 +47,7 @@ def save_results(projected_data, output_file, v):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    sticker_locations = video.process_video(args.video, args.automation_level, args.verbosity)  # nx10x14 floats
+    sticker_locations = video.process_video(args)  # nx10x14 floats
     r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, args)
     sensor_locations = geometry.apply_rigid_transform(r_matrix,
                                                       s_matrix,

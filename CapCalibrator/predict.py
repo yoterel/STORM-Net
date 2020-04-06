@@ -58,7 +58,7 @@ def predict_rigid_transform(sticker_locations, args):
     # utils.shuffle_timeseries(sticker_locations)
     # utils.shuffle_data(sticker_locations)
     # utils.mask_data(sticker_locations)
-    model_name = 'scene3_batch16_lr1e4_openpos50'
+    model_name = 'scene3_batch16_lr1e4_openpos50_2'
     model_dir = Path("models")
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     model = keras.models.load_model(str(model_full_name))
@@ -110,9 +110,13 @@ def get_facial_landmarks(frames, v):
         if len(rects) > 1:
             if v:
                 print("Warning: found more than 1 face in frame:", j)
+            rects = [max(rects, key=lambda x: x.top())]  # select bottom most
+        if rects:
+            if rects[0].top() < 100:
+                rects = []
         for (i, rect) in enumerate(rects):
             # Make the prediction and transform it to numpy array
-            plt.imshow(img_data)
+            # plt.imshow(img_data)
             landmarks = predictor(img_data, rect)
             landmarks = face_utils.shape_to_np(landmarks)
             # plt.scatter([landmarks[0:68, 0]], [landmarks[0:68, 1]], c='r', s=1)

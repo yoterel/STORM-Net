@@ -181,7 +181,7 @@ def get_sim_data():##ed=0, n_len=0, n_dep=0, new=False):
                                 [0.36, 9.33, 6.68],
                                 [-3.77, 9.74, 4.87],
                                 [-0.53, 0, 10.98]])
-    my_new_sim_data += [-0.16, -2.11, 0]  # lazy to subtract mask position
+    my_new_sim_data[3:] += [-0.16, -2.11, 0]  # lazy to subtract mask position
     my_sim_data = my_new_sim_data
     my_sim_data[:, 0] *= -1  # flip x axis, simulator uses right hand rule
     return my_sim_data
@@ -264,10 +264,10 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
     temp_sticker_data = get_sticker_data(names, base_model_data_in_sim_space.T)
     if plot:
         visualize.visualize_pc(np.vstack((base_model_data_in_sim_space.T[face_indices, :], temp_sticker_data)),
-                     ["Left_Eye", "Nose", "Right_Eye", "CZ", "FP1", "FPZ", "FP2"],
-                     sim_data,
-                     ["Left_Eye", "Nose", "Right_Eye", "Cz", "FP1", "FPZ", "FP2"],
-                     title="Base model data vs simulation baseline data in sim-space")
+                               ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "CZ"],
+                               sim_data,
+                               ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "Cz"],
+                               title="Base model data vs simulation baseline data in sim-space")
 
     #  apply network transformation
     transformed_base_model_data = r_matrix * (s_matrix * base_model_data_in_sim_space)

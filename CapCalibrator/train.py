@@ -12,8 +12,8 @@ from tensorflow.python.keras.callbacks import TensorBoard
 from sklearn.metrics import mean_squared_error
 
 # set paths
-model_name = 'scene3_batch16_lr1e4_openpos50'
-pretrained_model_name = 'scene3_batch16_lr1e4_supershuffle_noise5'
+model_name = 'scene3_batch16_lr1e4_openpos50_2'
+pretrained_model_name = 'scene3_batch16_lr1e4_openpos50'
 root_dir = Path("/disk1/yotam/capnet")
 data_dir = Path.joinpath(root_dir, "scene3_100k")
 model_dir = Path.joinpath(root_dir, "models")
@@ -30,7 +30,7 @@ stdout = sys.stdout
 redirect_sysout = True
 batch_size = 16
 learning_rate = 1e-4
-early_stopping_patience = 20
+early_stopping_patience = 10
 reduce_lr_patience = 3
 epochs = 2000
 verbosity = 1  # set verbosity of fit

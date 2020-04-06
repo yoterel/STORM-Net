@@ -7,7 +7,8 @@ from pathlib import Path
 import pickle
 import numpy as np
 import utils
-
+import video_annotator
+from PIL import Image
 
 def visualize_network_performance(model_name, root_dir):
     #############################################################
@@ -172,6 +173,25 @@ def fix_db(db):
             db[key]["frame_indices"] = db[key]["frame_indices"][:-1]
     return db
 
+# def fix_special_db(db):
+#     fresh_db = {}
+#     special_db_path = Path.joinpath(Path("data"), "full_db_special.pickle")
+#     for key in db.keys():
+#         fresh_db.setdefault(key[:-3], []).append({"data": db[key]["data"],
+#                                                   "label": db[key]["label"],
+#                                                   "frame_indices": db[key]["frame_indices"]})
+#     save_full_db(fresh_db, special_db_path)
+#     print("done")
+
+# def fix_normal_db(db):
+#     fresh_db = {}
+#     db_path = Path.joinpath(Path("data"), "full_db.pickle")
+#     for key in db.keys():
+#         fresh_db.setdefault(key, []).append({"data": db[key]["data"],
+#                                                   "label": db[key]["label"],
+#                                                   "frame_indices": db[key]["frame_indices"]})
+#     save_full_db(fresh_db, db_path)
+#     print("done")
 
 def visualize_data(db_path, filter=None):
     my_format = "pickle" if db_path.suffix == ".pickle" else "json"
@@ -255,7 +275,24 @@ def visualize_pc(points_blue, names_blue, points_red=None, names_red=None, title
     # plt.savefig(output_file)
 
 
+def doSFM(video_path):
+    video_name = "GX011635.MP4"
+    # full_db = video_annotator.load_full_db()
+    # frames_indices = full_db[video_name]
+    frames, indices = video_annotator.process_video(video_path,
+                                                    dump_frames=False,
+                                                    starting_frame=0,
+                                                    force_reselect=False,
+                                                    frame_indices=None,
+                                                    v=0)
+    for i, frame in enumerate(frames):
+        # im = Image.fromarray(frame)
+        frame.save("plots/sfm/IM{:03d}.jpg".format(i))
+
 if __name__ == "__main__":
+
+    doSFM(Path("E:/University/masters/CapTracking/videos/3911a/GX011635.MP4"))
+    print("done")
     # model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
     # root_dir = Path("/disk1/yotam/capnet")
     #
@@ -266,5 +303,6 @@ if __name__ == "__main__":
     #                 "GX011574.MP4", "GX011575.MP4", "GX011576.MP4", "GX011566.MP4",
     #                 "GX011567.MP4", "GX011568.MP4", "GX011569.MP4", "GX011570.MP4"]
     # db_path = Path("data", "full_db.pickle")
-    db_path = Path("E:/Src/CapCalibrator/DataSynth/build/captures")
-    visualize_data(db_path, filter=None)
+
+    # db_path = Path("E:/Src/CapCalibrator/DataSynth/build/captures")
+    # visualize_data(db_path, filter=None)
