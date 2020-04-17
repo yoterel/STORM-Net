@@ -4270,20 +4270,20 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'AL: 518.9 270.0
+  m_text: 'AL: 519.9 270.0
 
-    NZ: 482.2 249.5
+    NZ: 480.2 247.9
 
-    AR: 444.4 270.3
+    AR: 439.5 270.3
 
-    FP1: 537.1
-    349.7
+    FP1: 539.6
+    356.3
 
-    FPZ: 471.2 385.8
+    FPZ: 468.3 395.3
 
-    FP2: 412.9 353.2
+    FP2: 405.0 360.2
 
-    CZ: 471.3 408.4
+    CZ: 469.2 416.7
 
 '
   m_isRightToLeft: 0
