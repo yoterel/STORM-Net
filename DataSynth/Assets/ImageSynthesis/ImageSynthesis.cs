@@ -15,7 +15,7 @@ using System.IO;
 //      2) rendering several cameras with different aspect ratios - vectors do stretch to the sides of the screen
 
 [RequireComponent (typeof(Camera))]
-[ExecuteInEditMode]
+// [ExecuteInEditMode]
 public class ImageSynthesis : MonoBehaviour {
     public Shader uberReplacementShader;
 

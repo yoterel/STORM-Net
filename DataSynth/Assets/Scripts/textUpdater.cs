@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
-[ExecuteInEditMode]
+//[ExecuteInEditMode]
 public class textUpdater : MonoBehaviour
 {
     private TextMeshProUGUI textMesh;

@@ -94,7 +94,7 @@ public class SceneController : MonoBehaviour
         iterationsString = GetArg("-save_image");
         if (!bool.TryParse(iterationsString, out saveImage))
         {
-            saveImage = true;
+            saveImage = false;
         }
         iterationsString = GetArg("-save_data");
         if (!bool.TryParse(iterationsString, out saveData))
@@ -156,7 +156,7 @@ public class SceneController : MonoBehaviour
         }
         else
         {
-            string[] alias = { "LeftEye", "NoseTip", "RightEye", "Fp1", "Fpz", "Fp2", "Cz" };
+            string[] alias = { "lefteye", "nosetip", "righteye", "fp1", "fpz", "fp2", "cz" };
             string fileData = System.IO.File.ReadAllText(inputFile);
             string[] lines = fileData.Split("\n"[0]);
             for (int i = 0; i < lines.Length; i++)
@@ -164,7 +164,7 @@ public class SceneController : MonoBehaviour
                 string[] lineData = (lines[i].Trim()).Split(" "[0]);
                 if (lineData[0] != "")
                 {
-                    string name = lineData[0];
+                    string name = lineData[0].ToLower();
                     int index = System.Array.IndexOf(alias, name);
                     if (index != -1)
                     {
@@ -177,14 +177,15 @@ public class SceneController : MonoBehaviour
                     }
                 }
             }
+            int j = 0;
             foreach (bool entry in filled)
             {
-                System.Console.WriteLine("Parsing entry {0}", entry);
                 if (!entry)
                 {
-                    System.Console.WriteLine("Error finding sticker with alias: " + name + ". Falling back to default.");
+                    System.Console.WriteLine("Error finding sticker with alias: " + alias[j] + ". Falling back to default.");
                     return defaultPositions;
                 }
+                j++;
             }
             /* user is instructed to input data where the x axis positive direction is from left eye to right eye (right handed system),
                yet simulation uses oposite direction intrinsically (left handed system) */
@@ -199,10 +200,16 @@ public class SceneController : MonoBehaviour
 
     private bool verifyStickerPositions(Vector3[] positions)
     {
+        System.Console.WriteLine("Please note: renderer expects input to be in right-handed coordiante system (and internally switches to left-handed).");
         // just some sanity checks on input
         if (positions[0].x < positions[2].x)
         {
             System.Console.WriteLine("Sanity check failed. Left-Eye sticker x smaller than Right-Eye sticker.");
+            return false;
+        }
+        if (positions[3].x < positions[5].x)
+        {
+            System.Console.WriteLine("Sanity check failed. fp1 sticker x smaller than fp2 sticker.");
             return false;
         }
         if (positions[6].y != 0f)
@@ -256,9 +263,9 @@ public class SceneController : MonoBehaviour
             initial_sticker_positions[i] = sticker.transform.localPosition;
         }
         //set occlusion object position using Fp2
-        GameObject occlusion = GameObject.Find("Occlusion");
-        Vector3 occlusion_loc = new Vector3 { x = stickerPositions[5].x - 2f, y = stickerPositions[5].y, z = stickerPositions[5].z -1.5f};
-        occlusion.transform.localPosition = occlusion_loc;
+        //GameObject occlusion = GameObject.Find("Occlusion");
+        //Vector3 occlusion_loc = new Vector3 { x = stickerPositions[5].x - 2f, y = stickerPositions[5].y, z = stickerPositions[5].z -1.5f};
+        //occlusion.transform.localPosition = occlusion_loc;
 
         startOrientation = face.transform.rotation;
         face.transform.position = faceInitialPosition;

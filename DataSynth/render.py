@@ -10,16 +10,24 @@ def parse_arguments():
     parser.add_argument("output", help="The path where rendered images / data will be created")
     parser.add_argument("--iterations", type=int, default=20, help="Number of rendering iterations (10 images from each)")
     parser.add_argument("--exe", default="renderer.exe", help="The path to the renderer executable.")
+    parser.add_argument("--log", default="log.txt", help="The path to the output log file from renderer.")
     parser.add_argument("--transform", "--transform_input", default=False, action='store_true', help="Input template file will be transformed to comply with renderer. Intermediate result will be saved to 'template_transformed.txt'.")
     parser.add_argument("--images", "--save_images", default=False, action='store_true', help="Renderer will output images (in addition to formatted data)")
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = './../DataSynth/example_model2_full.txt ./../DataSynth/build/output --exe ./../DataSynth/build/UnityCap.exe --transform_input'.split()
-    args = parser.parse_args(cmd_line)
+    # cmd_line = './../example_models/example_model2.txt ./build/output --exe ./build/UnityCap.exe --log ./build/log.txt --transform_input --iterations 30000'.split()
+    args = parser.parse_args()
     args.exe = Path(args.exe)
+    args.log = Path(args.log)
     args.template = Path(args.template)
     args.output = Path(args.output)
+    if args.output.is_dir():
+        print("Warning! output folder already exists (data will be overridden) ok?")
+        val = input("y / n\n")
+        if val == "n":
+            print("Aborting renderer launch.")
+            exit()
     args.output.mkdir(parents=True, exist_ok=True)
     return args
 
@@ -58,7 +66,11 @@ def check_right_handed_system(names, data):
         if (xdir > 0 and ydir > 0) or (xdir < 0 and ydir < 0):
             return [1, 1, -1]
         else:
-            return [-1, -1, -1]
+            if xdir > 0:
+                return [1, -1, -1]
+            else:
+                return [-1, 1, -1]
+
 
 def fix_yaw(names, data):
     leftEye = names.index('lefteye')
@@ -92,22 +104,21 @@ def save_intermediate(names, data):
 
 
 def launch_renderer(args):
-    cmd = [str(args.exe),
-           #"-batchmode",
-           "-logFile log.txt",
-           "-iterations {}".format(args.iterations),
-           "-input_file {}".format(str(args.template.resolve())),
-           "-output_folder {}".format(str(args.output.resolve()))]
+    cmd = str(args.exe) + \
+          " -logFile {}".format(str(args.log.resolve())) +\
+          " -iterations {}".format(args.iterations) +\
+          " -input_file {}".format(str(args.template.resolve())) +\
+          " -output_folder {}".format(str(args.output.resolve())) +\
+          " -batchmode"
     if args.images:
-        cmd.append("-save_image true")
-
+        cmd += " -save_image True"
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    print("Renderer launched as daemon.")
 
 
 if __name__ == "__main__":
     args = parse_arguments()
     names, data = read_file(args.template)
-
     if args.transform:
         flip_axis = check_right_handed_system(names, data)
         data[:, 0] *= flip_axis[0]
@@ -117,4 +128,4 @@ if __name__ == "__main__":
         save_intermediate(names, data)
         args.template = Path("template_transformed.txt")
     launch_renderer(args)
-    print("Done!")
+    print("See", args.log.resolve(), "for detailed renderer log.")

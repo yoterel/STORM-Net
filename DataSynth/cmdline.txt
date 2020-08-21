@@ -1,0 +1,1 @@
+python render.py ./../example_models/example_model2.txt ./build/output --exe ./build/UnityCap.exe --log ./build/log.txt --transform_input --iterations 30000
