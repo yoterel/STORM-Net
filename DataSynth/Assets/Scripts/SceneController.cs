@@ -12,10 +12,12 @@ public class SceneController : MonoBehaviour
     private bool shiftCamera;
     private bool rotateCamera;
     private string inputFile;
+    private string outputFolder;
     //private parameters
     private Camera cam;
     private GameObject camHolder;
     private string[] stickerNames;
+    private Dictionary<string, Vector3> stickerDictionary;
     private Vector3 camHolderInitialPosition;
     private Vector3 targetCamHolderPosition;
     private Vector3 camHolderInitialRotation;
@@ -42,6 +44,11 @@ public class SceneController : MonoBehaviour
     void Awake()
     {
         stickerNames = new string[] { "AL", "NZ", "AR", "FP1", "FPZ", "FP2", "CZ" };
+        Dictionary<string, Vector3> stickerDictionary = new Dictionary<string, Vector3>();
+        foreach (string sticker in stickerNames)
+        {
+            stickerDictionary.Add(sticker, Vector3.zero);
+        }
         camHolderInitialPosition = new Vector3(0f, 25f, 0);
         camHolderInitialRotation = new Vector3(90f, 0f, 0f);
         faceInitialPosition = new Vector3(0f, 0f, 0f);
@@ -113,17 +120,28 @@ public class SceneController : MonoBehaviour
         {
             inputFile = iterationsString;
         }
+        iterationsString = GetArg("-output_folder");
+        if (string.IsNullOrEmpty(iterationsString))
+        {
+            outputFolder = "captures";
+        }
+        else
+        {
+            outputFolder = iterationsString;
+        }
         System.Console.WriteLine("Running {0} iterations", numberOfIterations);
         System.Console.WriteLine("Saving image to disk == {0}", saveImage);
         System.Console.WriteLine("Saving data to disk == {0}", saveData);
         System.Console.WriteLine("Camera shift enabled == {0}", shiftCamera);
         System.Console.WriteLine("Camera rotation enabled == {0}", rotateCamera);
         System.Console.WriteLine("Input file: " + inputFile);
+        System.Console.WriteLine("Output folder: " + outputFolder);
     }
 
     private Vector3[] readStickerLocations()
     {
         Vector3[] positions = new Vector3[7];
+        bool[] filled = new bool[7] { false, false, false, false, false, false, false };
         Vector3[] defaultPositions = new Vector3[] {
                 new Vector3 {x = 2.44f, y = 5.69f, z = 0f },
                 new Vector3 {x = 0.13f, y = 7.34f, z = -1.21f },
@@ -138,7 +156,7 @@ public class SceneController : MonoBehaviour
         }
         else
         {
-            string[] alias = { "LeftEye", "Nose", "RightEye", "Fp1", "Fpz", "Fp2", "Cz" };
+            string[] alias = { "LeftEye", "NoseTip", "RightEye", "Fp1", "Fpz", "Fp2", "Cz" };
             string fileData = System.IO.File.ReadAllText(inputFile);
             string[] lines = fileData.Split("\n"[0]);
             for (int i = 0; i < lines.Length; i++)
@@ -155,15 +173,21 @@ public class SceneController : MonoBehaviour
                         float.TryParse(lineData[2], out y);
                         float.TryParse(lineData[3], out z);
                         positions[index] = new Vector3 { x = x, y = y, z = z };
-                    }
-                    else
-                    {
-                        System.Console.WriteLine("Error finding sticker with alias: " + name + ". Falling back to default.");
-                        return defaultPositions;
+                        filled[index] = true;
                     }
                 }
             }
-            //user is instructed to input data where the x axis positive direction is from left eye to right eye, yet simulation uses oposite direction intrinsically.
+            foreach (bool entry in filled)
+            {
+                System.Console.WriteLine("Parsing entry {0}", entry);
+                if (!entry)
+                {
+                    System.Console.WriteLine("Error finding sticker with alias: " + name + ". Falling back to default.");
+                    return defaultPositions;
+                }
+            }
+            /* user is instructed to input data where the x axis positive direction is from left eye to right eye (right handed system),
+               yet simulation uses oposite direction intrinsically (left handed system) */
             for (int i = 0; i < positions.Length; i++)
             {
                 positions[i].x *= -1;
@@ -202,10 +226,12 @@ public class SceneController : MonoBehaviour
     private Vector3[] centerStickerPostions(Vector3[] positions)
     {
         Vector3[] centeredPositions = positions;
+        //todo: estimate better center of brain (nose bridge, Inion, right ear and left ear)
+        //todo: add scaling and rotating
         float my_x = (positions[0].x + positions[2].x) / 2;
         float my_y = positions[6].y;
         float my_z = (positions[0].z + positions[2].z) / 2;
-        // calc center of brain as pivoting point
+        // calc "center of brain" as pivoting point
         Vector3 pivot_point = new Vector3(my_x, my_y, my_z);
         for (int i = 0; i < positions.Length; i++)
         {
@@ -428,7 +454,7 @@ public class SceneController : MonoBehaviour
             {
                 yield return new WaitForEndOfFrame();
                 string filename = $"image_{iterationCount.ToString().PadLeft(6, '0')}_{frameCounter.ToString().PadLeft(3, '0')}";
-                synth.Save(filename, img_width, img_height, "captures", 1, saveImage, saveData);
+                synth.Save(filename, img_width, img_height, outputFolder, 1, saveImage, saveData);
                 amount += Time.fixedDeltaTime * speed;
                 face.transform.rotation = startOrientation * Quaternion.AngleAxis(amount, axis);
                 //float x = Random.Range(-1f, 1f) * magxyz;

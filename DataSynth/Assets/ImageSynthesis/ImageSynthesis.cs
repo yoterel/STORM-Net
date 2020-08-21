@@ -277,8 +277,9 @@ public class ImageSynthesis : MonoBehaviour {
         //Debug.Log(json);
         var filenameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
         filenameWithoutExtension = filenameWithoutExtension.Substring(0, 12);
-        File.AppendAllText("captures/" + filenameWithoutExtension + ".json",
-                   json + System.Environment.NewLine);
+        var parent = System.IO.Directory.GetParent(filename).FullName;
+        var full_path = Path.Combine(parent, filenameWithoutExtension + ".json");
+        File.AppendAllText(full_path, json + System.Environment.NewLine);
         //File.WriteAllText("captures/" + filenameWithoutExtension + ".json", json);
     }
     private class SaveObject
