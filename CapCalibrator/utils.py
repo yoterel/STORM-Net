@@ -141,12 +141,13 @@ def extract_session_data(file, use_scale=True):
         sticker_2d_locs = [[member[0]['x'] * rescalex, member[0]['y'] * rescaley] for (i, member) in enumerate(zip(sticker_3d_locs, valid_stickers))]
         if i == 0:
             number_of_features = len(sticker_2d_locs) * 2
-        for i in range(len(valid_stickers)):
-            if not valid_stickers[i]:
-                sticker_2d_locs[i] = [0, 0]
+        for j in range(len(valid_stickers)):
+            if not valid_stickers[j]:
+                sticker_2d_locs[j] = [0, 0]
             else:
                 sticker_count += 1
-        if sticker_2d_locs[0] == [0, 0] or sticker_2d_locs[1] == [0, 0] or sticker_2d_locs[2] == [0, 0]:
+        # if one of face stickers is missing, mark all of them as missing
+        if sticker_2d_locs[0] == [0, 0] or sticker_2d_locs[1] == [0, 0] or sticker_2d_locs[2] == [0, 0] or i >= 7:
             sticker_2d_locs[0] = [0, 0]
             sticker_2d_locs[1] = [0, 0]
             sticker_2d_locs[2] = [0, 0]
@@ -258,6 +259,7 @@ def center_data(x):
         b[ndx, :, 1::2] += np.expand_dims(0.5 - yvec_cent, axis=1)
     b[zero_indices] = 0
     return
+
 
 def perturb_data(x):
     """
