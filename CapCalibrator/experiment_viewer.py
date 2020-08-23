@@ -107,7 +107,7 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = "E:/Src/CapCalibrator/example_models/experiment_model.txt".split()
+    cmd_line = "./../example_models/experiment_model.txt".split()
     args = parser.parse_args(cmd_line)
     args.template = Path(args.template)
     return args
@@ -179,7 +179,7 @@ def plot_experiment(ax, data):
     ax.add_artist(d)
     for i, (c, x, y, z) in enumerate(zip(colors, data[:, 0], data[:, 1], data[:, 2])):
         ax.scatter(x, y, z, marker='o', c=c)
-        ax.text(x + 0.2, y + 0.2, z + 0.2, '%s' % (str(i)), size=6, zorder=1, color='k')
+        ax.text(x + 0.2, y + 0.2, z + 0.2, '%s' % (str(i+1)), size=6, zorder=1, color='k')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
