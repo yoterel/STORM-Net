@@ -11,6 +11,7 @@ import numpy as np
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 
+
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):
         FancyArrowPatch.__init__(self, (0,0), (0,0), *args, **kwargs)
@@ -107,7 +108,7 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    # cmd_line = "./../example_models/experiment_model.txt".split()
+    cmd_line = "./../example_models/experiment_model.txt".split()
     args = parser.parse_args()
     args.template = Path(args.template)
     return args
@@ -132,6 +133,7 @@ def read_template_file(template_path):
 
 def key_press_callback(event, data):
     global selected
+    total_data_points = len(data)
     ax = event.inaxes
     # ax.autoscale(enable=False, axis='both')
     # Rotational movement
@@ -146,9 +148,17 @@ def key_press_callback(event, data):
     elif event.key == "a":
         azim -= 10
     elif event.key == "right":
-        selected += 1
+        if selected < total_data_points-1:
+            selected += 1
+        else:
+            return
     elif event.key == "left":
-        selected -= 1
+        if selected > 0:
+            selected -= 1
+        else:
+            return
+    elif event.key == "backspace":
+        selected = 0
     else:
         return
     ax.cla()
@@ -170,13 +180,14 @@ def plot_experiment(ax, data):
     c = Arrow3D([data_min[0], data_min[0]], [data_min[1], data_min[1]],
                 [data_min[2], data_min[2]+3], mutation_scale=10,
                 lw=1, arrowstyle="-|>", color="r")
-    d = Arrow3D([data[selected, 0], data[selected+1, 0]], [data[selected, 1], data[selected+1, 1]],
-                [data[selected, 2], data[selected+1, 2]], mutation_scale=10,
-                lw=1, arrowstyle="-|>", color="r")
+    if selected < len(data) - 1:
+        d = Arrow3D([data[selected, 0], data[selected+1, 0]], [data[selected, 1], data[selected+1, 1]],
+                    [data[selected, 2], data[selected+1, 2]], mutation_scale=10,
+                    lw=1, arrowstyle="-|>", color="r")
+        ax.add_artist(d)
     ax.add_artist(a)
     ax.add_artist(b)
     ax.add_artist(c)
-    ax.add_artist(d)
     for i, (c, x, y, z) in enumerate(zip(colors, data[:, 0], data[:, 1], data[:, 2])):
         ax.scatter(x, y, z, marker='o', c=c)
         ax.text(x + 0.2, y + 0.2, z + 0.2, '%s' % (str(i+1)), size=6, zorder=1, color='k')
@@ -186,7 +197,7 @@ def plot_experiment(ax, data):
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.set_zticklabels([])
-    ax.set_title('Point {} (WASD: change view, Arrows: next/previous point)'.format(selected))
+    ax.set_title('Point {} (WASD: change view, Arrows: next/previous point)'.format(selected+1))
 
 
 if __name__ == "__main__":
