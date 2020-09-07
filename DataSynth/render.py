@@ -73,6 +73,14 @@ def check_right_handed_system(names, data):
 
 
 def fix_yaw(names, data):
+    """
+    given sticker names and data (nx3),
+    rotates data such that x axis is along the vector going from left to right (using 6 fiducials),
+    and z is pointing upwards.
+    :param names:
+    :param data:
+    :return:
+    """
     leftEye = names.index('lefteye')
     rightEye = names.index('righteye')
     leftEar = names.index('leftear')

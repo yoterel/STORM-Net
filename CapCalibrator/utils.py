@@ -22,6 +22,17 @@ from keras_unet.models import custom_unet
 import matplotlib.pyplot as plt
 
 
+def pairwise(iterable):
+    """
+    turns an iterable into a pairwise iterable
+    "s -> (s0, s1), (s2, s3), (s4, s5), ..."
+    :param iterable:
+    :return:
+    """
+    a = iter(iterable)
+    return zip(a, a)
+
+
 def load_semantic_seg_model(weights_loc):
     old_model = keras.models.load_model(weights_loc,
                                         custom_objects={'iou': iou, 'iou_thresholded': iou_thresholded})

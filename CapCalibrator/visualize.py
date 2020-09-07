@@ -10,6 +10,7 @@ import utils
 import video_annotator
 from PIL import Image
 
+
 def visualize_network_performance(model_name, root_dir):
     #############################################################
     db_path = Path("data", "full_db.pickle")
@@ -234,38 +235,41 @@ def visualize_data(db_path, filter=None):
         plt.savefig(Path("plots", "visualize_data", key+".png"))
 
 
-def visualize_pc(points_blue, names_blue, points_red=None, names_red=None, title=""):
+def visualize_pc(points_blue, names_blue=None, points_red=None, names_red=None, title=""):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     if points_red is not None:
         for i in range(len(points_blue)):  # plot each point + it's index as text above
             ax.scatter(points_blue[i, 0], points_blue[i, 1], points_blue[i, 2], color='b')
-            ax.text(points_blue[i, 0],
-                    points_blue[i, 1],
-                    points_blue[i, 2],
-                    '%s' % (names_blue[i]),
-                    size=20,
-                    zorder=1,
-                    color='k')
+            if names_blue:
+                ax.text(points_blue[i, 0],
+                        points_blue[i, 1],
+                        points_blue[i, 2],
+                        '%s' % (names_blue[i]),
+                        size=20,
+                        zorder=1,
+                        color='k')
         for i in range(len(points_red)):
             ax.scatter(points_red[i, 0], points_red[i, 1], points_red[i, 2], color='r')
-            ax.text(points_red[i, 0],
-                    points_red[i, 1],
-                    points_red[i, 2],
-                    '%s' % (names_red[i]),
-                    size=20,
-                    zorder=1,
-                    color='g')
+            if names_red:
+                ax.text(points_red[i, 0],
+                        points_red[i, 1],
+                        points_red[i, 2],
+                        '%s' % (names_red[i]),
+                        size=20,
+                        zorder=1,
+                        color='g')
     else:
         for i in range(len(points_blue)):  # plot each point + it's index as text above
             ax.scatter(points_blue[i, 0], points_blue[i, 1], points_blue[i, 2], color='b')
-            ax.text(points_blue[i, 0],
-                    points_blue[i, 1],
-                    points_blue[i, 2],
-                    '%s' % (names_blue[i]),
-                    size=20,
-                    zorder=1,
-                    color='k')
+            if names_blue:
+                ax.text(points_blue[i, 0],
+                        points_blue[i, 1],
+                        points_blue[i, 2],
+                        '%s' % (names_blue[i]),
+                        size=20,
+                        zorder=1,
+                        color='k')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -288,6 +292,7 @@ def doSFM(video_path):
     for i, frame in enumerate(frames):
         # im = Image.fromarray(frame)
         frame.save("plots/sfm/IM{:03d}.jpg".format(i))
+
 
 if __name__ == "__main__":
 

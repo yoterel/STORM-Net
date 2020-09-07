@@ -3,7 +3,7 @@ import imageio
 from PIL import Image, ImageTk
 import video_annotator
 from pathlib import Path
-
+import geometry
 
 def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, frame_indices=None):
     # Read an image, a window and bind the function to window
@@ -44,6 +44,7 @@ def process_video(args):
     if mode == "special":
         if v:
             print("Doing special stuff.")
+        geometry.print_calibration_results(args.model, args.ground_truth)
         # new_db = video_annotator.auto_annotate_videos(vid_path, args.model, mode)
         new_db = video_annotator.annotate_videos(vid_path, mode, v)
         data = np.zeros((len(new_db.keys()), 10, 14))

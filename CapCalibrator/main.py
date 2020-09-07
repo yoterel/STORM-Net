@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 import video
 import predict
-import numpy as np
 import geometry
+from file_io import save_results
 
 
 def parse_arguments():
@@ -20,7 +20,7 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = 'E:/University/masters/CapTracking/videos/3911a/GX011635.MP4 E:/University/masters/CapTracking/videos/openpos50 -m manual -v 1'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/yaara/seesion1/1.mp4 E:/Src/CapCalibrator/example_models/example_model2.txt -gt E:/University/masters/CapTracking/videos_data/yaara -m special -v 1'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/openPos55/GX011592.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m special -gt /disk1/yotam/capnet/openPos/openPos55'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/real_babies/1778b/GX011447.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m manual -v 1'.split()
     args = parser.parse_args(cmd_line)
@@ -32,17 +32,9 @@ def parse_arguments():
         args.model = args.model.glob("*.txt").__next__()
     if args.ground_truth:
         args.ground_truth = Path(args.ground_truth)
-        if Path.is_dir(args.ground_truth):
-            args.ground_truth = args.ground_truth.glob("*.txt").__next__()
+        # if Path.is_dir(args.ground_truth):
+        #     args.ground_truth = args.ground_truth.glob("*.txt").__next__()
     return args
-
-
-def save_results(projected_data, output_file, v):
-    if v:
-        print("Saving result to output file.")
-    if not output_file:
-        output_file = "output.txt"
-    # np.savetxt(output_file, projected_data, delimiter=" ")
 
 
 if __name__ == "__main__":
