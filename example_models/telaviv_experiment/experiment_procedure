@@ -1,0 +1,43 @@
+pre-setup:
+	disinfect equipment
+	run softwares - fastrak(put stylus mode) + mine
+	check equipment working
+
+
+introduce experiment and safety (give mask)
+
+put gloves
+
+sit down the patient
+
+measure head: from inion to nosion and from ear to ear
+
+mark CZ with sticker
+
+put cap on patient, inspect straightness
+
+put the measuring instrument on side, instruct not to move
+
+take two horizontal videos of patint (1920x1080) for 10 seconds without mask (but with cap)
+
+do twice: capture with stylus in order (instruct patient not to move for 15 minutes)
+	RightEar
+	NoseBridge
+	NoseTip
+	Right Eye
+	LeftEye
+	LeftEar
+	CZ
+	Fp1
+	Fp2
+	Fpz
+	Fz
+	spiral
+
+remove cap and cz sticker
+ask patient to walk outside the door and come back.
+reapply cz sticker and cap on top
+take 1 video
+measure everything again (one time).
+
+done.
