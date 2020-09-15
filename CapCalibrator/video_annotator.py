@@ -214,7 +214,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             sticker_number = 0
             canvas.delete("image")
             canvas.delete("cross")
-            img = ImageTk.PhotoImage(image=frames[frame_number])
+            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
@@ -232,7 +232,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             sticker_number = 0
             canvas.delete("image")
             canvas.delete("cross")
-            img = ImageTk.PhotoImage(image=frames[frame_number])
+            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
@@ -249,7 +249,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         sticker_number = 0
         canvas.delete("image")
         canvas.delete("cross")
-        img = ImageTk.PhotoImage(image=frames[frame_number])
+        img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
         canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
         canvas.image = img  # keep a reference or it gets deleted
         updateLabels()
@@ -265,7 +265,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             sticker_number = 0
             canvas.delete("image")
             canvas.delete("cross")
-            img = ImageTk.PhotoImage(image=frames[frame_number])
+            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
@@ -281,7 +281,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             sticker_number = 0
             canvas.delete("image")
             canvas.delete("cross")
-            img = ImageTk.PhotoImage(image=frames[frame_number])
+            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
@@ -292,7 +292,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             sticker_number = 0
             canvas.delete("image")
             canvas.delete("cross")
-            img = ImageTk.PhotoImage(image=frames[frame_number])
+            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
@@ -302,7 +302,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             frame_number -= 1
             sticker_number = 0
             canvas.delete("image")
-            img = ImageTk.PhotoImage(image=frames[frame_number])
+            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
@@ -332,7 +332,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             widget.destroy()
     canvas = tk.Canvas(root, height=frames[0].size[1], width=frames[0].size[0], bg="#263D42")
     canvas.pack(side="left")
-    img = ImageTk.PhotoImage(image=frames[0])
+    img = ImageTk.PhotoImage(master=canvas, image=frames[0])
     canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
     # canvas.image = img  # keep a reference!
     canvas.bind("<ButtonPress-1>", saveCoords)

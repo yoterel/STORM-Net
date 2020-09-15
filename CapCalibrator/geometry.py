@@ -27,6 +27,27 @@ def align_centroids(a, b):
     return a - diff
 
 
+def check_standard_coordiante_system(names, data):
+    """
+    swaps axis of data according to standard cordinate system (x is ear-to-ear, y is back-front, z is bottom-top
+    note: doesn't fix handedness or sign of axis.
+    :param names:
+    :param data:
+    :return:
+    """
+    leftEye = names.index('lefteye')
+    rightEye = names.index('righteye')
+    fpz = names.index('fpz')
+    fp1 = names.index('fp1')
+    fp2 = names.index('fp2')
+    x_axis = np.argmax(np.abs(data[rightEye] - data[leftEye]))
+    data[:, [0, x_axis]] = data[:, [x_axis, 0]]
+    z_axis = np.argmax(np.abs(data[fpz] - ((data[fp1]+data[fp2]) / 2)))
+    if z_axis != 0:
+        data[:, [2, z_axis]] = data[:, [z_axis, 2]]
+    return data
+
+
 def check_right_handed_system(names, data):
     """
     given certain sticker names, checks weather the nx3 data is represented in a right handed coordinate system
@@ -264,13 +285,19 @@ def find_best_params(data):
     :param data: locations of face & cap stickers nx3
     :return:
     """
-    short_sim_data = get_sim_data(data)
-    data_t = np.mat(np.transpose(data[3:]))
-    sim_data_t = np.mat(np.transpose(short_sim_data[3:]))
-    r, t = rigid_transform_3d(data_t, sim_data_t)
-    recovered_sim_data_t = (r * data_t) + np.tile(t, (1, len(short_sim_data[3:])))
-    short_rmse = calc_rmse_error(recovered_sim_data_t, sim_data_t)
-    return r, t, short_rmse
+    tx = (data[0, 0] + data[2, 0]) / 2
+    ty = data[6, 1]
+    tz = (data[0, 2] + data[2, 2]) / 2
+    return np.array([tx, ty, tz])
+
+
+    # short_sim_data = get_sim_data(data)
+    # data_t = np.mat(np.transpose(data[3:]))
+    # sim_data_t = np.mat(np.transpose(short_sim_data[3:]))
+    # r, t = rigid_transform_3d(data_t, sim_data_t)
+    # recovered_sim_data_t = (r * data_t) + np.tile(t, (1, len(short_sim_data[3:])))
+    # short_rmse = calc_rmse_error(recovered_sim_data_t, sim_data_t)
+    # return r, t, short_rmse
     # min_rmse = np.inf
     # best_R = np.zeros((3, 3))
     # best_T = np.zeros((1, 3))
@@ -292,11 +319,11 @@ def find_best_params(data):
 
 
 def get_sticker_data(names, data):
-    if "Fp1" in names:  #newest format
-        indices = [names.index("Fp1"),
-                   names.index("Fpz"),
-                   names.index("Fp2"),
-                   names.index("Cz")
+    if "fp1" in names:  #newest format
+        indices = [names.index("fp1"),
+                   names.index("fpz"),
+                   names.index("fp2"),
+                   names.index("cz")
                    ]
         return data[indices, :]
     if "AL" in names:  # some old format
@@ -311,39 +338,44 @@ def get_sticker_data(names, data):
 
 
 def get_face_data(names, data):
-    if "Nose" in names:
-        face_synonyms = ["LeftEye", "Nose", "RightEye"]
+    if "nose" in names:
+        face_synonyms = ["lefteye", "nose", "righteye"]
     else:
-        face_synonyms = ["AL", "Nz", "AR"]
+        if "nosetip" in names:
+            face_synonyms = ["lefteye", "nosetip", "righteye"]
+        else:
+            face_synonyms = ["AL", "Nz", "AR"]
     face_indices = [names.index(face_synonyms[0]), names.index(face_synonyms[1]), names.index(face_synonyms[2])]
     face_data = data[face_indices, :]
     return face_data, face_indices
 
 
 def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=1):
-    names, base_model_data = read_template_file(model_path)
+    names, base_model_data, format = read_template_file(model_path)
     face_data, face_indices = get_face_data(names, base_model_data)
     sticker_data = get_sticker_data(names, base_model_data)
     # sensor_indices = [i for i in range(len(base_model_data)) if i not in face_indices]
     # sensor_data = base_model_data[sensor_indices, :]
     fiducials_data = np.vstack((face_data, sticker_data))
-    r_fit, t_fit, rmse = find_best_params(fiducials_data)
+    t_fit = find_best_params(fiducials_data)
+    s_fit = np.array([-1, 1, 1])
+    base_model_data_in_sim_space = (base_model_data - t_fit) * s_fit
     # rot_m = R.from_matrix(r_fit)
     # rot_e = rot_m.as_euler('xyz', degrees=True)
 
     #  get base model data to simulation space
-    base_model_data_in_sim_space = (r_fit * base_model_data.T) + np.tile(t_fit, (1, len(base_model_data)))
-    temp_sticker_data = get_sticker_data(names, base_model_data_in_sim_space.T)
+    # base_model_data_in_sim_space = (r_fit * base_model_data.T) + np.tile(t_fit, (1, len(base_model_data)))
+    temp_sticker_data = get_sticker_data(names, base_model_data_in_sim_space)
     if plot:
         sim_data = get_sim_data(fiducials_data)
-        visualize.visualize_pc(np.vstack((base_model_data_in_sim_space.T[face_indices, :], temp_sticker_data)),
+        visualize.visualize_pc(np.vstack((base_model_data_in_sim_space[face_indices, :], temp_sticker_data)),
                                ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "CZ"],
                                sim_data,
                                ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "Cz"],
                                title="Base model data vs simulation baseline data in sim-space")
 
     #  apply network transformation
-    transformed_base_model_data = r_matrix * (s_matrix * base_model_data_in_sim_space)
+    transformed_base_model_data = r_matrix @ (s_matrix @ base_model_data_in_sim_space.T)
     # visualize_pc(transformed_base_model_data.T[mask_indices, :],
     #              ["Cz", "FP1", "FPZ", "FP2"],
     #              sim_data[mask_indices, :],
@@ -351,7 +383,7 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
     #              title="Prediction(base model) & simulation data in sim-space")
 
     # get back to real space (inverse of sim transformation)
-    transformed_base_model_data_in_real_space = r_fit.T * (transformed_base_model_data - np.tile(t_fit, (1, len(base_model_data))))
+    transformed_base_model_data_in_real_space = (transformed_base_model_data.T * s_fit) + t_fit
     if gt_file:
         gt_names, gt_data = read_template_file(gt_file)
         gt_sticker_data = get_sticker_data(gt_names, gt_data)
@@ -490,12 +522,13 @@ def normalize_coordinates(names, data):
     :param data:
     :return:
     """
-    xvec = get_x_vector(names, data)
-    yvec = get_y_vector(names, data)
-    zvec = np.cross(xvec, yvec)
-    transform = np.vstack((xvec, yvec, zvec))
-    new_data = transform @ data.T
-    new_data = new_data.T
+    # xvec = get_x_vector(names, data)
+    # yvec = get_y_vector(names, data)
+    # zvec = np.cross(xvec, yvec)
+    # transform = np.vstack((xvec, yvec, zvec))
+    # new_data = transform @ data.T
+    # new_data = new_data.T
+    new_data = data
     nominator = (new_data - np.min(new_data[names.index(0):], axis=0))
     denominator = (np.max(new_data[names.index(0):], axis=0) - np.min(new_data[names.index(0):], axis=0))
     new_data = nominator / denominator
@@ -506,6 +539,8 @@ def normalize_coordinates(names, data):
 
 
 def print_calibration_results(path_to_template, experiment_folder_path):
+    session1_path = Path.joinpath(experiment_folder_path, "session1")
+    session2_path = Path.joinpath(experiment_folder_path, "session2")
     template_names, template_data, template_format = read_template_file(path_to_template)
     flip_axis = check_right_handed_system(template_names, template_data)
     template_data[:, 0] *= flip_axis[0]
@@ -520,36 +555,42 @@ def print_calibration_results(path_to_template, experiment_folder_path):
                                        template_names.index('fpz'),
                                        template_names.index('cz')), :]
     template_spiral_data = template_data[template_names.index(0):, :]  # select spiral
-    for file in experiment_folder_path.glob('*'):
-        if "raw" not in file.name:
-            file_names, file_data, file_format = read_template_file(file)
-            file_data = file_data[:, 0, :] - file_data[:, 1, :]
-            flip_axis = check_right_handed_system(file_names, file_data)
-            file_data[:, 0] *= flip_axis[0]
-            file_data[:, 1] *= flip_axis[1]
-            file_data[:, 2] *= flip_axis[2]
-            file_data = normalize_coordinates(file_names, file_data)  # normalize data
-            file_face_data = file_data[(file_names.index('lefteye'),
-                                       file_names.index('righteye'),
-                                       file_names.index('nosetip'),
-                                       file_names.index('fp1'),
-                                       file_names.index('fp2'),
-                                       file_names.index('fpz'),
-                                       file_names.index('cz')), :]
-            file_spiral_data = file_data[file_names.index(0):, :]  # select first sensor and begin from spiral
-            ret_R, ret_t = rigid_transform_3d_nparray(template_face_data.T, file_face_data.T)
-            # ret_R1, ret_t1 = rigid_transform_3d(np.asmatrix(template_face_data.T), np.asmatrix(file_face_data.T))
-            estimation = (ret_R @ template_spiral_data.T).T + ret_t
-            rmse = get_rmse(estimation, file_spiral_data)
-            print("template-digitizer error (transform using fiducials):", rmse)
-            # vis_estimation = (ret_R @ template_face_data.T).T + ret_t
-            # visualize.visualize_pc(points_blue=vis_estimation,
-            #                        points_red=file_face_data,
-            #                        title="test")
-            ret_R, ret_t = rigid_transform_3d_nparray(template_spiral_data.T, file_spiral_data.T)
-            estimation = (ret_R @ template_spiral_data.T).T + ret_t
-            rmse = get_rmse(estimation, file_spiral_data)
-            print("template-digitizer (transform using all-sensors):", rmse)
+    estimations = []
+    for file in session1_path.glob('*'):
+        file_names, file_data, file_format = read_template_file(file)
+        file_data = file_data[:, 0, :] - file_data[:, 1, :]
+        flip_axis = check_right_handed_system(file_names, file_data)
+        file_data[:, 0] *= flip_axis[0]
+        file_data[:, 1] *= flip_axis[1]
+        file_data[:, 2] *= flip_axis[2]
+        file_data = normalize_coordinates(file_names, file_data)  # normalize data
+        file_face_data = file_data[(file_names.index('lefteye'),
+                                   file_names.index('righteye'),
+                                   file_names.index('nosetip'),
+                                   file_names.index('fp1'),
+                                   file_names.index('fp2'),
+                                   file_names.index('fpz'),
+                                   file_names.index('cz')), :]
+        file_spiral_data = file_data[file_names.index(0):, :]  # select first sensor and begin from spiral
+        ret_R, ret_t = rigid_transform_3d_nparray(template_face_data.T, file_face_data.T)
+        # ret_R1, ret_t1 = rigid_transform_3d(np.asmatrix(template_face_data.T), np.asmatrix(file_face_data.T))
+        gt_rot_m = R.from_matrix(ret_R)
+        gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
+        print(gt_rot_e)
+        estimation = (ret_R @ template_spiral_data.T).T + ret_t
+        # rmse = get_rmse(estimation, file_spiral_data)
+        # print("template-digitizer error (transform using fiducials):", rmse)
+        # vis_estimation = (ret_R @ template_face_data.T).T + ret_t
+        # visualize.visualize_pc(points_blue=vis_estimation,
+        #                        points_red=file_face_data,
+        #                        title="test")
+        # ret_R, ret_t = rigid_transform_3d_nparray(template_spiral_data.T, file_spiral_data.T)
+        # estimation = (ret_R @ template_spiral_data.T).T + ret_t
+        # rmse = get_rmse(estimation, file_spiral_data)
+        # print("template-digitizer (transform using all-sensors):", rmse)
+        estimations.append(estimation)
+    rmse = get_rmse(estimation[0], file_spiral_data[1])
+    print(rmse)
     path1 = Path.joinpath(experiment_folder_path, "yaara1.txt")
     path2 = Path.joinpath(experiment_folder_path, "yaara2.txt")
     rmse = compare_data_from_files(path1, path2, use_second_sensor=False)
