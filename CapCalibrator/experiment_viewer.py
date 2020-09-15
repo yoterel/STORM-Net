@@ -146,9 +146,10 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = "./../example_models/example_model2.txt".split()
+    cmd_line = "./../example_models/example_model3.txt".split()
     args = parser.parse_args(cmd_line)
     args.template = Path(args.template)
+    print(args.template)
     return args
 
 
