@@ -5,7 +5,8 @@ from pathlib import Path
 import keras
 import numpy as np
 from PIL import Image
-import utils
+import draw
+import file_io
 import pickle
 import cv2
 
@@ -34,7 +35,7 @@ if not pred_results_file.is_file():
     x = np.asarray(imgs_np, dtype=np.float32)/255
     y = np.expand_dims(masks_np, axis=-1)
     input_shape = (None, None, 3)
-    my_model = utils.load_semantic_seg_model(str(best_weight_location))
+    my_model = file_io.load_semantic_seg_model(str(best_weight_location))
     y_pred_list = []
     for i in range(x.shape[0]):
         print("predicting on image:", i)
@@ -53,7 +54,7 @@ else:
     imgs_np, masks_np, y_pred_np = pickle.load(f)
     f.close()
 
-utils.plot_semanticseg_results(org_imgs=imgs_np, mask_imgs=masks_np, pred_imgs=y_pred_np, nm_img_to_plot=10, figsize=6)
+draw.plot_semanticseg_results(org_imgs=imgs_np, mask_imgs=masks_np, pred_imgs=y_pred_np, nm_img_to_plot=10, figsize=6)
 print("bye!")
 # for image in test_image_dir.glob("*"):
 #     dst = Path.joinpath(output_folder, image.stem + ".png")

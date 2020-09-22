@@ -1,14 +1,13 @@
 import sys
 import os
-import utils
 from pathlib import Path
 from time import time
-import numpy as np
-import math
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 import keras
 from tensorflow.python.keras.callbacks import TensorBoard
+import utils
+import file_io
 from sklearn.metrics import mean_squared_error
 
 # set paths
@@ -42,15 +41,15 @@ if redirect_sysout:
 print("datapath:", data_dir)
 # load data
 if not pickle_file_path.is_file():
-    X, Y = utils.load_db(data_dir)
+    X, Y = file_io.load_raw_json_db(data_dir)
     x_train, x_val, y_train, y_val, x_test, y_test = utils.split_data(X, Y)
     # X_train = np.expand_dims(X_train, axis=0)
     # X_val = np.expand_dims(X_val, axis=0)
     # y_train = np.expand_dims(y_train, axis=0)
     # y_val = np.expand_dims(y_val, axis=0)
-    utils.serialize_data(pickle_file_path, x_train, x_val, y_train, y_val, x_test, y_test)
+    file_io.serialize_data(pickle_file_path, x_train, x_val, y_train, y_val, x_test, y_test)
 else:
-    x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
+    x_train, x_val, y_train, y_val, x_test, y_test = file_io.deserialize_data(pickle_file_path)
 # utils.disarrange(X_train)
 # sanity check
 # y_predict = np.random.uniform(-3, 3, y_val.shape)

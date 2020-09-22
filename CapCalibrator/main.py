@@ -20,7 +20,7 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/aviv E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment/aviv.txt -m special -v 1'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/amir E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment/amir.txt -m special -v 1'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/openPos55/GX011592.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m special -gt /disk1/yotam/capnet/openPos/openPos55'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/real_babies/1778b/GX011447.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m manual -v 1'.split()
     args = parser.parse_args(cmd_line)

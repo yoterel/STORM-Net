@@ -1,8 +1,9 @@
-import utils
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
-os.environ["CUDA_VISIBLE_DEVICES"] = "5";
+os.environ["CUDA_VISIBLE_DEVICES"] = "7";
 import keras
+import utils
+import file_io
 from pathlib import Path
 from sklearn.metrics import mean_squared_error
 import scipy.io as sio
@@ -209,7 +210,7 @@ def get_sticker_locations(frames, preloaded_model, v):
         model_name = 'unet_try_2'
         model_dir = Path("models")
         model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
-        my_model = utils.load_semantic_seg_model(str(model_full_name))
+        my_model = file_io.load_semantic_seg_model(str(model_full_name))
     else:
         my_model = preloaded_model
     imgs_list = []

@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import numpy as np
 import geometry
 import argparse
-import utils
+import file_io
 
 ### GLOBALS FOR GUI ###
 video_number = 0
@@ -80,7 +80,7 @@ def auto_annotate_videos(vid_path, model_digi_file, mode="normal"):
     db_path = Path.joinpath(data_dir, "full_db.pickle")
     model_name = 'unet_try_2'
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
-    my_model = utils.load_semantic_seg_model(str(model_full_name))
+    my_model = file_io.load_semantic_seg_model(str(model_full_name))
     # get label
     try:
         if is_vid_file:
@@ -155,6 +155,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
     root.resizable(False, False)
     root.bind("<Escape>", lambda e: root.destroy())
     root.configure(background='white')
+
     def saveCoords(event):
         global sticker_number, new_db
         current_video = paths[video_number].parent.name + "_" + paths[video_number].name
@@ -164,6 +165,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         else:
             sticker_number += 2
         updateLabels()
+
     def zeroCoords(event):
         global sticker_number, new_db
         current_video = paths[video_number].parent.name + "_" + paths[video_number].name
@@ -173,6 +175,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         else:
             sticker_number += 2
         updateLabels()
+
     def nextCoords(event):
         global sticker_number, new_db
         if sticker_number >= 12:
@@ -180,6 +183,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         else:
             sticker_number += 2
         updateLabels()
+
     def updateLabels():
         global new_db
         clearLabels()
@@ -203,6 +207,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
                                540-(int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
             canvas.create_line(int(db_to_show[i, 0]) + 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) - 5,
                                540-(int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
+
     def nextVideo():
         global frames, new_db, video_number, frame_number, sticker_number
         if video_number < (len(paths)-1):
@@ -225,6 +230,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
+
     def prevVideo():
         global frames, new_db, video_number, frame_number, sticker_number
         if video_number > 0:
@@ -247,6 +253,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
+
     def reselectFrames():
         global frames, new_db, frame_number, sticker_number
         current_video = paths[video_number].parent.name + "_" + paths[video_number].name
@@ -264,6 +271,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
         canvas.image = img  # keep a reference or it gets deleted
         updateLabels()
+
     def shiftVideoF():
         global new_db, frames, frame_number, sticker_number
         current_video = paths[video_number].parent.name + "_" + paths[video_number].name
@@ -283,6 +291,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
         canvas.image = img  # keep a reference or it gets deleted
         updateLabels()
+
     def shiftVideoB():
         global new_db, frames, frame_number, sticker_number
         current_video = paths[video_number].parent.name + "_" + paths[video_number].name
@@ -302,6 +311,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
         canvas.image = img  # keep a reference or it gets deleted
         updateLabels()
+
     def nextFrame():
         global frame_number, sticker_number
         if frame_number < 9:
@@ -313,6 +323,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
+
     def prevFrame():
         global frame_number, sticker_number
         if frame_number > 0:
@@ -323,6 +334,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
             canvas.image = img  # keep a reference or it gets deleted
             updateLabels()
+
     def loadSession():
         global new_db
         clearLabels()
@@ -337,13 +349,15 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
                                                 "frame_indices": indices})
         f.close()
         updateLabels()
+
     def saveSession():
         global new_db
-        f = filedialog.asksaveasfile(initialdir="./data", title="Select Session File", mode='wb', initialfile="full_db.pickle")
+        f = filedialog.asksaveasfile(initialdir="./data", title="Select Session File", mode='wb')
         if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
             return
         pickle.dump(new_db, f)
         f.close()
+
     def clearLabels():
         canvas.delete("cross")
         for widget in frame2.winfo_children():

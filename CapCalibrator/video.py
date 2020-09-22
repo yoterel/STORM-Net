@@ -1,9 +1,8 @@
 import numpy as np
 import imageio
-from PIL import Image, ImageTk
+from PIL import Image
 import video_annotator
 from pathlib import Path
-import geometry
 
 
 def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, frame_indices=None):

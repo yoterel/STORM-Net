@@ -9,7 +9,7 @@ import numpy as np
 import utils
 import video_annotator
 from PIL import Image
-
+import draw
 
 def visualize_network_performance(model_name, root_dir):
     #############################################################
@@ -47,9 +47,9 @@ def visualize_network_performance(model_name, root_dir):
     print("gt pred: ", gt_pred, gt[vid_name]["label"])
     print("synth pred: ", y_predict_special, y_train[min_index])
     filter = [vid_name]
-    visualize_data(db_path, filter)
+    draw.visualize_data(db_path, filter)
     filter = ["image_{:05d}.json".format(min_index)]
-    visualize_data(synth_data_dir, filter)
+    draw.visualize_data(synth_data_dir, filter)
 #################################################################
     pickle_file_path = Path.joinpath(data_dir, "data.pickle")
     x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
@@ -122,45 +122,6 @@ def visualize_network_performance(model_name, root_dir):
     print("done")
 
 
-def load_gt_db(db_path, format="pickle", filter=None):
-    db = {}
-    if format == "pickle":
-        f = open(db_path, 'rb')
-        db = pickle.load(f)
-        f.close()
-        if filter is not None:
-            new_db = {}
-            for file in filter:
-                new_db[file] = db.pop(file, None)
-            db = new_db
-    else:
-        if format == "json":
-            number_of_samples = 50
-            skip_files = 1000
-            count = 0
-            for i, file in enumerate(db_path.glob("*.json")):
-                if filter:
-                    if file.name in filter:
-                        x, y = utils.extract_session_data(file, use_scale=False)
-                        x = np.expand_dims(x, axis=0)
-                        x[:, :, 0::2] *= 960
-                        x[:, :, 1::2] *= 540
-                        db[file.name] = {"data": x, "label": y}
-                else:
-                    if i < skip_files:
-                        continue
-                    x, y = utils.extract_session_data(file, use_scale=False)
-                    if x is not None:
-                        x = np.expand_dims(x, axis=0)
-                        x[:, :, 0::2] *= 960
-                        x[:, :, 1::2] *= 540
-                        db[file.name] = {"data": x, "label": y}
-                        count += 1
-                    if count >= number_of_samples:
-                        break
-    return db
-
-
 def save_db(db, db_path):
     f = open(db_path, 'wb')
     pickle.dump(db, f)
@@ -193,46 +154,6 @@ def fix_db(db):
 #                                                   "frame_indices": db[key]["frame_indices"]})
 #     save_full_db(fresh_db, db_path)
 #     print("done")
-
-def visualize_data(db_path, filter=None):
-    my_format = "pickle" if db_path.suffix == ".pickle" else "json"
-    db = load_gt_db(db_path, my_format, filter)
-    # db = fix_db(db)
-    # save_db(db, db_path)
-    for key in db.keys():
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        data = db[key]["data"][0]
-        if len(db[key]["data"][0].shape) < 3:
-            data = np.expand_dims(data, axis=0)
-        data[:, :, 0::2] /= 960
-        data[:, :, 1::2] /= 540
-        utils.center_data(data)
-        data = np.squeeze(data)
-        # s_linear = [n for n in range(len(data))]
-        c = ['b', 'b', 'b', 'r', 'r', 'r', 'g']
-        for t in range(0, data.shape[1], 2):
-            x = data[:, t]
-            y = data[:, t+1]
-            exist = np.nonzero(x)
-            x = x[exist]
-            y = y[exist]
-            u = np.diff(x)
-            v = np.diff(y)
-            pos_x = x[:-1] + u / 2
-            pos_y = y[:-1] + v / 2
-            norm = np.sqrt(u ** 2 + v ** 2)
-            ax.scatter(x, y, marker='o', c=c[t//2])
-            ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid", scale=10, scale_units='inches')
-        # for t in range(len(data)):
-        #     ax.scatter(data[t, 0::2], data[t, 1::2], marker='o', s=t*20)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_title(key)
-        ax.set_xlim([0, 1])
-        ax.set_ylim([0, 1])
-        # plt.show()
-        plt.savefig(Path("plots", "visualize_data", key+".png"))
 
 
 def visualize_pc(points_blue, names_blue=None, points_red=None, names_red=None, title=""):
@@ -292,22 +213,3 @@ def doSFM(video_path):
     for i, frame in enumerate(frames):
         # im = Image.fromarray(frame)
         frame.save("plots/sfm/IM{:03d}.jpg".format(i))
-
-
-if __name__ == "__main__":
-
-    doSFM(Path("E:/University/masters/CapTracking/videos/3911a/GX011635.MP4"))
-    print("done")
-    # model_name = 'scene3_batch16_lr1e4_supershuffle_noise6'
-    # root_dir = Path("/disk1/yotam/capnet")
-    #
-    # visualize_network_performance(model_name, root_dir)
-
-    # filter_files = ["GX011577.MP4", "GX011578.MP4", "GX011579.MP4", "GX011580.MP4",
-    #                 "GX011581.MP4", "GX011582.MP4", "GX011572.MP4", "GX011573.MP4",
-    #                 "GX011574.MP4", "GX011575.MP4", "GX011576.MP4", "GX011566.MP4",
-    #                 "GX011567.MP4", "GX011568.MP4", "GX011569.MP4", "GX011570.MP4"]
-    # db_path = Path("data", "full_db.pickle")
-
-    # db_path = Path("E:/Src/CapCalibrator/DataSynth/build/captures")
-    # visualize_data(db_path, filter=None)

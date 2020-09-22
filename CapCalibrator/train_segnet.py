@@ -2,14 +2,15 @@ import sys
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+import keras
+from keras_unet.utils import get_augmented
+from tensorflow.python.keras.callbacks import TensorBoard
 import utils
+import file_io
 from pathlib import Path
 import numpy as np
 from PIL import Image
 from time import time
-from keras_unet.utils import get_augmented
-import keras
-from tensorflow.python.keras.callbacks import TensorBoard
 stdout = sys.stdout
 
 # hyper parameters
@@ -67,9 +68,9 @@ if not pickle_file_path.is_file():
     y = np.expand_dims(masks_np, axis=-1)
     print(x.shape, y.shape)
     x_train, x_val, y_train, y_val = utils.split_data(x, y, with_test_set=False)
-    utils.serialize_data(pickle_file_path, x_train, x_val, y_train, y_val, None, None)
+    file_io.serialize_data(pickle_file_path, x_train, x_val, y_train, y_val, None, None)
 else:
-    x_train, x_val, y_train, y_val = utils.deserialize_data(pickle_file_path, with_test_set=False)
+    x_train, x_val, y_train, y_val = file_io.deserialize_data(pickle_file_path, with_test_set=False)
 
 input_shape = (None, None, 3)
 model = utils.create_semantic_seg_model(input_shape, learning_rate)
