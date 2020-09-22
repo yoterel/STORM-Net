@@ -27,54 +27,51 @@ def align_centroids(a, b):
     return a - diff
 
 
-def check_standard_coordiante_system(names, data):
+def to_standard_coordinate_system(names, data):
     """
-    swaps axis of data according to standard cordinate system (x is ear-to-ear, y is back-front, z is bottom-top
-    note: doesn't fix handedness or sign of axis.
+    given certain sticker names, converts the nx3 data to the standard coordinate system where:
+    x is from left to right ear
+    y is from back to front of head
+    z is from bottom to top of head
+    origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
+    scale is cm. if cz is too close to origin in terms of cm, this function scales it to cm (assuming it is inch)
+    note: only performs swaps, reflections, translation and possibly scale (no rotation is performed).
     :param names:
     :param data:
-    :return:
+    :return: returns the data in the standard coordinate system
     """
-    leftEye = names.index('lefteye')
-    rightEye = names.index('righteye')
-    fpz = names.index('fpz')
-    fp1 = names.index('fp1')
-    fp2 = names.index('fp2')
-    x_axis = np.argmax(np.abs(data[rightEye] - data[leftEye]))
+    left_eye_index = names.index('lefteye')
+    right_eye_index = names.index('righteye')
+    cz_index = names.index('cz')
+    fpz_index = names.index('fpz')
+    fp1_index = names.index('fp1')
+    fp2_index = names.index('fp2')
+    # swap x axis with the best candidate
+    x_axis = np.argmax(np.abs(data[right_eye_index] - data[left_eye_index]))
     data[:, [0, x_axis]] = data[:, [x_axis, 0]]
-    z_axis = np.argmax(np.abs(data[fpz] - ((data[fp1]+data[fp2]) / 2)))
+    # swap z axis with the best candidate (but not x)
+    z_axis = np.argmax(np.abs(data[fpz_index] - ((data[fp1_index] + data[fp2_index]) / 2)))
     if z_axis != 0:
         data[:, [2, z_axis]] = data[:, [z_axis, 2]]
+
+    # find reflections
+    xdir = data[right_eye_index, 0] - data[left_eye_index, 0]
+    ydir = data[left_eye_index, 1] - data[cz_index, 1]
+    zdir = data[cz_index, 2] - data[left_eye_index, 2]
+    i, j, k = (xdir > 0)*2 - 1, (ydir > 0)*2 - 1, (zdir > 0)*2 - 1
+    data[:, 0] *= i
+    data[:, 1] *= j
+    data[:, 2] *= k
+
+    # translate to standard origin
+    eye_midpoint = (data[right_eye_index] + data[left_eye_index]) / 2
+    origin = np.array([eye_midpoint[0], data[cz_index, 1], eye_midpoint[2]])
+    data = data - origin
+
+    # possibly convert from inch to cm
+    if data[cz_index, 2] < 7:  # distance from "middle" of brain to top is ~9-10 cm on average
+        data *= 2.54
     return data
-
-
-def check_right_handed_system(names, data):
-    """
-    given certain sticker names, checks weather the nx3 data is represented in a right handed coordinate system
-    :param names:
-    :param data:
-    :return: returns which axis should be flipped to turn into a right handed coordinate system
-    """
-    leftEye = names.index('lefteye')
-    rightEye = names.index('righteye')
-    CZ = names.index('cz')
-    xdir = data[rightEye, 0] - data[leftEye, 0]
-    ydir = data[leftEye, 1] - data[CZ, 1]
-    zdir = data[CZ, 2] - data[leftEye, 2]
-    if zdir > 0:
-        if (xdir > 0 and ydir > 0) or (xdir < 0 and ydir < 0):
-            return [1, 1, 1]
-        else:
-            return [-1, 1, 1]
-    else:
-        # print("Warning ! Z axis is pointing downwards, fixing.")
-        if (xdir > 0 and ydir > 0) or (xdir < 0 and ydir < 0):
-            return [1, 1, -1]
-        else:
-            if xdir > 0:
-                return [1, -1, -1]
-            else:
-                return [-1, 1, -1]
 
 
 def get_euler_angles(gt_data, model_data):
@@ -119,60 +116,19 @@ def rigid_transform_svd(P, Q):
     return c, R, t
 
 
-def last_rt(P, Q):
-    affine_matrix = cv2.estimateAffine3D(P, Q, confidence=0.99)
-    SR = affine_matrix[1][:, :-1]
-    T = affine_matrix[1][:, -1]
-    s = np.linalg.norm(SR, axis=1)
-    S = np.identity(3) * s
-    S_divide = np.copy(S)
-    S_divide[S_divide == 0] = 1
-    R = SR / S_divide
-    return T, S, R, SR
-
-
-def test():
-    a1 = np.array([
-        [0, 0, -1],
-        [0, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0],
-        [1, 0, 0],
-    ])
-
-    a2 = np.array([
-        [0, 0, 2],
-        [0, 0, 0],
-        [0, 0, -2],
-        [0, 2, 0],
-        [-1, 0, 0],
-    ])
-    #a2 *= 2  # for testing the scale calculation
-    a2 += 3  # for testing the translation calculation
-    t, s, r, sr = last_rt(a1, a2)
-    print("R =\n", r)
-    print("c =", s)
-    print("t =\n", t)
-    print("Check:  a1*cR + t = a2  is", np.allclose(a1.dot(s * r) + t, a2))
-    err = ((a1.dot(s * r) + t - a2) ** 2).sum()
-    print("Residual error", err)
-
-
 def rigid_transform_3d_nparray(A, B):
     """
-    finds best (in terms of rmse) rigid transformation between pc a and pc b
-    # Input: expects 3XN matrix of points
-    # Returns R,t
+    finds best rigid transformation between pc a and pc b (in terms of rmse)
+    # Input: expects nx3 matrix of points
+    # Returns R,t = the transformation to apply to A such that it matches B.
     # R = 3x3 rotation matrix
     # t = 1x3 column vector
     """
-    A_transpose = A.T
-    B_transpose = B.T
-    centroid_A = np.mean(A_transpose, axis=0)
-    centroid_B = np.mean(B_transpose, axis=0)
+    centroid_A = np.mean(A, axis=0)
+    centroid_B = np.mean(B, axis=0)
 
-    A_mean = A_transpose - centroid_A
-    B_mean = B_transpose - centroid_B
+    A_mean = A - centroid_A
+    B_mean = B - centroid_B
 
     H = A_mean.T @ B_mean
     U, S, Vt = np.linalg.svd(H)
@@ -350,8 +306,47 @@ def get_face_data(names, data):
     return face_data, face_indices
 
 
-def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=1):
-    names, base_model_data, format = read_template_file(model_path)
+def from_standard_to_sim_space(names, data):
+    data[:, 0] *= -1
+    return data
+
+
+def from_sim_to_standard_space(names, data):
+    return from_standard_to_sim_space(names, data)
+
+
+def apply_rigid_transform(r_matrix, s_matrix, args, plot=True):
+    if args.mode == "special":
+        digi2digi_est = get_digi2digi_results(args.template, args.ground_truth)
+        vid2vid_est = []
+        names, data, format = read_template_file(args.template)
+        names = names[0]
+        data = data[0]
+        data = to_standard_coordinate_system(names, data)
+        data_spiral = data[names.index(0):, :]  # select spiral
+        # data_sim = from_standard_to_sim_space(names, data)
+        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
+            transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
+            # transformed_data = from_sim_to_standard_space(names, transformed_data_sim.T)
+            vid2vid_est.append(transformed_data_sim.T)
+        rmse = get_rmse(vid2vid_est[0], vid2vid_est[1])
+        print("vid2vid rmse between session 1 and session 2:", rmse)
+        rmse = get_rmse(vid2vid_est[0], vid2vid_est[2])
+        print("vid2vid rmse between session 1 and session 3:", rmse)
+        rmse = get_rmse(vid2vid_est[1], vid2vid_est[2])
+        print("vid2vid rmse between session 2 and session 3:", rmse)
+        rmse = get_rmse(vid2vid_est[0], digi2digi_est[0])
+        print("vid2digi rmse session 1:", rmse)
+        rmse = get_rmse(vid2vid_est[1], digi2digi_est[1])
+        print("vid2digi rmse session 2:", rmse)
+        rmse = get_rmse(vid2vid_est[2], digi2digi_est[2])
+        print("vid2digi rmse session 3:", rmse)
+        # visualize.visualize_pc(points_blue=vid2vid_est[0],
+        #                        points_red=digi2digi_est[0],
+        #                        title="test")
+        return None
+
+    names, base_model_data, format = read_template_file(args.template)
     face_data, face_indices = get_face_data(names, base_model_data)
     sticker_data = get_sticker_data(names, base_model_data)
     # sensor_indices = [i for i in range(len(base_model_data)) if i not in face_indices]
@@ -384,12 +379,12 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
 
     # get back to real space (inverse of sim transformation)
     transformed_base_model_data_in_real_space = (transformed_base_model_data.T * s_fit) + t_fit
-    if gt_file:
-        gt_names, gt_data = read_template_file(gt_file)
+    if args.ground_truth:
+        gt_names, gt_data = read_template_file(args.ground_truth)
         gt_sticker_data = get_sticker_data(gt_names, gt_data)
         transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
         # correct for translation (useful for viz & RMSE)
-        transformed_sticker_data = align_centroids(from_data=transformed_sticker_data, to_data=gt_sticker_data)
+        transformed_sticker_data = align_centroids(transformed_sticker_data, gt_sticker_data)
         if plot:
             visualize.visualize_pc(points_blue=transformed_sticker_data,
                          names_blue=["FP1", "FPZ", "FP2", "Cz"],
@@ -400,7 +395,7 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
         base_data = np.mat(np.transpose(sticker_data))
         gt_data = np.mat(np.transpose(gt_sticker_data))
         ret_R, ret_t = rigid_transform_3d(base_data, gt_data)
-        if v > 1:
+        if args.verbosity > 1:
             print("Stickers RMSE error (prediction, gt):", rmse_1)
             print("Here is the translation between GT and base model:", ret_t)
         recovered_gt = (ret_R * base_data) + np.tile(ret_t, (1, len(base_data.T)))
@@ -409,9 +404,9 @@ def apply_rigid_transform(r_matrix, s_matrix, model_path, gt_file, plot=True, v=
         gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
         pred_rot_m = R.from_matrix(r_matrix)
         pred_rot_e = pred_rot_m.as_euler('xyz', degrees=True)
-        if v:
+        if args.verbosity:
             print("Euler Angles RMSE (Horns, Network):", mean_squared_error(gt_rot_e, pred_rot_e, squared=False))
-        if v > 1:
+        if args.verbosity > 1:
             print("Horns Euler angels:", gt_rot_e)
             print("Network Euler angels:", pred_rot_e)
             print("RMSE error (horn's(baseline), gt):", rmse_2)
@@ -538,46 +533,51 @@ def normalize_coordinates(names, data):
     # zscale = new_data[names.index('cz'), 1] - np.min(data[:, 2])
 
 
-def print_calibration_results(path_to_template, experiment_folder_path):
-    session1_path = Path.joinpath(experiment_folder_path, "session1")
-    session2_path = Path.joinpath(experiment_folder_path, "session2")
+def get_digi2digi_results(path_to_template, experiment_folder_path):
     template_names, template_data, template_format = read_template_file(path_to_template)
-    flip_axis = check_right_handed_system(template_names, template_data)
-    template_data[:, 0] *= flip_axis[0]
-    template_data[:, 1] *= flip_axis[1]
-    template_data[:, 2] *= flip_axis[2]
-    template_data = normalize_coordinates(template_names, template_data)  # normalize data
-    template_face_data = template_data[(template_names.index('lefteye'),
-                                       template_names.index('righteye'),
-                                       template_names.index('nosetip'),
-                                       template_names.index('fp1'),
-                                       template_names.index('fp2'),
-                                       template_names.index('fpz'),
-                                       template_names.index('cz')), :]
+    template_data = template_data[0]
+    template_names = template_names[0]
+    template_data = to_standard_coordinate_system(template_names, template_data)
+    # template_data = normalize_coordinates(template_names, template_data)  # normalize data
+    template_mask_data = template_data[(template_names.index('fp1'),
+                                        template_names.index('fp2'),
+                                        template_names.index('fpz'),
+                                        template_names.index('cz'),
+                                        template_names.index('o1'),
+                                        template_names.index('o2'),
+                                        template_names.index('oz'),
+                                        template_names.index('f7'),
+                                        template_names.index('f8')), :]
     template_spiral_data = template_data[template_names.index(0):, :]  # select spiral
     estimations = []
-    for file in session1_path.glob('*'):
-        file_names, file_data, file_format = read_template_file(file)
-        file_data = file_data[:, 0, :] - file_data[:, 1, :]
-        flip_axis = check_right_handed_system(file_names, file_data)
-        file_data[:, 0] *= flip_axis[0]
-        file_data[:, 1] *= flip_axis[1]
-        file_data[:, 2] *= flip_axis[2]
-        file_data = normalize_coordinates(file_names, file_data)  # normalize data
-        file_face_data = file_data[(file_names.index('lefteye'),
-                                   file_names.index('righteye'),
-                                   file_names.index('nosetip'),
-                                   file_names.index('fp1'),
-                                   file_names.index('fp2'),
-                                   file_names.index('fpz'),
-                                   file_names.index('cz')), :]
-        file_spiral_data = file_data[file_names.index(0):, :]  # select first sensor and begin from spiral
-        ret_R, ret_t = rigid_transform_3d_nparray(template_face_data.T, file_face_data.T)
-        # ret_R1, ret_t1 = rigid_transform_3d(np.asmatrix(template_face_data.T), np.asmatrix(file_face_data.T))
-        gt_rot_m = R.from_matrix(ret_R)
-        gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
-        print(gt_rot_e)
-        estimation = (ret_R @ template_spiral_data.T).T + ret_t
+    if experiment_folder_path.is_dir():
+        print("woops")
+    else:
+        file_names, file_data, file_format = read_template_file(experiment_folder_path)
+        for session in zip(file_names, file_data):
+            names = session[0]
+            data = session[1][:, 0, :]# - session[1][:, 1, :]  # subtract second sensor
+            data = to_standard_coordinate_system(names, data)
+            # file_data = normalize_coordinates(file_names, file_data)  # normalize data
+            file_mask_data = data[(names.index('fp1'),
+                                   names.index('fp2'),
+                                   names.index('fpz'),
+                                   names.index('cz'),
+                                   names.index('o1'),
+                                   names.index('o2'),
+                                   names.index('oz'),
+                                   names.index('f7'),
+                                   names.index('f8')), :]
+            ret_R, ret_t = rigid_transform_3d_nparray(template_mask_data, file_mask_data)
+            # vis_estimation = (ret_R @ template_mask_data.T).T + ret_t
+            # visualize.visualize_pc(points_blue=vis_estimation,
+            #                        points_red=file_mask_data,
+            #                        title="test")
+            gt_rot_m = R.from_matrix(ret_R)
+            gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
+            print("Digitizer Euler angels: ", gt_rot_e)
+            estimation = (ret_R @ template_spiral_data.T).T
+            estimations.append(estimation)
         # rmse = get_rmse(estimation, file_spiral_data)
         # print("template-digitizer error (transform using fiducials):", rmse)
         # vis_estimation = (ret_R @ template_face_data.T).T + ret_t
@@ -588,13 +588,11 @@ def print_calibration_results(path_to_template, experiment_folder_path):
         # estimation = (ret_R @ template_spiral_data.T).T + ret_t
         # rmse = get_rmse(estimation, file_spiral_data)
         # print("template-digitizer (transform using all-sensors):", rmse)
-        estimations.append(estimation)
-    rmse = get_rmse(estimation[0], file_spiral_data[1])
-    print(rmse)
-    path1 = Path.joinpath(experiment_folder_path, "yaara1.txt")
-    path2 = Path.joinpath(experiment_folder_path, "yaara2.txt")
-    rmse = compare_data_from_files(path1, path2, use_second_sensor=False)
-    print("digitizer-digitzier (not using 2nd sensor) rmse:", rmse)
-    rmse = compare_data_from_files(path1, path2, use_second_sensor=True)
-    print("digitizer-digitzier (using 2nd sensor) rmse:", rmse)
+        rmse = get_rmse(estimations[0], estimations[1])
+        print("digi2digi rmse between session 1 and session 2:", rmse)
+        rmse = get_rmse(estimations[0], estimations[2])
+        print("digi2digi rmse between session 1 and session 3:", rmse)
+        rmse = get_rmse(estimations[1], estimations[2])
+        print("digi2digi rmse between session 2 and session 3:", rmse)
+        return estimations
 

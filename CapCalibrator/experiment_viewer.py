@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 from draw import Arrow3D, plot_3d_pc
-from geometry import check_right_handed_system
+from geometry import to_standard_coordinate_system
 from file_io import read_template_file
 
 
@@ -86,24 +86,24 @@ class ExperimentViewer(tk.Frame):
         # b = quiver(X, Y, Z, U, V, W, **kwargs)
         args = parse_arguments()
         names, data, format = read_template_file(args.template)
+        data = data[0]
+        names = names[0]
         if format == "telaviv":
             if args.use_sensor2:
                 data = data[:, 0, :] - data[:, 1, :]
             else:
                 data = data[:, 0, :]
-        flip_axis = check_right_handed_system(names, data)
-        data[:, 0] *= flip_axis[0]
-        data[:, 1] *= flip_axis[1]
-        data[:, 2] *= flip_axis[2]
-        data = data[10:, :]
-        plot_3d_pc(a, data, selected)
+        data = to_standard_coordinate_system(names, data)
+        data = data[15:, :]
+        names = names[15:]
+        plot_3d_pc(a, data, selected, names)
         canvas = FigureCanvasTkAgg(f, self)
         canvas.draw()
-        canvas.mpl_connect("key_press_event", lambda event: key_press_callback(event, data))
+        canvas.mpl_connect("key_press_event", lambda event: key_press_callback(event, data, names))
         canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
 
-def key_press_callback(event, data):
+def key_press_callback(event, data, names):
     global selected
     total_data_points = len(data)
     ax = event.inaxes
@@ -135,7 +135,7 @@ def key_press_callback(event, data):
         return
     ax.cla()
     ax.view_init(elev=elev, azim=azim)
-    plot_3d_pc(ax, data, selected)
+    plot_3d_pc(ax, data, selected, names)
     ax.figure.canvas.draw()
 
 
@@ -146,7 +146,7 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = "./../example_models/example_model3.txt".split()
+    cmd_line = "./../example_models/example_model3.txt --use_sensor2".split()
     args = parser.parse_args(cmd_line)
     args.template = Path(args.template)
     print(args.template)

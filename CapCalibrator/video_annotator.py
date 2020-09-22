@@ -25,10 +25,11 @@ frames =[]
 def process_video(vid_path, dump_frames=False, starting_frame=0, force_reselect=False, frame_indices=None, v=0):
     if frame_indices is not None:
         starting_frame = frame_indices[0]
-    if starting_frame != 0:
-        my_string = vid_path.name + "_{:03d}_frames.pickle".format(starting_frame)
-    else:
-        my_string = vid_path.name + "_frames.pickle"
+    name = vid_path.parent.name + "_" + vid_path.name
+    # if starting_frame != 0:
+    #     my_string = name + "_{:03d}_frames.pickle".format(starting_frame)
+    # else:
+    my_string = name + "_frames.pickle"
     pickle_path = Path.joinpath(Path("data"), my_string)
     if pickle_path.is_file() and not force_reselect:
         f = open(pickle_path, 'rb')
@@ -103,7 +104,8 @@ def auto_annotate_videos(vid_path, model_digi_file, mode="normal"):
     my_db = load_full_db(db_path)
     for path in paths:
         print("processing video:", path)
-        if path.name not in my_db.keys():
+        name = path.parent + "_" + path.name
+        if name not in my_db.keys():
             if mode == "special":
                 my_range = 50
             else:
@@ -111,14 +113,14 @@ def auto_annotate_videos(vid_path, model_digi_file, mode="normal"):
             for i in range(my_range):
                 frames, indices = process_video(path, dump_frames=False, starting_frame=i, force_reselect=True)
                 data = predict.predict_keypoints_locations(frames,
-                                                           path.name,
+                                                           name,
                                                            is_puppet=False,
                                                            save_intermed=False,
                                                            preloaded_model=my_model,
                                                            v=1)
-                my_db.setdefault(path.name, []).append({"data": data,
-                                                        "label": np.array(label),
-                                                        "frame_indices": indices})
+                my_db.setdefault(name, []).append({"data": data,
+                                                   "label": np.array(label),
+                                                   "frame_indices": indices})
             save_full_db(my_db, db_path)
     return my_db
 
@@ -126,7 +128,7 @@ def auto_annotate_videos(vid_path, model_digi_file, mode="normal"):
 def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
     global new_db, frames, video_number
     if mode == "special":
-        special_db = Path.joinpath(Path("data"), "full_db_special.pickle")
+        special_db = Path.joinpath(Path("data"), "telaviv_db.pickle")
         new_db = load_full_db(special_db)
     else:
         new_db = load_full_db()
@@ -139,14 +141,15 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         for file in video_path.glob("*.MP4"):
             paths.append(file)
     frames, indices = process_video(paths[video_number], dump_frames=True, v=v)
-    if paths[video_number].name not in new_db.keys():
+    name = paths[video_number].parent.name + "_" + paths[video_number].name
+    if name not in new_db.keys():
         if mode == "semi-auto" or mode == "auto":
-            data = predict.predict_keypoints_locations(frames, paths[video_number].name, is_puppet=True, save_intermed=False)
+            data = predict.predict_keypoints_locations(frames, name, is_puppet=False, save_intermed=False, v=v)
         else:
             data = np.zeros((1, 10, 14))
-        new_db.setdefault(paths[video_number].name, []).append({"data": data,
-                                                                "label": np.array([0, 0, 0]),
-                                                                "frame_indices": indices})
+        new_db.setdefault(name, []).append({"data": data,
+                                            "label": np.array([0, 0, 0]),
+                                            "frame_indices": indices})
     root = tk.Tk()
     root.title("Video Annotator")
     root.resizable(False, False)
@@ -154,7 +157,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
     root.configure(background='white')
     def saveCoords(event):
         global sticker_number, new_db
-        current_video = paths[video_number].name
+        current_video = paths[video_number].parent.name + "_" + paths[video_number].name
         new_db[current_video][shift]["data"][0, frame_number, sticker_number:sticker_number+2] = event.x, 540-event.y
         if sticker_number >= 12:
             sticker_number = 0
@@ -163,7 +166,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         updateLabels()
     def zeroCoords(event):
         global sticker_number, new_db
-        current_video = paths[video_number].name
+        current_video = paths[video_number].parent.name + "_" + paths[video_number].name
         new_db[current_video][shift]["data"][0, frame_number, sticker_number:sticker_number+2] = 0, 0
         if sticker_number >= 12:
             sticker_number = 0
@@ -180,7 +183,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
     def updateLabels():
         global new_db
         clearLabels()
-        current_video = paths[video_number].name
+        current_video = paths[video_number].parent.name + "_" + paths[video_number].name
         db_to_show = np.reshape(new_db[current_video][shift]["data"][0, frame_number, :], (7, 2))
         sticker_names = ["AL", "NZ", "AR", "CAP1", "CAP2", "CAP3", "CAP4"]
         my_string = "File Name: {}".format(current_video)
@@ -205,11 +208,15 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         if video_number < (len(paths)-1):
             video_number += 1
             frames, indices = process_video(paths[video_number], dump_frames=True)
-            if paths[video_number].name not in new_db.keys():
-                data = predict.predict_keypoints_locations(frames, is_puppet=True, vid_name=paths[video_number].name)
-                new_db.setdefault(paths[video_number].name, []).append({"data": data,
-                                                                        "label": np.array([0, 0, 0]),
-                                                                        "frame_indices": indices})
+            name = paths[video_number].parent.name + "_" + paths[video_number].name
+            if name not in new_db.keys():
+                if mode == "semi-auto" or mode == "auto":
+                    data = predict.predict_keypoints_locations(frames, is_puppet=False, vid_name=name)
+                else:
+                    data = np.zeros((1, 10, 14))
+                new_db.setdefault(name, []).append({"data": data,
+                                                    "label": np.array([0, 0, 0]),
+                                                    "frame_indices": indices})
             frame_number = 0
             sticker_number = 0
             canvas.delete("image")
@@ -223,11 +230,15 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         if video_number > 0:
             video_number -= 1
             frames, indices = process_video(paths[video_number], dump_frames=True)
-            if paths[video_number].name not in new_db.keys():
-                data = predict.predict_keypoints_locations(frames, is_puppet=True, vid_name=paths[video_number].name)
-                new_db.setdefault(paths[video_number].name, []).append({"data": data,
-                                                                        "label": np.array([0, 0, 0]),
-                                                                        "frame_indices": indices})
+            name = paths[video_number].parent.name + "_" + paths[video_number].name
+            if name not in new_db.keys():
+                if mode == "semi-auto" or mode == "auto":
+                    data = predict.predict_keypoints_locations(frames, is_puppet=False, vid_name=name)
+                else:
+                    data = np.zeros((1, 10, 14))
+                new_db.setdefault(name, []).append({"data": data,
+                                                    "label": np.array([0, 0, 0]),
+                                                    "frame_indices": indices})
             frame_number = 0
             sticker_number = 0
             canvas.delete("image")
@@ -238,7 +249,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
             updateLabels()
     def reselectFrames():
         global frames, new_db, frame_number, sticker_number
-        current_video = paths[video_number].name
+        current_video = paths[video_number].parent.name + "_" + paths[video_number].name
         current_starting_frame_index = new_db[current_video][shift]["frame_indices"][0]
         frames, indices = process_video(paths[video_number],
                                         dump_frames=True,
@@ -254,37 +265,43 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         canvas.image = img  # keep a reference or it gets deleted
         updateLabels()
     def shiftVideoF():
-        global shift, frame_number, sticker_number
-        if shift < 49:
-            shift += 1
-            current_video = paths[video_number].name
-            frames, indices = process_video(paths[video_number],
-                                            dump_frames=True,
-                                            frame_indices=new_db[current_video][shift]["frame_indices"])
-            frame_number = 0
-            sticker_number = 0
-            canvas.delete("image")
-            canvas.delete("cross")
-            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
-            canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
-            canvas.image = img  # keep a reference or it gets deleted
-            updateLabels()
+        global new_db, frames, frame_number, sticker_number
+        current_video = paths[video_number].parent.name + "_" + paths[video_number].name
+        current_indices = new_db[current_video][shift]["frame_indices"]
+        print("current indices:", current_indices)
+        new_indices = current_indices.copy()
+        new_indices[frame_number] += 1
+        frames, indices = process_video(paths[video_number],
+                                        dump_frames=True,
+                                        frame_indices=new_indices,
+                                        force_reselect=True)
+        new_db[current_video][shift]["frame_indices"] = new_indices
+        print("new indices:", new_indices)
+        canvas.delete("image")
+        canvas.delete("cross")
+        img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
+        canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
+        canvas.image = img  # keep a reference or it gets deleted
+        updateLabels()
     def shiftVideoB():
-        global shift, frame_number, sticker_number
-        if shift > 0:
-            shift -= 1
-            current_video = paths[video_number].name
-            frames, indices = process_video(paths[video_number],
-                                            dump_frames=True,
-                                            frame_indices=new_db[current_video][shift]["frame_indices"])
-            frame_number = 0
-            sticker_number = 0
-            canvas.delete("image")
-            canvas.delete("cross")
-            img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
-            canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
-            canvas.image = img  # keep a reference or it gets deleted
-            updateLabels()
+        global new_db, frames, frame_number, sticker_number
+        current_video = paths[video_number].parent.name + "_" + paths[video_number].name
+        current_indices = new_db[current_video][shift]["frame_indices"]
+        print("current indices:", current_indices)
+        new_indices = current_indices.copy()
+        new_indices[frame_number] -= 1
+        frames, indices = process_video(paths[video_number],
+                                        dump_frames=True,
+                                        frame_indices=new_indices,
+                                        force_reselect=True)
+        new_db[current_video][shift]["frame_indices"] = new_indices
+        print("new indices:", new_indices)
+        canvas.delete("image")
+        canvas.delete("cross")
+        img = ImageTk.PhotoImage(master=canvas, image=frames[frame_number])
+        canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
+        canvas.image = img  # keep a reference or it gets deleted
+        updateLabels()
     def nextFrame():
         global frame_number, sticker_number
         if frame_number < 9:
@@ -312,11 +329,12 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         filename = filedialog.askopenfilename(initialdir="./data", title="Select Session File")
         f = open(filename, 'rb')
         new_db = pickle.load(f)
-        if paths[video_number].name not in new_db.keys():
-            data = predict.predict_keypoints_locations(frames, paths[video_number].name)
-            new_db.setdefault(paths[video_number].name, []).append({"data": data,
-                                                                    "label": np.array([0, 0, 0]),
-                                                                    "frame_indices": indices})
+        name = paths[video_number].parent.name + "_" + paths[video_number].name
+        if name not in new_db.keys():
+            data = predict.predict_keypoints_locations(frames, name)
+            new_db.setdefault(name, []).append({"data": data,
+                                                "label": np.array([0, 0, 0]),
+                                                "frame_indices": indices})
         f.close()
         updateLabels()
     def saveSession():
