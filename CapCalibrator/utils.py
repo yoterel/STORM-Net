@@ -103,16 +103,6 @@ def create_lstm_model(input_shape, learning_rate):
     return model
 
 
-def load_model(model_dir, pretrained_model_name, learning_rate):
-    pretrained_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(pretrained_model_name))
-    model = keras.models.load_model(str(pretrained_weight_location))
-    opt = keras.optimizers.Adam(lr=learning_rate)
-    model.compile(loss='mean_squared_error', optimizer=opt)
-    model.summary()
-    return model
-
-
-
 def shuffle_timeseries(x):
     """
     Shuffles the frames in-place pair-wise for augmentation.

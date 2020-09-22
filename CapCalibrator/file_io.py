@@ -6,6 +6,7 @@ import os
 import keras
 from keras_unet.metrics import iou, iou_thresholded
 from sklearn.model_selection import train_test_split
+from pathlib import Path
 
 
 def read_template_file(template_path):
@@ -250,3 +251,12 @@ def load_semantic_seg_model(weights_loc):
     new_model = keras.engine.Model(new_input, new_outputs)
     new_model.summary()
     return new_model
+
+
+def load_keras_model(model_dir, pretrained_model_name, learning_rate):
+    pretrained_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(pretrained_model_name))
+    model = keras.models.load_model(str(pretrained_weight_location))
+    opt = keras.optimizers.Adam(lr=learning_rate)
+    model.compile(loss='mean_squared_error', optimizer=opt)
+    model.summary()
+    return model

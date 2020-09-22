@@ -57,7 +57,7 @@ else:
 input_shape = (x_train.shape[1], x_train.shape[2])
 output_shape = y_train.shape[-1]
 if pretrained_model_name:
-    model = utils.load_model(model_dir, pretrained_model_name, learning_rate)
+    model = file_io.load_keras_model(model_dir, pretrained_model_name, learning_rate)
 else:
     model = utils.create_fc2_model(input_shape, output_shape, learning_rate)
 keras.utils.plot_model(model, to_file=str(model_graph_path)+"_graph.png", show_shapes=True)
