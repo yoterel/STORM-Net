@@ -20,17 +20,26 @@ put the measuring instrument on side, instruct not to move
 
 take two horizontal videos of patint (1920x1080) for 10 seconds without mask (but with cap)
 
+The function requires at least four of the following reference positions:
+Iz, Nz, AL, AR, Fp1, Fp2, Fz, F3, F4, F7, F8, Cz, C3, C4, T3, T4, Pz, P3, P4, T5, T6, O1, and O2.
+AL and AR stand for left and right preauricular points, respectively. Other nomenclature is according to 10-20 system 
+
 do twice: capture with stylus in order (instruct patient not to move for 15 minutes)
-	RightEar
+	LeftEar
 	NoseBridge
 	NoseTip
-	Right Eye
 	LeftEye
-	LeftEar
-	CZ
-	Fp1
+	Right Eye
+	RightEar
+	F8
 	Fp2
-	Fpz
+	"Fpz"
+	Fp1
+	F7
+	CZ
+	O1
+	OZ
+	O2
 	spiral
 
 remove cap and cz sticker
