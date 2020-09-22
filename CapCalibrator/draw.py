@@ -1,6 +1,31 @@
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import numpy as np
+import cv2
+
+
+
+image_hsv = None
+pixel = (0, 0, 0) #RANDOM DEFAULT VALUE
+ftypes = [
+    ('JPG', '*.jpg;*.JPG;*.JPEG'),
+    ('PNG', '*.png;*.PNG'),
+    ('GIF', '*.gif;*.GIF'),
+]
+
+
+def pick_color(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        pixel = image_hsv[y, x]
+
+        #HUE, SATURATION, AND VALUE (BRIGHTNESS) RANGES. TOLERANCE COULD BE ADJUSTED.
+        upper = np.array([pixel[0] + 10, pixel[1] + 10, pixel[2] + 40])
+        lower = np.array([pixel[0] - 10, pixel[1] - 10, pixel[2] - 40])
+        print(lower, upper)
+
+        #A MONOCHROME MASK FOR GETTING A BETTER VISION OVER THE COLORS
+        image_mask = cv2.inRange(image_hsv, lower, upper)
+        cv2.imshow("Mask", image_mask)
 
 
 class Arrow3D(FancyArrowPatch):
@@ -18,13 +43,17 @@ class Arrow3D(FancyArrowPatch):
         FancyArrowPatch.draw(self, renderer)
 
 
-def plot_3d_pc(ax, data, selected):
+def plot_3d_pc(ax, data, selected, names=None):
     """
-    plots a 3d point cloud representation of data (nx3)
-    :param ax:
-    :param data:
+    plots a 3d point cloud representation of data
+    :param ax: the axis to plot into
+    :param data: the data (nx3 numpy array)
+    :param selected: an int representing the currently selected data point - will be painted red
+    :param names: the names of the data points
     :return:
     """
+    if not names:
+        names = [str(i) for i in range(len(data))]
     colors = ['b'] * len(data)
     colors[selected] = 'r'
     data_min = np.min(data, axis=0)
@@ -47,7 +76,7 @@ def plot_3d_pc(ax, data, selected):
     ax.add_artist(c)
     for i, (c, x, y, z) in enumerate(zip(colors, data[:, 0], data[:, 1], data[:, 2])):
         ax.scatter(x, y, z, marker='o', c=c)
-        ax.text(x + 0.2, y + 0.2, z + 0.2, '%s' % (str(i)), size=6, zorder=1, color='k')
+        ax.text(x + 0.2, y + 0.2, z + 0.2, '%s' % (names[i]), size=6, zorder=1, color='k')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
