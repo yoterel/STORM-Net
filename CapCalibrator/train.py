@@ -6,16 +6,16 @@ from time import time
 import numpy as np
 import math
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 import keras
 from tensorflow.python.keras.callbacks import TensorBoard
 from sklearn.metrics import mean_squared_error
 
 # set paths
-model_name = 'scene3_batch16_lr1e4_openpos50_2'
-pretrained_model_name = 'scene3_batch16_lr1e4_openpos50'
+model_name = 'telaviv_model_b16'
+pretrained_model_name = 'scene3_batch16_new_model'
 root_dir = Path("/disk1/yotam/capnet")
-data_dir = Path.joinpath(root_dir, "scene3_100k")
+data_dir = Path.joinpath(root_dir, "telaviv_model")
 model_dir = Path.joinpath(root_dir, "models")
 logs_dir = Path.joinpath(root_dir, "logs")
 best_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
