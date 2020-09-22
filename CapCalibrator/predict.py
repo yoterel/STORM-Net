@@ -17,29 +17,6 @@ import sys
 import tkinter as tk
 from tkinter import filedialog
 import geometry
-image_hsv = None
-pixel = (0, 0, 0) #RANDOM DEFAULT VALUE
-
-
-ftypes = [
-    ('JPG', '*.jpg;*.JPG;*.JPEG'),
-    ('PNG', '*.png;*.PNG'),
-    ('GIF', '*.gif;*.GIF'),
-]
-
-
-def pick_color(event, x, y, flags, param):
-    if event == cv2.EVENT_LBUTTONDOWN:
-        pixel = image_hsv[y, x]
-
-        #HUE, SATURATION, AND VALUE (BRIGHTNESS) RANGES. TOLERANCE COULD BE ADJUSTED.
-        upper = np.array([pixel[0] + 10, pixel[1] + 10, pixel[2] + 40])
-        lower = np.array([pixel[0] - 10, pixel[1] - 10, pixel[2] - 40])
-        print(lower, upper)
-
-        #A MONOCHROME MASK FOR GETTING A BETTER VISION OVER THE COLORS
-        image_mask = cv2.inRange(image_hsv, lower, upper)
-        cv2.imshow("Mask", image_mask)
 
 
 def predict_rigid_transform(sticker_locations, args):
@@ -58,7 +35,7 @@ def predict_rigid_transform(sticker_locations, args):
     # utils.shuffle_timeseries(sticker_locations)
     # utils.shuffle_data(sticker_locations)
     # utils.mask_data(sticker_locations)
-    model_name = 'scene3_batch16_telaviv'
+    model_name = 'telaviv_model_b16'
     model_dir = Path("models")
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     model = keras.models.load_model(str(model_full_name))
@@ -67,11 +44,11 @@ def predict_rigid_transform(sticker_locations, args):
     # notice x is not negated - the positive direction in simulation is flipped.
     rs = []
     sc = []
+
     for i in range(len(y_predict)):
+        if args.verbosity:
+            print("Network Euler angels:", [y_predict[i][0], -y_predict[i][1], -y_predict[i][2]])
         rot = R.from_euler('xyz', [y_predict[i][0], -y_predict[i][1], -y_predict[i][2]], degrees=True)
-        # if v:
-            # print("Network Euler angels:", [y_predict[0][0], -y_predict[0][2], -y_predict[0][1]])
-            # print("Network scale:", y_predict[0][3], y_predict[0][4])
         scale_mat = np.identity(3)
         if y_predict.shape[-1] > 3:
             scale_mat[0, 0] = y_predict[0][3]  # xscale
@@ -80,16 +57,16 @@ def predict_rigid_transform(sticker_locations, args):
         rotation_mat = rot.as_matrix()
         rs.append(rotation_mat)
         sc.append(scale_mat)
-    if len(rs) > 1:
-        for i in range(len(rs)):
-            geometry.apply_rigid_transform(rs[i],
-                                           sc[i],
-                                           args.model,
-                                           args.ground_truth,
-                                           plot=False,
-                                           v=1)
-        exit()
-    return rs[0], sc[0]
+    # if len(rs) > 1:
+    #     for i in range(len(rs)):
+    #         geometry.apply_rigid_transform(rs[i],
+    #                                        sc[i],
+    #                                        args.model,
+    #                                        args.ground_truth,
+    #                                        plot=False,
+    #                                        v=1)
+    #     exit()
+    return rs, sc
 
 
 def get_facial_landmarks(frames, v):
