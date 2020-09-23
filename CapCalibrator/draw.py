@@ -45,6 +45,59 @@ class Arrow3D(FancyArrowPatch):
         FancyArrowPatch.draw(self, renderer)
 
 
+def visualize_2_pc(points_blue, names_blue=None, points_red=None, names_red=None, title=""):
+    """
+    plots one or two 3d point clouds in blue and red in a nx3 numpy array format
+    :param points_blue:
+    :param names_blue:
+    :param points_red:
+    :param names_red:
+    :param title:
+    :return:
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    if points_red is not None:
+        for i in range(len(points_blue)):  # plot each point + it's index as text above
+            ax.scatter(points_blue[i, 0], points_blue[i, 1], points_blue[i, 2], color='b')
+            if names_blue:
+                ax.text(points_blue[i, 0],
+                        points_blue[i, 1],
+                        points_blue[i, 2],
+                        '%s' % (names_blue[i]),
+                        size=20,
+                        zorder=1,
+                        color='k')
+        for i in range(len(points_red)):
+            ax.scatter(points_red[i, 0], points_red[i, 1], points_red[i, 2], color='r')
+            if names_red:
+                ax.text(points_red[i, 0],
+                        points_red[i, 1],
+                        points_red[i, 2],
+                        '%s' % (names_red[i]),
+                        size=20,
+                        zorder=1,
+                        color='g')
+    else:
+        for i in range(len(points_blue)):  # plot each point + it's index as text above
+            ax.scatter(points_blue[i, 0], points_blue[i, 1], points_blue[i, 2], color='b')
+            if names_blue:
+                ax.text(points_blue[i, 0],
+                        points_blue[i, 1],
+                        points_blue[i, 2],
+                        '%s' % (names_blue[i]),
+                        size=20,
+                        zorder=1,
+                        color='k')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.view_init(30, 30)
+    ax.set_title(title)
+    plt.show()
+    # plt.savefig(output_file)
+
+
 def plot_3d_pc(ax, data, selected, names=None):
     """
     plots a 3d point cloud representation of data
@@ -95,8 +148,7 @@ def visualize_annotated_data(db_path, filter=None):
     # save_db(db, db_path)
     shift = 0
     for key in db.keys():
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        fig, ax = plt.subplots()
         data = db[key][shift]["data"][0]
         if len(db[key][shift]["data"][0].shape) < 3:
             data = np.expand_dims(data, axis=0)
@@ -128,6 +180,7 @@ def visualize_annotated_data(db_path, filter=None):
         ax.set_ylim([0, 1])
         # plt.show()
         plt.savefig(Path("plots", "telaviv", key+".png"))
+        plt.close(fig)
 
 
 def plot_patches(img_arr, org_img_size, stride=None, size=None):
@@ -284,7 +337,6 @@ if __name__ == "__main__":
     #                 "GX011581.MP4", "GX011582.MP4", "GX011572.MP4", "GX011573.MP4",
     #                 "GX011574.MP4", "GX011575.MP4", "GX011576.MP4", "GX011566.MP4",
     #                 "GX011567.MP4", "GX011568.MP4", "GX011569.MP4", "GX011570.MP4"]
-    # db_path = Path("data", "full_db.pickle")
-
     db_path = Path("data", "telaviv_db.pickle")
+    # db_path = Path("data", "output")
     visualize_annotated_data(db_path, filter=None)

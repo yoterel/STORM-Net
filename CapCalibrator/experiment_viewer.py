@@ -86,16 +86,16 @@ class ExperimentViewer(tk.Frame):
         # b = quiver(X, Y, Z, U, V, W, **kwargs)
         args = parse_arguments()
         names, data, format = read_template_file(args.template)
-        data = data[0]
-        names = names[0]
+        data = data[0]  # read only first session
+        names = names[0]  # read only first session
         if format == "telaviv":
             if args.use_sensor2:
                 data = data[:, 0, :] - data[:, 1, :]
             else:
                 data = data[:, 0, :]
         data = to_standard_coordinate_system(names, data)
-        data = data[15:, :]
-        names = names[15:]
+        # data = data[15:, :]
+        # names = names[15:]
         plot_3d_pc(a, data, selected, names)
         canvas = FigureCanvasTkAgg(f, self)
         canvas.draw()

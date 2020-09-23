@@ -195,7 +195,7 @@ def load_db(db_path, format="pickle", filter=None):
     else:
         if format == "json":
             number_of_samples = 50
-            skip_files = 1000
+            skip_files = 0
             count = 0
             for i, file in enumerate(db_path.glob("*.json")):
                 if filter:
@@ -204,7 +204,7 @@ def load_db(db_path, format="pickle", filter=None):
                         x = np.expand_dims(x, axis=0)
                         x[:, :, 0::2] *= 960
                         x[:, :, 1::2] *= 540
-                        db[file.name] = {"data": x, "label": y}
+                        db[file.name] = [{"data": x, "label": y}]
                 else:
                     if i < skip_files:
                         continue
@@ -213,7 +213,7 @@ def load_db(db_path, format="pickle", filter=None):
                         x = np.expand_dims(x, axis=0)
                         x[:, :, 0::2] *= 960
                         x[:, :, 1::2] *= 540
-                        db[file.name] = {"data": x, "label": y}
+                        db[file.name] = [{"data": x, "label": y}]
                         count += 1
                     if count >= number_of_samples:
                         break

@@ -7,23 +7,24 @@ from pathlib import Path
 import pickle
 import numpy as np
 import utils
+import file_io
 import video_annotator
-from PIL import Image
 import draw
+
 
 def visualize_network_performance(model_name, root_dir):
     #############################################################
     db_path = Path("data", "full_db.pickle")
-    gt = load_gt_db(db_path)
+    gt = file_io.load_db(db_path)
     vid_name = "GX011578.MP4"
     synth_data_dir = Path.joinpath(root_dir, "captures_special")
     pickle_file_path = Path.joinpath(synth_data_dir, "data.pickle")
     if not pickle_file_path.is_file():
-        X, Y = utils.load_db(synth_data_dir)
+        X, Y = file_io.load_db(synth_data_dir)
         x_train, x_val, y_train, y_val, x_test, y_test = utils.split_data(X, Y)
-        utils.serialize_data(pickle_file_path, x_train, x_val, y_train, y_val, x_test, y_test)
+        file_io.serialize_data(pickle_file_path, x_train, x_val, y_train, y_val, x_test, y_test)
     else:
-        x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
+        x_train, x_val, y_train, y_val, x_test, y_test = file_io.deserialize_data(pickle_file_path)
     A = gt[vid_name]["data"][0]
     A[:, 0::2] /= 960
     A[:, 1::2] /= 540
@@ -47,12 +48,12 @@ def visualize_network_performance(model_name, root_dir):
     print("gt pred: ", gt_pred, gt[vid_name]["label"])
     print("synth pred: ", y_predict_special, y_train[min_index])
     filter = [vid_name]
-    draw.visualize_data(db_path, filter)
+    draw.visualize_annotated_data(db_path, filter)
     filter = ["image_{:05d}.json".format(min_index)]
-    draw.visualize_data(synth_data_dir, filter)
+    draw.visualize_annotated_data(synth_data_dir, filter)
 #################################################################
     pickle_file_path = Path.joinpath(data_dir, "data.pickle")
-    x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
+    x_train, x_val, y_train, y_val, x_test, y_test = file_io.deserialize_data(pickle_file_path)
     fig = plt.figure()
     ax = plt.axes()
     n, bins, patches = ax.hist(y_train[:, 0], 50, density=True, facecolor='r', alpha=0.75)
@@ -154,50 +155,6 @@ def fix_db(db):
 #                                                   "frame_indices": db[key]["frame_indices"]})
 #     save_full_db(fresh_db, db_path)
 #     print("done")
-
-
-def visualize_pc(points_blue, names_blue=None, points_red=None, names_red=None, title=""):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    if points_red is not None:
-        for i in range(len(points_blue)):  # plot each point + it's index as text above
-            ax.scatter(points_blue[i, 0], points_blue[i, 1], points_blue[i, 2], color='b')
-            if names_blue:
-                ax.text(points_blue[i, 0],
-                        points_blue[i, 1],
-                        points_blue[i, 2],
-                        '%s' % (names_blue[i]),
-                        size=20,
-                        zorder=1,
-                        color='k')
-        for i in range(len(points_red)):
-            ax.scatter(points_red[i, 0], points_red[i, 1], points_red[i, 2], color='r')
-            if names_red:
-                ax.text(points_red[i, 0],
-                        points_red[i, 1],
-                        points_red[i, 2],
-                        '%s' % (names_red[i]),
-                        size=20,
-                        zorder=1,
-                        color='g')
-    else:
-        for i in range(len(points_blue)):  # plot each point + it's index as text above
-            ax.scatter(points_blue[i, 0], points_blue[i, 1], points_blue[i, 2], color='b')
-            if names_blue:
-                ax.text(points_blue[i, 0],
-                        points_blue[i, 1],
-                        points_blue[i, 2],
-                        '%s' % (names_blue[i]),
-                        size=20,
-                        zorder=1,
-                        color='k')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.view_init(30, 30)
-    ax.set_title(title)
-    plt.show()
-    # plt.savefig(output_file)
 
 
 def doSFM(video_path):
