@@ -94,8 +94,9 @@ class ExperimentViewer(tk.Frame):
             else:
                 data = data[:, 0, :]
         data = to_standard_coordinate_system(names, data)
-        # data = data[15:, :]
-        # names = names[15:]
+        spiral_index = names.index(0)
+        data = data[spiral_index:, :]
+        names = names[spiral_index:]
         plot_3d_pc(a, data, selected, names)
         canvas = FigureCanvasTkAgg(f, self)
         canvas.draw()

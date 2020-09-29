@@ -316,3 +316,21 @@ def get_patches(img_arr, size=256, stride=256):
         raise ValueError('img_arr.ndim must be equal 2, 3 or 4')
 
     return np.stack(patches_list)
+
+
+def get_local_range(x, local_env_size, frames_to_use):
+    """
+    gets non negative local envrionment of indices around x given size of environment and maximum frames
+    :param x: the index about we find a local environment
+    :param local_env_size: the size of the local environment
+    :param frames_to_use: maximum index allowed
+    :return:
+    """
+    diff_minus = max(x - local_env_size // 2, 0)
+    diff_plus = min(x + local_env_size // 2, frames_to_use)
+    if diff_plus - diff_minus != (local_env_size - 1):
+        if diff_minus == 0:
+            diff_plus -= x - local_env_size // 2
+        else:
+            assert (1 == 0)
+    return diff_minus, diff_plus

@@ -3,46 +3,69 @@ import imageio
 from PIL import Image
 import video_annotator
 from pathlib import Path
+import utils
+import cv2
 
 
-def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, frame_indices=None):
+def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, local_env_size=5, frame_indices=None):
     """
-    selects "steps_per_datapoint" number of frames from a video starting with "starting_frame"
-    frames spacing is set uniformly unless indices are specified by frame_indices.
-    :param vid_path:
-    :param steps_per_datapoint:
-    :param starting_frame:
-    :param frame_indices:
-    :return: the frames (list of numpy array) and their indices
+    selects "steps_per_datapoint" number of frames from a video starting with "starting_frame".
+    frames spacing is set uniformly unless local_env_size is greater than 1
+    user may also supply his own indices skipping this process.
+    :param vid_path: the path to the video file
+    :param steps_per_datapoint: the number of frames to retrieve
+    :param starting_frame: the starting frame, defualts to 0
+    :param local_env_size: the local environment of indices to look for non-blurred images using variance of laplacian
+            note: if 1 then selected frames are the initial evenly spaced sites.
+    :param frame_indices: if specified, these are the frames that are selected
+    :return: the frames (list of PIL images) and their respected indices
     """
-    # Read an image, a window and bind the function to window
-    # cap = cv2.VideoCapture(str(video_path))
     reader = imageio.get_reader(vid_path, 'ffmpeg')
     meta_data = reader.get_meta_data()
-    estimated_total_frames = np.array(meta_data["fps"] * meta_data["duration"], dtype=int).tolist()
+    estimated_total_frames = int(meta_data["fps"] * meta_data["duration"])
     frames_to_use = estimated_total_frames
-    if starting_frame >= (frames_to_use // steps_per_datapoint):
-        starting_frame = 0
-    # db = np.zeros((frames_to_use // steps_per_datapoint, steps_per_datapoint, number_of_features))
-    # imgs = np.zeros((steps_per_datapoint, 960, 540))
-    # my_dict = {"db": db, "img": img}
-    frames = []
-    indices = []
+    assert(starting_frame < frames_to_use)
+    frames_to_use -= starting_frame
+    stride = frames_to_use // steps_per_datapoint
+    assert (local_env_size < stride)
+    assert (local_env_size % 2 == 1)
+    if frame_indices is not None:
+        indices = [frame_indices]
+    else:
+        base_sites = [i for i in range(0, frames_to_use, stride)]
+        base_sites = base_sites[:steps_per_datapoint]
+        base_sites = [x+starting_frame for x in base_sites]
+        indices = []
+        for x in base_sites:
+            begin, end = utils.get_local_range(x, local_env_size, frames_to_use)
+            indices.append([x for x in range(begin, end+1)])
+    frames = np.empty(np.array(indices).shape, dtype=object)
     for i, im in enumerate(reader):
-        if frame_indices is not None:
-            if i in frame_indices:
-                frames.append(Image.fromarray(im).resize((960, 540)))
-                indices.append(i)
-        else:
-            if i >= frames_to_use:
-                break
-            else:
-                if i % (frames_to_use // steps_per_datapoint) == starting_frame:
-                    frames.append(Image.fromarray(im).resize((960, 540)))
-                    indices.append(i)
-                    if len(frames) >= steps_per_datapoint:
-                        break
+        if any(i in sublist for sublist in indices):
+            loc = [(j, idx.index(i)) for j, idx in enumerate(indices) if i in idx]
+            loc = loc[0]
+            frames[loc[0], loc[1]] = Image.fromarray(im).resize((960, 540))
+    if local_env_size != 1 and frame_indices is None:
+        selected_sites = []
+        for i in range(len(frames)):
+            cur = frames[i, :]
+            blur = np.array([measure_blur(xi) for xi in cur])
+            selected_sites.append(np.argmax(blur).astype(int))
+        indices = [x[s] for x, s in zip(indices, selected_sites)]
+        frames = [x[s] for x, s in zip(frames.tolist(), selected_sites)]
+    else:
+        frames = frames[0].tolist()
+        indices = indices[0]
     return frames, indices
+
+
+def measure_blur(frame):
+    """
+    returns a score measureing how blurry is the frame (the higher, the less blurry)
+    :param frame: the frame to analyze
+    :return: a float representing the score
+    """
+    return cv2.Laplacian(np.array(frame), cv2.CV_64F).var()
 
 
 def process_video(args):
