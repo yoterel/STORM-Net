@@ -6,6 +6,7 @@ from pathlib import Path
 import utils
 import cv2
 import file_io
+import predict
 
 
 def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, local_env_size=5, frame_indices=None):
@@ -140,60 +141,37 @@ def process_video(args):
         return new_db[vid_path.parent.name + "_" + vid_path.name][0]["data"]
 
 
-def auto_annotate_videos(vid_path, dump_to_db, force_annotate, mode="normal"):
+def auto_annotate_videos(vid_path, dump_to_db, force_annotate):
     """
-    given a video file or folder of video files,
+    given a video file or folder of video files, automatically annotates the video
     :param vid_path:
     :param model_digi_file:
     :param mode:
     :return:
     """
-    is_vid_file = True if Path.is_file(vid_path) else False
+    db_path = Path("data", "full_db.pickle")
     model_dir = Path("models")
-    data_dir = Path("data")
-    db_path = Path.joinpath(data_dir, "full_db.pickle")
-    model_name = 'unet_try_2'
+    model_name = 'unet_tel_aviv'
     model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     my_model = file_io.load_semantic_seg_model(str(model_full_name))
-    # get label
-    # try:
-    #     if is_vid_file:
-    #         gt_digi_file = vid_path.parent.glob("*.txt").__next__()  # assumes gt digi file is in same folder
-    #     else:
-    #         gt_digi_file = vid_path.glob("*.txt").__next__()
-    #     names, data = geometry.get_data_from_model_file(gt_digi_file)
-    #     gt_sticker_data = geometry.get_sticker_data(names, data)
-    #     names, data = geometry.get_data_from_model_file(model_digi_file)
-    #     model_sticker_data = geometry.get_sticker_data(names, data)
-    #     label = geometry.get_euler_angles(gt_sticker_data, model_sticker_data)  # obtain the angels needed to turn gt into my data
-    # except:
-    #     label = np.zeros((1, 3))
-    label = np.zeros((1, 3))
+    my_db = file_io.load_full_db(db_path)
     paths = []
-    if is_vid_file:
+    if Path.is_file(vid_path):
         paths.append(vid_path)
     else:
         for file in vid_path.glob("*.MP4"):
             paths.append(file)
-    my_db = file_io.load_full_db(db_path)
     for path in paths:
-        print("processing video:", path)
-        name = path.parent + "_" + path.name
-        if name not in my_db.keys():
-            if mode == "special":
-                my_range = 50
-            else:
-                my_range = 1
-            for i in range(my_range):
-                frames, indices = video_to_frames(path, dump_frames=False, starting_frame=i, force_reselect=True)
-                data = predict.predict_keypoints_locations(frames,
-                                                           name,
-                                                           is_puppet=False,
-                                                           save_intermed=False,
-                                                           preloaded_model=my_model,
-                                                           v=1)
-                my_db.setdefault(name, []).append({"data": data,
-                                                   "label": np.array(label),
-                                                   "frame_indices": indices})
-            file_io.dump_full_db(my_db, db_path)
+        frames, indices = video_to_frames(path, dump_frames=True)
+        name = path.parent.name + "_" + path.name
+        if name not in my_db.keys() or force_annotate:
+            data = predict.predict_keypoints_locations(frames, name,
+                                                       is_puppet=False,
+                                                       save_intermed=False,
+                                                       preloaded_model=my_model)
+            my_db.setdefault(name, []).append({"data": data,
+                                               "label": np.array([0, 0, 0]),
+                                               "frame_indices": indices})
+    if dump_to_db:
+        file_io.dump_full_db(my_db, db_path)
     return my_db
