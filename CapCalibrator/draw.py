@@ -110,7 +110,7 @@ def plot_3d_pc(ax, data, selected, names=None):
     if not names:
         names = [str(i) for i in range(len(data))]
     colors = ['b'] * len(data)
-    colors[selected] = 'r'
+    # colors[selected] = 'r'
     data_min = np.min(data, axis=0)
     a = Arrow3D([data_min[0], data_min[0]+3], [data_min[1], data_min[1]],
                 [data_min[2], data_min[2]], mutation_scale=10,

@@ -24,7 +24,7 @@ def predict_rigid_transform(sticker_locations, args):
     """
     predicts rigid transformation of cap object using 2d sticker locations
     :param sticker_locations: a batch of 2d array of sticker locations
-    :param v: verbosity
+    :param args: command line arguments
     :return: rotation and scale matrices list
     """
     if args.verbosity:
@@ -207,7 +207,7 @@ def get_sticker_locations(frames, preloaded_model, v):
     :return: locations of stickers in all frames as a 2d numpy array
     """
     if not preloaded_model:
-        model_name = 'unet_try_2'
+        model_name = 'unet_tel_aviv'
         model_dir = Path("models")
         model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
         my_model = file_io.load_semantic_seg_model(str(model_full_name))

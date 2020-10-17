@@ -260,3 +260,36 @@ def load_keras_model(model_dir, pretrained_model_name, learning_rate):
     model.compile(loss='mean_squared_error', optimizer=opt)
     model.summary()
     return model
+
+
+def load_from_pickle(pickle_file_path):
+    f = open(pickle_file_path, 'rb')
+    data = pickle.load(f)
+    f.close()
+    return data
+
+
+def dump_to_pickle(pickle_file_path, data):
+    f = open(pickle_file_path, 'wb')
+    pickle.dump(data, f)
+    f.close()
+
+
+def dump_full_db(db, path=None):
+    if path:
+        pickle_path = path
+    else:
+        pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
+    dump_to_pickle(pickle_path, db)
+
+
+def load_full_db(db_path=None):
+    if db_path is None:
+        pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
+    else:
+        pickle_path = db_path
+    if pickle_path.is_file():
+        db = load_from_pickle(pickle_path)
+    else:
+        db = {}
+    return db
