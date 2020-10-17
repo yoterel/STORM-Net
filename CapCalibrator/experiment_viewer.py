@@ -94,9 +94,10 @@ class ExperimentViewer(tk.Frame):
             else:
                 data = data[:, 0, :]
         data = to_standard_coordinate_system(names, data)
-        spiral_index = names.index(0)
-        data = data[spiral_index:, :]
-        names = names[spiral_index:]
+        if not args.only_fiducials:
+            spiral_index = names.index(0)
+            data = data[spiral_index:, :]
+            names = names[spiral_index:]
         plot_3d_pc(a, data, selected, names)
         canvas = FigureCanvasTkAgg(f, self)
         canvas.draw()
@@ -144,10 +145,11 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Renders training images for fNIRS alighment')
     parser.add_argument("template", help="Path to raw template file. For exact format see documentation.")
     parser.add_argument("--use_sensor2", action='store_true', help="sensor2 results will be subtracted from sensor1 for more accuracy.")
+    parser.add_argument("--only_fiducials", action="store_true", help="viewer just shows specific fiducials.")
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = "./../example_models/example_model3.txt --use_sensor2".split()
+    cmd_line = "./../example_models/telaviv_experiment/maya.txt --use_sensor2 --only_fiducials".split()
     args = parser.parse_args(cmd_line)
     args.template = Path(args.template)
     print(args.template)

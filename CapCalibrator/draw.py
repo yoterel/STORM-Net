@@ -101,6 +101,7 @@ def visualize_2_pc(points_blue, names_blue=None, points_red=None, names_red=None
 def plot_3d_pc(ax, data, selected, names=None):
     """
     plots a 3d point cloud representation of data
+    used in experiment viewer
     :param ax: the axis to plot into
     :param data: the data (nx3 numpy array)
     :param selected: an int representing the currently selected data point - will be painted red
