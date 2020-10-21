@@ -20,7 +20,7 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/amir E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment/amir.txt -m special -v 1'.split()
+    cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/good_experiments E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment -m special -v 1'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/openPos55/GX011592.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m special -gt /disk1/yotam/capnet/openPos/openPos55'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/real_babies/1778b/GX011447.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m manual -v 1'.split()
     args = parser.parse_args(cmd_line)
@@ -32,16 +32,16 @@ def parse_arguments():
         args.template = args.template.glob("*.txt").__next__()
     if args.ground_truth:
         args.ground_truth = Path(args.ground_truth)
-        if Path.is_dir(args.ground_truth):
-            args.ground_truth = args.ground_truth.glob("*.txt")
+        # if Path.is_dir(args.ground_truth):
+        #     args.ground_truth = args.ground_truth.glob("*.txt")
     return args
 
 
 if __name__ == "__main__":
     args = parse_arguments()
-    sticker_locations = video.process_video(args)  # nx10x14 floats
+    sticker_locations, video_names = video.process_video(args)  # nx10x14 floats
     r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, args)
-    sensor_locations = geometry.apply_rigid_transform(r_matrix, s_matrix, args, plot=True)
+    sensor_locations = geometry.apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True)
     projected_data = geometry.project_sensors_to_MNI(sensor_locations, args.verbosity)
     save_results(projected_data, args.output_file, args.verbosity)
     if args.verbosity:

@@ -341,9 +341,10 @@ def from_sim_to_standard_space(names, data):
     return from_standard_to_sim_space(names, data)
 
 
-def apply_rigid_transform(r_matrix, s_matrix, args, plot=True):
+def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
     if args.mode == "special":
         digi2digi_est = get_digi2digi_results(args.template, args.ground_truth)
+
         vid2vid_est = []
         names, data, format = read_template_file(args.template)
         names = names[0]
@@ -581,11 +582,17 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
                                         template_names.index('nosebridge'),
                                         template_names.index('nosetip')), :]
     template_spiral_data = template_data[template_names.index(0):, :]  # select spiral
-    estimations = []
+
+    experiment_file_list = []
+    estimations = {}
     if experiment_folder_path.is_dir():
-        print("woops")
+        for exp_file in experiment_folder_path.glob("*.txt"):
+            experiment_file_list.append(exp_file)
     else:
-        file_names, file_data, file_format = read_template_file(experiment_folder_path)
+        experiment_file_list.append(experiment_folder_path)
+
+    for exp_file in experiment_file_list:
+        file_names, file_data, file_format = read_template_file(exp_file)
         for session in zip(file_names, file_data):
             names = session[0]
             data = session[1][:, 0, :]# - session[1][:, 1, :]  # subtract second sensor
@@ -621,7 +628,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
             # note: we apply only the mask transformation and report that to downstream.
             # facial alignment was an intermediate result
             estimation = (ret_R @ template_spiral_data.T).T
-            estimations.append(estimation)
+            estimations.setdefault(exp_file.stem, []).append(estimation)
         # rmse = get_rmse(estimation, file_spiral_data)
         # print("template-digitizer error (transform using fiducials):", rmse)
         # vis_estimation = (ret_R @ template_face_data.T).T + ret_t

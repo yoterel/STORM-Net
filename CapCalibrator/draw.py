@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 from pathlib import Path
 import utils
-from file_io import load_db
+from file_io import load_db, load_raw_json_db
 
 image_hsv = None
 pixel = (0, 0, 0) #RANDOM DEFAULT VALUE
@@ -142,14 +142,21 @@ def plot_3d_pc(ax, data, selected, names=None):
     ax.set_title('Point {} (WASD: change view, Arrows: next/previous point)'.format(selected))
 
 
-def visualize_annotated_data(db_path, filter=None):
-    my_format = "pickle" if db_path.suffix == ".pickle" else "json"
-    db = load_db(db_path, my_format, filter)
-    # db = fix_db(db)
-    # save_db(db, db_path)
+def visualize_annotated_data(db_path, synth_data_path, filter=None):
+    """
+    plots sticker locations over 10 frames from a real database and closest output from a synthetic database folder for comparison.
+    the locations are centered and plotted in normalized screen space
+    :param synth_data_path:
+    :param db_path:
+    :param filter:
+    :return:
+    """
+    db = load_db(db_path, "pickle", filter)
+    synth_db = load_raw_json_db(synth_data_path)
+    synth_db = synth_db[0]  # selects data, discards label
+    utils.center_data(synth_db)
     shift = 0
     for key in db.keys():
-        fig, ax = plt.subplots()
         data = db[key][shift]["data"][0]
         if len(db[key][shift]["data"][0].shape) < 3:
             data = np.expand_dims(data, axis=0)
@@ -157,31 +164,40 @@ def visualize_annotated_data(db_path, filter=None):
         data[:, :, 1::2] /= 540
         utils.center_data(data)
         data = np.squeeze(data)
+        closest_synth_image = np.argmin(np.sum((synth_db - data)**2, axis=(1, 2)))
+        selected_synth_data = synth_db[closest_synth_image]
         # s_linear = [n for n in range(len(data))]
-        c = ['b', 'b', 'b', 'r', 'r', 'r', 'g']
-        for t in range(0, data.shape[1], 2):
-            x = data[:, t]
-            y = data[:, t+1]
-            exist = np.nonzero(x)
-            x = x[exist]
-            y = y[exist]
-            u = np.diff(x)
-            v = np.diff(y)
-            pos_x = x[:-1] + u / 2
-            pos_y = y[:-1] + v / 2
-            norm = np.sqrt(u ** 2 + v ** 2)
-            ax.scatter(x, y, marker='o', c=c[t//2])
-            ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid", scale=10, scale_units='inches')
-        # for t in range(len(data)):
-        #     ax.scatter(data[t, 0::2], data[t, 1::2], marker='o', s=t*20)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_title(key)
-        ax.set_xlim([0, 1])
-        ax.set_ylim([0, 1])
-        # plt.show()
-        plt.savefig(Path("plots", "telaviv", key+".png"))
-        plt.close(fig)
+        gen_and_save_quiver_plot(Path("plots", "telaviv", key+".png"), data)
+        gen_and_save_quiver_plot(Path("plots", "telaviv", key+"_synth.png"), selected_synth_data)
+
+
+def gen_and_save_quiver_plot(my_path, data, title=None):
+    fig, ax = plt.subplots()
+    c = ['b', 'b', 'b', 'r', 'r', 'r', 'g']
+    for t in range(0, data.shape[1], 2):
+        x = data[:, t]
+        y = data[:, t + 1]
+        exist = np.nonzero(x)
+        x = x[exist]
+        y = y[exist]
+        u = np.diff(x)
+        v = np.diff(y)
+        pos_x = x[:-1] + u / 2
+        pos_y = y[:-1] + v / 2
+        norm = np.sqrt(u ** 2 + v ** 2)
+        ax.scatter(x, y, marker='o', c=c[t // 2])
+        ax.quiver(pos_x, pos_y, u / norm, v / norm, angles="xy", zorder=5, pivot="mid", scale=10, scale_units='inches')
+    # for t in range(len(data)):
+    #     ax.scatter(data[t, 0::2], data[t, 1::2], marker='o', s=t*20)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    if title:
+        ax.set_title(title)
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
+    # plt.show()
+    plt.savefig(my_path)
+    plt.close(fig)
 
 
 def plot_patches(img_arr, org_img_size, stride=None, size=None):
@@ -339,5 +355,6 @@ if __name__ == "__main__":
     #                 "GX011574.MP4", "GX011575.MP4", "GX011576.MP4", "GX011566.MP4",
     #                 "GX011567.MP4", "GX011568.MP4", "GX011569.MP4", "GX011570.MP4"]
     db_path = Path("data", "telaviv_db.pickle")
+    synthetic_data_path = Path("E:/Src/CapCalibrator/DataSynth/build/new_model_30k")
     # db_path = Path("data", "output")
-    visualize_annotated_data(db_path, filter=None)
+    visualize_annotated_data(db_path, synthetic_data_path, filter=None)

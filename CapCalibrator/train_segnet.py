@@ -1,7 +1,11 @@
 import sys
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+import keras.backend as K
+config = K.tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = K.tf.Session(config=config)
 import keras
 from keras_unet.utils import get_augmented
 from tensorflow.python.keras.callbacks import TensorBoard
@@ -14,14 +18,14 @@ from time import time
 stdout = sys.stdout
 
 # hyper parameters
-redirect_sysout = True
+redirect_sysout = False
 batch_size = 8
 learning_rate = 1e-4
 early_stopping_patience = 20
 reduce_lr_patience = 3
 epochs = 1000
 verbosity = 1  # set verbosity of fit
-model_name = 'unet_try_2'
+model_name = 'unet_tel_aviv'
 
 # paths
 root_dir = Path("/disk1/yotam/capnet")
@@ -33,10 +37,10 @@ my_log_dir.mkdir(parents=True, exist_ok=True)
 model_graph_path = Path.joinpath(my_log_dir, model_name)
 event_file_path = Path.joinpath(my_log_dir, model_name+"_events.txt")
 db_dir = Path.joinpath(root_dir, "db_segmentation")
-pickle_file_path = Path.joinpath(db_dir, "data.pickle")
-image_dir = Path.joinpath(db_dir, "Frames")
+pickle_file_path = Path.joinpath(db_dir, "data_telaviv.pickle")
+image_dir = Path.joinpath(db_dir, "tel_aviv_frames")
 orig_label_dir = Path.joinpath(db_dir, "Labels")
-label_dir = Path.joinpath(db_dir, "Labels_stickers")
+label_dir = Path.joinpath(db_dir, "tel_aviv_labels")
 if not label_dir.is_dir():
     utils.preprocess_labels(orig_label_dir, label_dir)
 if redirect_sysout:

@@ -5,7 +5,7 @@ import json
 import os
 import keras
 from keras_unet.metrics import iou, iou_thresholded
-from sklearn.model_selection import train_test_split
+import tensorflow as tf
 from pathlib import Path
 
 
@@ -176,7 +176,7 @@ def load_raw_json_db(db_path, use_scale=False):
 def load_db(db_path, format="pickle", filter=None):
     """
     loads a db according to known format
-    note: formats supported are either pickle or json serialized files.
+    note: formats supported are either pickle or folder of json serialized files.
     :param db_path: the path to the db file / folder of db files
     :param format: the format (pickle / json)
     :param filter: a list of files used to select specific files
@@ -194,7 +194,7 @@ def load_db(db_path, format="pickle", filter=None):
             db = new_db
     else:
         if format == "json":
-            number_of_samples = 50
+            number_of_samples = 30000
             skip_files = 0
             count = 0
             for i, file in enumerate(db_path.glob("*.json")):
@@ -250,7 +250,7 @@ def load_semantic_seg_model(weights_loc):
     new_outputs = old_model(new_input)
     new_model = keras.engine.Model(new_input, new_outputs)
     new_model.summary()
-    return new_model
+    return new_model, tf.get_default_graph()
 
 
 def load_keras_model(model_dir, pretrained_model_name, learning_rate):

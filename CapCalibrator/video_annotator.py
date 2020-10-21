@@ -35,29 +35,32 @@ class AnnotationPage(tk.Frame):
                               bg="#263D42", command=self.controller.next_video)
         prevVideo = tk.Button(self, text="Previous Video", width=button_width, padx=pad_x, pady=pad_y, fg="white",
                               bg="#263D42", command=self.controller.prev_video)
-        shiftVideoF = tk.Button(self, text="Next Shift", width=button_width, padx=pad_x, pady=pad_y, fg="white",
+        shiftVideoF = tk.Button(self, text="Shift Forward", width=button_width, padx=pad_x, pady=pad_y, fg="white",
                                 bg="#263D42", command=self.controller.shift_video_f)
-        shiftVideoB = tk.Button(self, text="Prev Shift", width=button_width, padx=pad_x, pady=pad_y, fg="white",
+        shiftVideoB = tk.Button(self, text="Shift Backward", width=button_width, padx=pad_x, pady=pad_y, fg="white",
                                 bg="#263D42", command=self.controller.shift_video_b)
         loadSession = tk.Button(self, text="Load Session", width=button_width, padx=pad_x, pady=pad_y, fg="white",
                                 bg="#263D42", command=self.controller.load_session)
         saveSession = tk.Button(self, text="Save Session", width=button_width, padx=pad_x, pady=pad_y, fg="white",
                                 bg="#263D42", command=self.controller.save_session)
+        autoAnnotate = tk.Button(self, text="Auto Annotate", width=button_width, padx=pad_x, pady=pad_y, fg="white",
+                                bg="#263D42", command=self.controller.auto_annotate)
         doneButton = tk.Button(self, text="Done", width=button_width, padx=pad_x, pady=pad_y, fg="white",
                                bg="#263D42", command=self.controller.destroy)
         self.data_panel = tk.Frame(self, bg="white")
         self.update_labels()
         loadSession.grid(row=0, column=0, sticky="w"+"e")
         saveSession.grid(row=0, column=1, sticky="w"+"e")
-        nextVideo.grid(row=0, column=2, sticky="w"+"e")
-        prevVideo.grid(row=0, column=3, sticky="w"+"e")
-        nextFrame.grid(row=0, column=4, sticky="w"+"e")
-        prevFrame.grid(row=0, column=5, sticky="w"+"e")
-        shiftVideoF.grid(row=0, column=6, sticky="w"+"e")
-        shiftVideoB.grid(row=0, column=7, sticky="w"+"e")
-        doneButton.grid(row=0, column=8, sticky="w"+"e")
-        self.data_panel.grid(row=0, column=9, rowspan=9)
-        self.canvas.grid(row=1, columnspan=9, rowspan=8)
+        prevVideo.grid(row=0, column=2, sticky="w"+"e")
+        nextVideo.grid(row=0, column=3, sticky="w"+"e")
+        prevFrame.grid(row=0, column=4, sticky="w"+"e")
+        nextFrame.grid(row=0, column=5, sticky="w"+"e")
+        shiftVideoB.grid(row=0, column=6, sticky="w"+"e")
+        shiftVideoF.grid(row=0, column=7, sticky="w"+"e")
+        autoAnnotate.grid(row=0, column=8, sticky="w" + "e")
+        doneButton.grid(row=0, column=9, sticky="w"+"e")
+        self.data_panel.grid(row=0, column=10, rowspan=10)
+        self.canvas.grid(row=1, columnspan=10, rowspan=9)
 
     def update_labels(self):
         self.clear_labels()
@@ -103,14 +106,21 @@ class AnnotationPage(tk.Frame):
 class ProgressBarPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.status_label = tk.Label(self, text="", bg=controller['bg'], pady=10)
         self.prog_bar = ttk.Progressbar(self, orient=tk.HORIZONTAL, length=300, mode="indeterminate")
-        self.prog_bar.pack(fill="none", expand=True)
+
+        self.status_label.pack(side="top")
+        self.prog_bar.pack(side="top")
 
     def show_progress(self, show):
         if show:
             self.prog_bar.start(10)
         else:
             self.prog_bar.stop()
+            self.status_label.config(text="")
+
+    def update_status_label(self, label):
+        self.status_label.config(text=label)
 
 
 class GUI(tk.Tk):
@@ -126,7 +136,13 @@ class GUI(tk.Tk):
         self.frames = None
         self.indices = None
         self.queue = queue.Queue()
-
+        self.model = None
+        self.graph = None
+        if self.mode == "semi-automatic" or self.mode == "special":
+            model_name = 'unet_tel_aviv'
+            model_dir = Path("models")
+            model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
+            self.model, self.graph = file_io.load_semantic_seg_model(str(model_full_name))
         self.wm_title("Video Annotator")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
@@ -141,7 +157,7 @@ class GUI(tk.Tk):
             self.panels[F] = panel
             panel.grid(row=0, column=0, sticky="nsew")
         self.show_panel(ProgressBarPage)
-        self.take_async_action(["video_to_frames", self.paths, self.cur_video_index, self.mode, self.db])
+        self.take_async_action(self.prep_vid_to_frames_packet())
 
     def process_queue(self):
         try:
@@ -149,7 +165,14 @@ class GUI(tk.Tk):
             if msg[0] == "video_to_frames":
                 self.frames, self.indices, my_dict = msg[1:]
                 if my_dict:
-                    self.db.setdefault(self.get_cur_video_name(), []).append(my_dict)
+                    self.db[self.get_cur_video_name()] = [my_dict]
+                else:
+                    if self.get_cur_video_name() not in self.db.keys():
+                        data = np.zeros((1, 10, 14))
+                        my_dict = {"data": data,
+                                   "label": np.array([0, 0, 0]),
+                                   "frame_indices": self.indices}
+                        self.db.setdefault(self.get_cur_video_name(), []).append(my_dict)
                 self.panels[AnnotationPage].update_canvas()
                 self.panels[AnnotationPage].update_labels()
             elif msg[0] == "shift_video":
@@ -164,11 +187,14 @@ class GUI(tk.Tk):
         except queue.Empty:
             self.after(100, self.process_queue)
 
-    def take_async_action(self, msg_id):
+    def take_async_action(self, msg):
+        msg_dict = {"video_to_frames": "Selecting frames & predicting landmarks. This might take some time if GPU is not being used.\nUsing GPU: {}".format(predict.is_using_gpu()),
+                    "shift_video": "Selecting different frame..."}
         self.disbale_menu()
         self.show_panel(ProgressBarPage)
         self.panels[ProgressBarPage].show_progress(True)
-        ThreadedTask(self.queue, msg_id).start()
+        self.panels[ProgressBarPage].update_status_label(msg_dict[msg[0]])
+        ThreadedTask(self.queue, msg).start()
         self.after(100, self.process_queue)
 
     def show_panel(self, cont):
@@ -187,6 +213,19 @@ class GUI(tk.Tk):
 
     def get_db(self):
         return self.db
+
+    def prep_vid_to_frames_packet(self, perform_pred=None):
+        path = self.paths[self.cur_video_index]
+        if not perform_pred:
+            if self.mode == "semi-auto":
+                perform_pred = True
+                name = self.get_cur_video_name()
+                if name in self.db.keys():
+                    if self.db[self.get_cur_video_name()][self.shift]["data"] != np.zeros((1, 10, 14)):
+                        perform_pred = False
+            else:
+                perform_pred = False
+        return ["video_to_frames", path, perform_pred, self.model, self.graph]
 
     def get_cur_frame_index(self):
         return self.cur_frame_index
@@ -236,19 +275,24 @@ class GUI(tk.Tk):
     def next_coords(self, event):
         self.go_to_next_coord()
 
+    def auto_annotate(self):
+        self.cur_frame_index = 0
+        self.cur_sticker_index = 0
+        self.take_async_action(self.prep_vid_to_frames_packet(True))
+
     def next_video(self):
         if self.cur_video_index < (len(self.paths)-1):
             self.cur_video_index += 1
             self.cur_frame_index = 0
             self.cur_sticker_index = 0
-            self.take_async_action(["video_to_frames", self.paths, self.cur_video_index, self.mode, self.db])
+            self.take_async_action(self.prep_vid_to_frames_packet())
 
     def prev_video(self):
         if self.cur_video_index > 0:
             self.cur_video_index -= 1
             self.cur_frame_index = 0
             self.cur_sticker_index = 0
-            self.take_async_action(["video_to_frames", self.paths, self.cur_video_index, self.mode, self.db])
+            self.take_async_action(self.prep_vid_to_frames_packet())
 
     def shift_video_f(self):
         current_video = self.get_cur_video_name()
@@ -285,11 +329,7 @@ class GUI(tk.Tk):
         if not filename:
             return
         self.db = file_io.load_from_pickle(filename)
-        if self.get_cur_video_name() not in self.db.keys():
-            self.take_async_action("video_to_frames")
-        else:
-            self.panels[AnnotationPage].update_canvas()
-            self.panels[AnnotationPage].update_labels()
+        self.take_async_action(self.prep_vid_to_frames_packet())
 
     def save_session(self):
         f = filedialog.asksaveasfile(initialdir="./data", title="Select Session File", mode='wb')
@@ -311,15 +351,17 @@ class ThreadedTask(threading.Thread):
             self.handle_shift_video()
 
     def handle_video_to_frames(self):
-        paths, cur_video_index, mode, db = self.msg[1:]
+        path, perform_pred, preloaded_model, graph = self.msg[1:]
+        frames, indices = video.video_to_frames(path, dump_frames=True)
+        name = path.parent.name + "_" + path.name
         my_dict = {}
-        frames, indices = video.video_to_frames(paths[cur_video_index], dump_frames=True)
-        name = paths[cur_video_index].parent.name + "_" + paths[cur_video_index].name
-        if name not in db.keys():
-            if mode == "semi-auto" or mode == "special":
-                data = predict.predict_keypoints_locations(frames, name, is_puppet=False, save_intermed=False)
-            else:
-                data = np.zeros((1, 10, 14))
+        if perform_pred:
+            data = predict.predict_keypoints_locations(frames,
+                                                       name,
+                                                       is_puppet=False,
+                                                       save_intermed=False,
+                                                       preloaded_model=preloaded_model,
+                                                       graph=graph)
             my_dict = {"data": data,
                        "label": np.array([0, 0, 0]),
                        "frame_indices": indices}
@@ -344,7 +386,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
     if Path.is_file(video_path):
         paths.append(video_path)
     else:
-        for file in video_path.glob("*.MP4"):
+        for file in video_path.glob("**/*.MP4"):
             paths.append(file)
 
     app = GUI(new_db, paths, mode)

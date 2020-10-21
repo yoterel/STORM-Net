@@ -2,6 +2,7 @@ import numpy as np
 import imageio
 from PIL import Image
 import video_annotator
+import video
 from pathlib import Path
 import utils
 import cv2
@@ -116,11 +117,10 @@ def process_video(args):
     if mode == "special":
         if v:
             print("Doing special stuff.")
-        # new_db = video_annotator.auto_annotate_videos(vid_path, args.template, mode)
         new_db = video_annotator.annotate_videos(vid_path, mode, v)
     else:
         if mode == "auto":
-            new_db = video_annotator.auto_annotate_videos(vid_path, args.template, mode)
+            new_db = video.auto_annotate_videos(vid_path, True, True)
         else:
             if mode == "semi-auto" or mode == "manual":
                 if v:
@@ -128,17 +128,21 @@ def process_video(args):
                 new_db = video_annotator.annotate_videos(vid_path, mode, v)
     if Path.is_dir(vid_path):
         vid_names = []
-        for file in sorted(vid_path.glob("*.MP4")):
+        for file in sorted(vid_path.glob("**/*.MP4")):
             name = file.parent.name + "_" + file.name
             vid_names.append(name)
         if v:
             print("Found following video files:", vid_names)
         data = np.zeros((len(vid_names), 10, 14))
         for i, vid in enumerate(vid_names):
-            data[i] = new_db[vid][0]["data"]
-        return data
+            try:
+                data[i] = new_db[vid][0]["data"]
+            except KeyError:
+                print("Error! did you forget to annotate {} ?".format(vid))
+                exit(1)
+        return data, vid_names
     else:
-        return new_db[vid_path.parent.name + "_" + vid_path.name][0]["data"]
+        return new_db[vid_path.parent.name + "_" + vid_path.name][0]["data"], [vid_path]
 
 
 def auto_annotate_videos(vid_path, dump_to_db, force_annotate):
