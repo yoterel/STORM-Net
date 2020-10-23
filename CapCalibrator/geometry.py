@@ -3,7 +3,7 @@ from scipy.spatial.transform import Rotation as R
 import math
 from sklearn.metrics import mean_squared_error
 from file_io import read_template_file
-import draw
+import re
 
 
 def align_centroids(a, b):
@@ -356,21 +356,37 @@ def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
             transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
             # transformed_data = from_sim_to_standard_space(names, transformed_data_sim.T)
             vid2vid_est.append(transformed_data_sim.T)
-        rmse = get_rmse(vid2vid_est[0], vid2vid_est[1])
-        print("vid2vid rmse between session 1 and session 2:", rmse)
-        rmse = get_rmse(vid2vid_est[0], vid2vid_est[2])
-        print("vid2vid rmse between session 1 and session 3:", rmse)
-        rmse = get_rmse(vid2vid_est[1], vid2vid_est[2])
-        print("vid2vid rmse between session 2 and session 3:", rmse)
-        rmse = get_rmse(vid2vid_est[0], digi2digi_est[0])
-        print("vid2digi rmse session 1:", rmse)
-        rmse = get_rmse(vid2vid_est[1], digi2digi_est[1])
-        print("vid2digi rmse session 2:", rmse)
-        rmse = get_rmse(vid2vid_est[2], digi2digi_est[2])
-        print("vid2digi rmse session 3:", rmse)
-        # visualize.visualize_pc(points_blue=vid2vid_est[0],
-        #                        points_red=digi2digi_est[0],
-        #                        title="test")
+        digi_intra_method_sessions1 = []
+        digi_intra_method_sessions2 = []
+
+        for video_name in video_names:
+            subject_name, session_name = video_name.split("_")
+            session_number = int(re.findall(r'\d+', session_name)[0]) - 1
+            if session_number == 0:
+                digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
+            if session_number == 1:
+                digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
+        digi_intra_method_rmse = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
+        digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
+        digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
+        print("digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
+
+        vid_intra_method_sessions1 = vid2vid_est[::3]
+        vid_intra_method_sessions2 = vid2vid_est[1::3]
+        vid_intra_method_rmse = [get_rmse(x, y) for x, y in zip(vid_intra_method_sessions1, vid_intra_method_sessions2)]
+        vid_intra_method_rmse_avg = np.mean(vid_intra_method_rmse)
+        vid_intra_method_rmse_std = np.std(vid_intra_method_rmse)
+        print("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
+
+        inter_method_rmse1 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions1)]
+        inter_method_rmse2 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions2)]
+        inter_method_rmse3 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions1)]
+        inter_method_rmse4 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions2)]
+        inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+        inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+        print("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
+
+        #todo: calculate shifts
         return None
 
     names, base_model_data, format = read_template_file(args.template)
@@ -639,11 +655,11 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
         # estimation = (ret_R @ template_spiral_data.T).T + ret_t
         # rmse = get_rmse(estimation, file_spiral_data)
         # print("template-digitizer (transform using all-sensors):", rmse)
-        rmse = get_rmse(estimations[0], estimations[1])
-        print("digi2digi rmse between session 1 and session 2:", rmse)
-        rmse = get_rmse(estimations[0], estimations[2])
-        print("digi2digi rmse between session 1 and session 3:", rmse)
-        rmse = get_rmse(estimations[1], estimations[2])
-        print("digi2digi rmse between session 2 and session 3:", rmse)
-        return estimations
+        # rmse = get_rmse(estimations[0], estimations[1])
+        # print("digi2digi rmse between session 1 and session 2:", rmse)
+        # rmse = get_rmse(estimations[0], estimations[2])
+        # print("digi2digi rmse between session 1 and session 3:", rmse)
+        # rmse = get_rmse(estimations[1], estimations[2])
+        # print("digi2digi rmse between session 2 and session 3:", rmse)
+    return estimations
 
