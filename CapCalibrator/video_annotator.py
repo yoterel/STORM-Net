@@ -176,7 +176,8 @@ class GUI(tk.Tk):
                 self.panels[AnnotationPage].update_canvas()
                 self.panels[AnnotationPage].update_labels()
             elif msg[0] == "shift_video":
-                self.frames, self.indices, self.db[self.cur_video_index][self.shift]["frame_indices"] = msg[1:]
+                self.frames, self.indices = msg[1:]
+                self.db[self.get_cur_video_name()][self.shift]["frame_indices"] = self.indices
                 print("new indices:", self.indices)
                 self.panels[AnnotationPage].update_canvas()
                 self.panels[AnnotationPage].update_labels()
@@ -296,18 +297,18 @@ class GUI(tk.Tk):
 
     def shift_video_f(self):
         current_video = self.get_cur_video_name()
-        current_indices = self.db[current_video][self.controller.shift]["frame_indices"]
+        current_indices = self.db[current_video][self.shift]["frame_indices"]
         print("current indices:", current_indices)
         new_indices = current_indices.copy()
-        new_indices[self.controller.get_cur_frame_index] += 1
+        new_indices[self.get_cur_frame_index()] += 1
         self.take_async_action(["shift_video", self.paths, self.cur_video_index, new_indices])
 
     def shift_video_b(self):
         current_video = self.get_cur_video_name()
-        current_indices = self.db[current_video][self.controller.shift]["frame_indices"]
+        current_indices = self.db[current_video][self.shift]["frame_indices"]
         print("current indices:", current_indices)
         new_indices = current_indices.copy()
-        new_indices[self.controller.get_cur_frame_index] -= 1
+        new_indices[self.get_cur_frame_index()] -= 1
         self.take_async_action(["shift_video", self.paths, self.cur_video_index, new_indices])
 
     def next_frame(self):
