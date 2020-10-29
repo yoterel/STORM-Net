@@ -15,7 +15,7 @@ It contains three seperate tools:
       
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
-- Unity 2019.3 or higher (required by (3) if changes are made to the synthetic data renderer)
+- Unity 2019.3 or higher (required by (3), only for compiling the renderer executable)
 
 
 ### The template model file
