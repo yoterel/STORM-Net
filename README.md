@@ -1,7 +1,7 @@
 # STORM: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS)
 All files in the repository are an implementation of the original manuscript and research which is not yet published.
 ## Introduction
-This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or some other coordiante system that can be easly transformed to MNI using external tools (such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
+This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or in the original cooridnate system supplied by user, this can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
 It contains three seperate tools:
 1. A GUI that allows supervising the automatic method ("semi-supervised") in a controlled manner - this is recommended for first time users.
