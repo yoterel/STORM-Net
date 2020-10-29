@@ -2,7 +2,6 @@ import numpy as np
 import imageio
 from PIL import Image
 import video_annotator
-import video
 from pathlib import Path
 import utils
 import cv2
@@ -114,13 +113,13 @@ def process_video(args):
     mode = args.mode
     v = args.verbosity
     new_db = []
-    if mode == "special":
+    if mode == "experimental":
         if v:
-            print("Doing special stuff.")
+            print("Performing experimental stuff.")
         new_db = video_annotator.annotate_videos(vid_path, mode, v)
     else:
         if mode == "auto":
-            new_db = video.auto_annotate_videos(vid_path, True, True)
+            new_db = auto_annotate_videos(vid_path, True, True)
         else:
             if mode == "semi-auto" or mode == "manual":
                 if v:

@@ -149,7 +149,7 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd_line = "./../example_models/telaviv_experiment/maya.txt --use_sensor2 --only_fiducials".split()
+    cmd_line = "./../example_models/telaviv_experiment/argaman.txt --use_sensor2 --only_fiducials".split()
     args = parser.parse_args(cmd_line)
     args.template = Path(args.template)
     print(args.template)

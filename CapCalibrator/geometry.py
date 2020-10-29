@@ -342,9 +342,8 @@ def from_sim_to_standard_space(names, data):
 
 
 def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
-    if args.mode == "special":
+    if args.mode == "experimental":
         digi2digi_est = get_digi2digi_results(args.template, args.ground_truth)
-
         vid2vid_est = []
         names, data, format = read_template_file(args.template)
         names = names[0]
@@ -385,101 +384,30 @@ def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
         inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
         inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
         print("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
-
         #todo: calculate shifts
         return None
-
-    names, base_model_data, format = read_template_file(args.template)
-    face_data, face_indices = get_face_data(names, base_model_data)
-    sticker_data = get_sticker_data(names, base_model_data)
-    # sensor_indices = [i for i in range(len(base_model_data)) if i not in face_indices]
-    # sensor_data = base_model_data[sensor_indices, :]
-    fiducials_data = np.vstack((face_data, sticker_data))
-    t_fit = find_best_params(fiducials_data)
-    s_fit = np.array([-1, 1, 1])
-    base_model_data_in_sim_space = (base_model_data - t_fit) * s_fit
-    # rot_m = R.from_matrix(r_fit)
-    # rot_e = rot_m.as_euler('xyz', degrees=True)
-
-    #  get base model data to simulation space
-    # base_model_data_in_sim_space = (r_fit * base_model_data.T) + np.tile(t_fit, (1, len(base_model_data)))
-    temp_sticker_data = get_sticker_data(names, base_model_data_in_sim_space)
-    if plot:
-        sim_data = get_sim_data(fiducials_data)
-        # visualize.visualize_pc(np.vstack((base_model_data_in_sim_space[face_indices, :], temp_sticker_data)),
-        #                        ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "CZ"],
-        #                        sim_data,
-        #                        ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "Cz"],
-        #                        title="Base model data vs simulation baseline data in sim-space")
-
-    #  apply network transformation
-    transformed_base_model_data = r_matrix @ (s_matrix @ base_model_data_in_sim_space.T)
-    # visualize_pc(transformed_base_model_data.T[mask_indices, :],
-    #              ["Cz", "FP1", "FPZ", "FP2"],
-    #              sim_data[mask_indices, :],
-    #              ["Cz", "FP1", "FPZ", "FP2"],
-    #              title="Prediction(base model) & simulation data in sim-space")
-
-    # get back to real space (inverse of sim transformation)
-    transformed_base_model_data_in_real_space = (transformed_base_model_data.T * s_fit) + t_fit
-    if args.ground_truth:
-        gt_names, gt_data = read_template_file(args.ground_truth)
-        gt_sticker_data = get_sticker_data(gt_names, gt_data)
-        transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
-        # correct for translation (useful for viz & RMSE)
-        transformed_sticker_data = align_centroids(transformed_sticker_data, gt_sticker_data)
-        # if plot:
-            # visualize.visualize_pc(points_blue=transformed_sticker_data,
-            #              names_blue=["FP1", "FPZ", "FP2", "Cz"],
-            #              points_red=gt_sticker_data,
-            #              names_red=["FP1", "FPZ", "FP2", "Cz"],
-            #              title="Prediction(base model) & gt in real-space - translation corrected")
-        rmse_1 = calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T)
-        base_data = np.mat(np.transpose(sticker_data))
-        gt_data = np.mat(np.transpose(gt_sticker_data))
-        ret_R, ret_t = rigid_transform_3d(base_data, gt_data)
-        if args.verbosity > 1:
-            print("Stickers RMSE error (prediction, gt):", rmse_1)
-            print("Here is the translation between GT and base model:", ret_t)
-        recovered_gt = (ret_R * base_data) + np.tile(ret_t, (1, len(base_data.T)))
-        rmse_2 = calc_rmse_error(recovered_gt, gt_data)
-        gt_rot_m = R.from_matrix(ret_R)
-        gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
-        pred_rot_m = R.from_matrix(r_matrix)
-        pred_rot_e = pred_rot_m.as_euler('xyz', degrees=True)
-        if args.verbosity:
-            print("Euler Angles RMSE (Horns, Network):", mean_squared_error(gt_rot_e, pred_rot_e, squared=False))
-        if args.verbosity > 1:
-            print("Horns Euler angels:", gt_rot_e)
-            print("Network Euler angels:", pred_rot_e)
-            print("RMSE error (horn's(baseline), gt):", rmse_2)
-        # if plot:
-            # visualize.visualize_pc(recovered_gt.T,
-            #              ["FP1", "FPZ", "FP2", "Cz"],
-            #              gt_data.T,
-            #              ["FP1", "FPZ", "FP2", "Cz"],
-            #              title="Horn's(baseline) & Ground Truth data in real-space")
-        # test_rotation = [10, 8.3, 3]
-        # # test_scale = np.identity(3)
-        # rot = R.from_euler('xyz', test_rotation, degrees=True)
-        # rot_m = rot.as_matrix()
-        # transformed_base_model_data = rot_m * base_model_data_in_sim_space
-        # transformed_base_model_data_in_real_space = r_fit.T * (
-        #             transformed_base_model_data - np.tile(t_fit, (1, len(base_model_data))))
-        # transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
-        # # # correct for translation (useful for viz)
-        # transformed_sticker_data = align_centroids(from_data=transformed_sticker_data, to_data=gt_sticker_data)
-        # if plot:
-        #     visualize.visualize_pc(points_blue=transformed_sticker_data,
-        #                  names_blue=["FP1", "FPZ", "FP2", "Cz"],
-        #                  points_red=gt_sticker_data,
-        #                  names_red=["FP1", "FPZ", "FP2", "Cz"],
-        #                  title="test")
-        # print("test_rmse:", calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T))
-    return transformed_base_model_data_in_real_space
+    else:
+        vid_est = []
+        names, data, format = read_template_file(args.template)
+        names = names[0]
+        data = data[0]
+        data = to_standard_coordinate_system(names, data)
+        data_spiral = data[names.index(0):, :]  # select spiral
+        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
+            transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
+            vid_est.append(transformed_data_sim.T)
+    
+    return vid_est[0]
 
 
 def project_sensors_to_MNI(sensor_locations, v):
+    """
+    project new sensor locations to MNI
+    :param sensor_locations:
+    :param v:
+    :return:
+    """
+    print("Projection to MNI is not implemented yet, results will be saved in original template file frame of reference.")
     return sensor_locations
 
 
@@ -494,14 +422,6 @@ def get_rmse(A, B):
     mse = np.mean(diff*diff)
     rmse = np.sqrt(mse)
     return rmse
-
-# find template-digitizer error by rigidly transforming template (using fiducials) x2
-# find template-digitizer error by rigidly transforming template (using all stickers) x2
-# compare inter-session digitizer (using given origin)
-# compare outer-session digitizer (x2)
-# compare inter-session digitizer (using 2nd sensor as origin)
-# compare outer-session digitizer (x2, using 2nd sensor as origin)
-#
 
 
 def compare_data_from_files(file_path1, file_path2, use_second_sensor):
@@ -663,3 +583,91 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
         # print("digi2digi rmse between session 2 and session 3:", rmse)
     return estimations
 
+
+# names, base_model_data, format = read_template_file(args.template)
+#     face_data, face_indices = get_face_data(names, base_model_data)
+#     sticker_data = get_sticker_data(names, base_model_data)
+#     # sensor_indices = [i for i in range(len(base_model_data)) if i not in face_indices]
+#     # sensor_data = base_model_data[sensor_indices, :]
+#     fiducials_data = np.vstack((face_data, sticker_data))
+#     t_fit = find_best_params(fiducials_data)
+#     s_fit = np.array([-1, 1, 1])
+#     base_model_data_in_sim_space = (base_model_data - t_fit) * s_fit
+#     # rot_m = R.from_matrix(r_fit)
+#     # rot_e = rot_m.as_euler('xyz', degrees=True)
+#
+#     #  get base model data to simulation space
+#     # base_model_data_in_sim_space = (r_fit * base_model_data.T) + np.tile(t_fit, (1, len(base_model_data)))
+#     temp_sticker_data = get_sticker_data(names, base_model_data_in_sim_space)
+#     if plot:
+#         sim_data = get_sim_data(fiducials_data)
+#         # visualize.visualize_pc(np.vstack((base_model_data_in_sim_space[face_indices, :], temp_sticker_data)),
+#         #                        ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "CZ"],
+#         #                        sim_data,
+#         #                        ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "Cz"],
+#         #                        title="Base model data vs simulation baseline data in sim-space")
+#
+#     #  apply network transformation
+#     transformed_base_model_data = r_matrix @ (s_matrix @ base_model_data_in_sim_space.T)
+#     # visualize_pc(transformed_base_model_data.T[mask_indices, :],
+#     #              ["Cz", "FP1", "FPZ", "FP2"],
+#     #              sim_data[mask_indices, :],
+#     #              ["Cz", "FP1", "FPZ", "FP2"],
+#     #              title="Prediction(base model) & simulation data in sim-space")
+#
+#     # get back to real space (inverse of sim transformation)
+#     transformed_base_model_data_in_real_space = (transformed_base_model_data.T * s_fit) + t_fit
+#     if args.ground_truth:
+#         gt_names, gt_data = read_template_file(args.ground_truth)
+#         gt_sticker_data = get_sticker_data(gt_names, gt_data)
+#         transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
+#         # correct for translation (useful for viz & RMSE)
+#         transformed_sticker_data = align_centroids(transformed_sticker_data, gt_sticker_data)
+#         # if plot:
+#             # visualize.visualize_pc(points_blue=transformed_sticker_data,
+#             #              names_blue=["FP1", "FPZ", "FP2", "Cz"],
+#             #              points_red=gt_sticker_data,
+#             #              names_red=["FP1", "FPZ", "FP2", "Cz"],
+#             #              title="Prediction(base model) & gt in real-space - translation corrected")
+#         rmse_1 = calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T)
+#         base_data = np.mat(np.transpose(sticker_data))
+#         gt_data = np.mat(np.transpose(gt_sticker_data))
+#         ret_R, ret_t = rigid_transform_3d(base_data, gt_data)
+#         if args.verbosity > 1:
+#             print("Stickers RMSE error (prediction, gt):", rmse_1)
+#             print("Here is the translation between GT and base model:", ret_t)
+#         recovered_gt = (ret_R * base_data) + np.tile(ret_t, (1, len(base_data.T)))
+#         rmse_2 = calc_rmse_error(recovered_gt, gt_data)
+#         gt_rot_m = R.from_matrix(ret_R)
+#         gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
+#         pred_rot_m = R.from_matrix(r_matrix)
+#         pred_rot_e = pred_rot_m.as_euler('xyz', degrees=True)
+#         if args.verbosity:
+#             print("Euler Angles RMSE (Horns, Network):", mean_squared_error(gt_rot_e, pred_rot_e, squared=False))
+#         if args.verbosity > 1:
+#             print("Horns Euler angels:", gt_rot_e)
+#             print("Network Euler angels:", pred_rot_e)
+#             print("RMSE error (horn's(baseline), gt):", rmse_2)
+        # if plot:
+            # visualize.visualize_pc(recovered_gt.T,
+            #              ["FP1", "FPZ", "FP2", "Cz"],
+            #              gt_data.T,
+            #              ["FP1", "FPZ", "FP2", "Cz"],
+            #              title="Horn's(baseline) & Ground Truth data in real-space")
+        # test_rotation = [10, 8.3, 3]
+        # # test_scale = np.identity(3)
+        # rot = R.from_euler('xyz', test_rotation, degrees=True)
+        # rot_m = rot.as_matrix()
+        # transformed_base_model_data = rot_m * base_model_data_in_sim_space
+        # transformed_base_model_data_in_real_space = r_fit.T * (
+        #             transformed_base_model_data - np.tile(t_fit, (1, len(base_model_data))))
+        # transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
+        # # # correct for translation (useful for viz)
+        # transformed_sticker_data = align_centroids(from_data=transformed_sticker_data, to_data=gt_sticker_data)
+        # if plot:
+        #     visualize.visualize_pc(points_blue=transformed_sticker_data,
+        #                  names_blue=["FP1", "FPZ", "FP2", "Cz"],
+        #                  points_red=gt_sticker_data,
+        #                  names_red=["FP1", "FPZ", "FP2", "Cz"],
+        #                  title="test")
+        # print("test_rmse:", calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T))

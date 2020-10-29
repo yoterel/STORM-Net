@@ -90,11 +90,13 @@ def save_results(data, output_file, v):
     :param v:
     :return:
     """
-    if v:
-        print("Saving result to output file.")
+    if not data:
+        return
     if not output_file:
         output_file = "output.txt"
-    # np.savetxt(output_file, data, delimiter=" ")
+    if v:
+        print("Saving result to output file:", output_file)
+    np.savetxt(output_file, data, delimiter=" ")
 
 
 def extract_session_data(file, use_scale=True):
