@@ -25,7 +25,7 @@ This template model was obtained using a 3D digitizer, but can similarly be obta
 It is strongly recommended to create your own template model file **per physical cap model you are using in your lab**, this will lead to best accuracies.
 The exact format of this file is now specified.
 The file is a csv space delimited file, where each row contains 4 values:
-1. A "name" of the optode (some identifier that distinguishes it from the rest, it can also be a number)
+1. An index of the optode (an integer numerical value representing the index of this optode. Starts from 0. any other value (strings, etc) will be skipped and not be calibrated).
 2. 3 numerical values: X, Y, Z representing the location of this optode (note: values must be supplied in cm or inch).
 The coordinate system these values are supplied at are not improtant, as they are transformed internally to a standard right-handed system.
 
