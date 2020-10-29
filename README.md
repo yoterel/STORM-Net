@@ -12,6 +12,7 @@ It contains three seperate tools:
 -	[x] Python 3.6 or higher (required by (1), (2), and (3))
 -	[x] Use the requirments.txt file to obtain all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `pip install -r requirements.txt`
+      
 -     [x] Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip).\
       Place the files under CapCalibrator/models (after extracting)
 -	[x] Unity 2019.3 or higher (required by (3) if changes are made to the synthetic data renderer)
