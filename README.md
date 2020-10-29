@@ -31,7 +31,7 @@ The coordinate system these values are supplied at are not improtant, as they ar
 
 ### How to use GUI & Automatic calibration
 
-The file main.py is the entry point of the application. In the most common use case, this script expects a path to a video file to be analyzed. Notice another mandatory input is a "template" model file, which is a text file containing data of the locations of all relevant optodes in some arbitrary global coordinate system (further details below).
+The file [main.py](CapCalibrator/main.py) is the entry point of the application. In the most common use case, this script expects a path to a video file to be analyzed. Notice another mandatory input is a "template" model file, which is a text file containing data of the locations of all relevant optodes in some arbitrary global coordinate system (further details below).
 
 `python main.py path_to_video_file path_to_template_file --mode manual`\
 `python main.py path_to_video_file path_to_template_file --mode semi-auto`\
