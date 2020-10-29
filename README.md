@@ -9,13 +9,13 @@ It contains three seperate tools:
 3. A bundle of python scripts for finetunning (or training from scratch) the neural networks we provide - this is suggested for advanced users who wish to customize or improve some block in the pipeline. Note this also includes a synthetic data generator implemented in [Unity](https://unity.com/).
 
 ### Application dependencies:
--Python 3.6 or higher (required by (1), (2), and (3))
--Use the requirments.txt file to obtain all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
+- Python 3.6 or higher (required by (1), (2), and (3))
+- Use the requirments.txt file to obtain all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `pip install -r requirements.txt`
       
--Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
-      Place the files under CapCalibrator/models (after extracting)
--Unity 2019.3 or higher (required by (3) if changes are made to the synthetic data renderer)
+- Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
+      Place the files under the [models](CapCalibrator/models) folder (after extracting).
+- Unity 2019.3 or higher (required by (3) if changes are made to the synthetic data renderer)
 
 
 ### The template model file
