@@ -17,13 +17,13 @@ def parse_arguments():
                         help="Controls whether to automatically or manually annotate the stickers in the video.")
     parser.add_argument("-o", "--output_file", help="The output csv file with calibrated results (given in MNI coordinates)")
     parser.add_argument("-v", "--verbosity", type=int, choices=[0, 1, 2], default=2, help="Selects verbosity level")
-    # if len(sys.argv) == 1:
-    #     parser.print_help(sys.stderr)
-    #     sys.exit(1)
-    cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/good_experiments E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment -m special -v 1'.split()
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+    # cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/good_experiments E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment -m special -v 1'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/openPos55/GX011592.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m special -gt /disk1/yotam/capnet/openPos/openPos55'.split()
     # cmd_line = '/disk1/yotam/capnet/openPos/real_babies/1778b/GX011447.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m manual -v 1'.split()
-    args = parser.parse_args(cmd_line)
+    args = parser.parse_args()
     args.video = Path(args.video)
     # if Path.is_dir(args.video):
     #     args.video = args.video.glob("*.MP4").__next__()
