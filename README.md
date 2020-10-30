@@ -75,4 +75,4 @@ This application outputs data in the following coordiante system (notice it is r
 - y axis is from back to front of head
 - z axis is from bottom to top of head
 - the origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
-- scale is cm. If "CZ" is too close to origin in terms of cm, this function scales it to cm (assuming it is inch)
+- scale is cm. If "CZ" is too close to origin in terms of cm, the code scales it to cm (by assuming it is measured in inches).
