@@ -158,7 +158,7 @@ def auto_annotate_videos(vid_path, dump_to_db, force_annotate, args):
     model_dir = Path("models")
     model_name = args.u_net
     model_full_name = Path.joinpath(model_dir, model_name)
-    my_model = file_io.load_semantic_seg_model(str(model_full_name))
+    my_model = file_io.load_semantic_seg_model(str(model_full_name), args.verbosity)
     my_db = file_io.load_full_db(db_path)
     paths = []
     if Path.is_file(vid_path):

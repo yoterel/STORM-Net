@@ -4,8 +4,10 @@ import pickle
 import json
 import keras
 from keras_unet.metrics import iou, iou_thresholded
-import tensorflow as tf
 from pathlib import Path
+import tensorflow as tf
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
 
 
 def read_template_file(template_path):
@@ -95,7 +97,11 @@ def save_results(data, output_file, v):
         output_file = "output.txt"
     if v:
         print("Saving result to output file:", output_file)
-    np.savetxt(output_file, data, delimiter=" ")
+    optode_number = len(data[0])
+    with open(str(output_file), 'a') as f:
+        for i in range(optode_number):
+            my_line = "{} {:.3f} {:.3f} {:.3f}\n".format(data[0][i], data[1][i, 0], data[1][i, 1], data[1][i, 2])
+            f.write(my_line)
 
 
 def extract_session_data(file, use_scale=True):
@@ -242,7 +248,9 @@ def deserialize_data(file_path, with_test_set=True):
         return x_train, x_val, y_train, y_val
 
 
-def load_semantic_seg_model(weights_loc):
+def load_semantic_seg_model(weights_loc, verbosity=2):
+    if verbosity:
+        print("Loading unet model from:", weights_loc)
     old_model = keras.models.load_model(weights_loc,
                                         custom_objects={'iou': iou, 'iou_thresholded': iou_thresholded})
     old_model.layers.pop(0)
@@ -250,7 +258,8 @@ def load_semantic_seg_model(weights_loc):
     new_input = keras.layers.Input(input_shape)
     new_outputs = old_model(new_input)
     new_model = keras.engine.Model(new_input, new_outputs)
-    new_model.summary()
+    if verbosity:
+        new_model.summary()
     return new_model, tf.get_default_graph()
 
 

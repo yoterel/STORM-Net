@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import math
-from sklearn.metrics import mean_squared_error
 from file_io import read_template_file
 import re
 
@@ -392,11 +391,12 @@ def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
         names = names[0]
         data = data[0]
         data = to_standard_coordinate_system(names, data)
-        data_spiral = data[names.index(0):, :]  # select spiral
+        data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
+        data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
         for rot_mat, scale_mat in zip(r_matrix, s_matrix):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
-            vid_est.append(transformed_data_sim.T)
-
+            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+            data_optodes = transformed_data_sim.T
+            vid_est.append([names, np.vstack((data_origin, data_optodes))])
     return vid_est[0]
 
 

@@ -141,7 +141,7 @@ class GUI(tk.Tk):
             model_name = args.u_net
             model_dir = Path("models")
             model_full_name = Path.joinpath(model_dir, model_name)
-            self.model, self.graph = file_io.load_semantic_seg_model(str(model_full_name))
+            self.model, self.graph = file_io.load_semantic_seg_model(str(model_full_name), self.args.verbosity)
         self.wm_title("Video Annotator")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
@@ -217,14 +217,14 @@ class GUI(tk.Tk):
     def prep_vid_to_frames_packet(self, perform_pred=None):
         path = self.paths[self.cur_video_index]
         if not perform_pred:
-            if self.args.mode == "semi-auto":
-                perform_pred = True
-                name = self.get_cur_video_name()
-                if name in self.db.keys():
-                    if self.db[self.get_cur_video_name()][self.shift]["data"] != np.zeros((1, 10, 14)):
-                        perform_pred = False
-            else:
-                perform_pred = False
+            # if self.args.mode == "semi-auto":
+            #     perform_pred = True
+            #     name = self.get_cur_video_name()
+            #     if name in self.db.keys():
+            #         if self.db[self.get_cur_video_name()][self.shift]["data"] != np.zeros((1, 10, 14)):
+            #             perform_pred = False
+            # else:
+            perform_pred = False
         return ["video_to_frames", path, perform_pred, self.model, self.graph, self.args]
 
     def get_cur_frame_index(self):

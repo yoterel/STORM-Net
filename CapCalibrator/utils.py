@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
-import pickle
 from pathlib import Path
 import keras
 from keras.models import Sequential

@@ -1,6 +1,3 @@
-import os
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
-os.environ["CUDA_VISIBLE_DEVICES"] = "7";
 import keras
 import utils
 import file_io
@@ -31,7 +28,7 @@ def predict_rigid_transform(sticker_locations, args):
     :return: rotation and scale matrices list
     """
     if args.verbosity:
-        print("Predicting rotation and scale transforms from key points.")
+        print("Predicting rotation from key points.")
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
@@ -156,7 +153,7 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
         model_name = args.u_net
         model_dir = Path("models")
         model_full_name = Path.joinpath(model_dir, model_name)
-        my_model, graph = file_io.load_semantic_seg_model(str(model_full_name))
+        my_model, graph = file_io.load_semantic_seg_model(str(model_full_name), args.verbosity)
     else:
         my_model = preloaded_model
     imgs_list = []
