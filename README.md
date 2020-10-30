@@ -16,7 +16,7 @@ It contains three seperate tools:
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
 - Unity 2019.3 or higher (required by (3), only for compiling the renderer executable)
-- Hardware: the automatic anotation performes significantly faster when a compliant GPU is availble (by 2 orders of magnitude). We strongly recommend using a GPU if fast calibration times are needed.
+- Hardware: the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We strongly recommend using a GPU if fast calibration times are needed.
 
 ### The template model file
 
