@@ -1,1 +1,0 @@
-python render.py ./../raw_data/new_magnetic_source_model.txt ./build/output --exe ./build/UnityCap.exe --log ./build/log.txt --transform_input --iterations 50000

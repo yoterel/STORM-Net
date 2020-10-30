@@ -11,16 +11,16 @@ from geometry import fix_yaw
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Renders training images for fNIRS alighment')
     parser.add_argument("template", help="Path to raw template file. For exact format see documentation.")
-    parser.add_argument("output", help="The path where rendered images / data will be created")
+    parser.add_argument("output", help="A path to a folder where rendered images / data will be created")
     parser.add_argument("--iterations", type=int, default=20, help="Number of rendering iterations (10 images from each)")
     parser.add_argument("--exe", default="renderer.exe", help="The path to the renderer executable.")
     parser.add_argument("--log", default="log.txt", help="The path to the output log file from renderer.")
-    parser.add_argument("--transform", "--transform_input", default=False, action='store_true', help="Input template file will be transformed to comply with renderer. Intermediate result will be saved to 'template_transformed.txt'.")
+    parser.add_argument("--no_transform", default=False, action='store_true', help="If specified, the data from the input template model will *NOT* be transformed to standard coordinate system before rendering. This is not recommended.")
     parser.add_argument("--images", "--save_images", default=False, action='store_true', help="Renderer will output images (in addition to formatted data)")
-    # if len(sys.argv) == 1:
-    #     parser.print_help(sys.stderr)
-    #     sys.exit(1)
-    cmd_line = './../raw_data/new_magnetic_source_model.txt ./build/output --exe ./build/UnityCap.exe --log ./build/log.txt --transform_input --iterations 50 --images'.split()
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+    # cmd_line = './../example_models/example_model.txt ./output --exe ./windows_build/DataSynth.exe --log ./windows_build/log.txt --iterations 30000'.split()
     args = parser.parse_args()
     args.exe = Path(args.exe)
     args.log = Path(args.log)
@@ -62,11 +62,12 @@ def launch_renderer(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    names, data, format = read_template_file(args.template)
+    names, data, file_format = read_template_file(args.template)
     data = data[0]  # select first (and only) session
-    data = data[:, 0, :]  # select first sensor
+    if file_format == "telaviv":
+        data = data[:, 0, :]  # select first sensor
     names = names[0]  # select first (and only) session
-    if args.transform:
+    if not args.no_transform:
         data = to_standard_coordinate_system(names, data)
         data = fix_yaw(names, data)
         save_intermediate(names, data)

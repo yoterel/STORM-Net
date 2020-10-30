@@ -9,6 +9,9 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Mm]emoryCaptures/
+/linux_build/
+/mac_build.app/
+/windows_build/
 
 # Never ignore Asset meta data
 !/[Aa]ssets/**/*.meta
@@ -42,6 +45,8 @@ ExportedObj/
 *.mdb
 *.opendb
 *.VC.db
+*.txt
+*.zip
 
 # Unity3D generated meta files
 *.pidb.meta
