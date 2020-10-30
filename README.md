@@ -10,7 +10,7 @@ It contains three seperate tools:
 
 ### Application dependencies:
 - Python 3.6 or higher (required by (1), (2), and (3))
-- Use the requirments.txt file to obtain all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
+- Use the [requirments.txt](requirements.txt) file to obtain all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `pip install -r requirements.txt`
       
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
