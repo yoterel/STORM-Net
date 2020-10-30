@@ -396,7 +396,7 @@ def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
         for rot_mat, scale_mat in zip(r_matrix, s_matrix):
             transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
             vid_est.append(transformed_data_sim.T)
-    
+
     return vid_est[0]
 
 

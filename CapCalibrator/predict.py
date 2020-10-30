@@ -39,9 +39,9 @@ def predict_rigid_transform(sticker_locations, args):
     # utils.shuffle_timeseries(sticker_locations)
     # utils.shuffle_data(sticker_locations)
     # utils.mask_data(sticker_locations)
-    model_name = 'telaviv_model_b16'
+    model_name = args.storm_net
     model_dir = Path("models")
-    model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
+    model_full_name = Path.joinpath(model_dir, model_name)
     model = keras.models.load_model(str(model_full_name))
     y_predict = model.predict(sticker_locations)
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
@@ -61,15 +61,6 @@ def predict_rigid_transform(sticker_locations, args):
         rotation_mat = rot.as_matrix()
         rs.append(rotation_mat)
         sc.append(scale_mat)
-    # if len(rs) > 1:
-    #     for i in range(len(rs)):
-    #         geometry.apply_rigid_transform(rs[i],
-    #                                        sc[i],
-    #                                        args.model,
-    #                                        args.ground_truth,
-    #                                        plot=False,
-    #                                        v=1)
-    #     exit()
     return rs, sc
 
 
@@ -153,7 +144,7 @@ def get_blob_keypoints(mask, max_key_points, facial_landmarks=False, v=0):
     return keypoints
 
 
-def get_sticker_locations(frames, preloaded_model, graph, v):
+def get_sticker_locations(frames, preloaded_model, graph, args):
     """
     predicts green sticker locations in a set of frames
     :param frames: the frames to process
@@ -162,9 +153,9 @@ def get_sticker_locations(frames, preloaded_model, graph, v):
     :return: locations of stickers in all frames as a 2d numpy array
     """
     if not preloaded_model:
-        model_name = 'unet_tel_aviv'
+        model_name = args.u_net
         model_dir = Path("models")
-        model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
+        model_full_name = Path.joinpath(model_dir, model_name)
         my_model = file_io.load_semantic_seg_model(str(model_full_name))
     else:
         my_model = preloaded_model
@@ -186,7 +177,7 @@ def get_sticker_locations(frames, preloaded_model, graph, v):
     y_pred_np = np.where(y_pred_np > threshold, upper, lower)
     y_pred_np = y_pred_np.astype(np.uint8)
     key_points_list = []
-    if v:
+    if args.verbosity:
         print("Filtering & extracting blobs.")
     for i in range(len(y_pred_np)):
         key_points = get_blob_keypoints(y_pred_np[i], 4, False, v)
@@ -203,10 +194,11 @@ def get_sticker_locations(frames, preloaded_model, graph, v):
     return kp_np
 
 
-def predict_keypoints_locations(frames, vid_name="", is_puppet=False, save_intermed=True, preloaded_model=None, graph=None, v=0):
+def predict_keypoints_locations(frames, args, vid_name="", is_puppet=False, save_intermed=True, preloaded_model=None, graph=None):
     """
     predicts all requried keypoints (stickers & facial landmarks) locations from frames.
     :param frames: the frames to process
+    :param args: cmd line arguments
     :param vid_name: a pickle file will be loaded if exists to save time (from previous runs)
     :param is_puppet: if true a different landmark estimator will be used (color thresholding)
     :param save_intermed: if true intermediate products will be saved to disk
@@ -216,20 +208,20 @@ def predict_keypoints_locations(frames, vid_name="", is_puppet=False, save_inter
     """
     pickle_path = Path("data", vid_name+"_preds.pickle")
     if pickle_path.is_file():
-        if v:
+        if args.verbosity:
             print("Loading key points from:", pickle_path)
         f = open(pickle_path, 'rb')
         key_points = pickle.load(f)
     else:
-        if v:
+        if args.verbosity:
             print("Detecting facial key points.")
         if is_puppet:
-            facial_keypoints = get_puppet_landmarks(frames, v)
+            facial_keypoints = get_puppet_landmarks(frames, args.verbosity)
         else:
-            facial_keypoints = get_facial_landmarks(frames, v)
-        if v:
+            facial_keypoints = get_facial_landmarks(frames, args.verbosity)
+        if args.verbosity:
             print("Detecting sticker key points.")
-        sticker_keypoints = get_sticker_locations(frames, preloaded_model, graph,v)
+        sticker_keypoints = get_sticker_locations(frames, preloaded_model, graph, args)
         key_points = np.concatenate((facial_keypoints, sticker_keypoints), axis=1)
         key_points = np.expand_dims(key_points, axis=0)
         if (save_intermed):

@@ -116,15 +116,15 @@ def process_video(args):
     if mode == "experimental":
         if v:
             print("Performing experimental stuff.")
-        new_db = video_annotator.annotate_videos(vid_path, mode, v)
+        new_db = video_annotator.annotate_videos(vid_path, mode, args)
     else:
         if mode == "auto":
-            new_db = auto_annotate_videos(vid_path, True, True)
+            new_db = auto_annotate_videos(vid_path, True, True, args)
         else:
             if mode == "semi-auto" or mode == "manual":
                 if v:
                     print("Launching GUI to manually fix/annotate frames.")
-                new_db = video_annotator.annotate_videos(vid_path, mode, v)
+                new_db = video_annotator.annotate_videos(vid_path, mode, args)
     if Path.is_dir(vid_path):
         vid_names = []
         for file in sorted(vid_path.glob("**/*.MP4")):
@@ -144,7 +144,7 @@ def process_video(args):
         return new_db[vid_path.parent.name + "_" + vid_path.name][0]["data"], [vid_path]
 
 
-def auto_annotate_videos(vid_path, dump_to_db, force_annotate):
+def auto_annotate_videos(vid_path, dump_to_db, force_annotate, args):
     """
     given a video file or folder of video files, automatically annotates the video
     :param vid_path:
@@ -154,8 +154,8 @@ def auto_annotate_videos(vid_path, dump_to_db, force_annotate):
     """
     db_path = Path("data", "full_db.pickle")
     model_dir = Path("models")
-    model_name = 'unet_tel_aviv'
-    model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
+    model_name = args.u_net
+    model_full_name = Path.joinpath(model_dir, model_name)
     my_model = file_io.load_semantic_seg_model(str(model_full_name))
     my_db = file_io.load_full_db(db_path)
     paths = []
@@ -168,7 +168,7 @@ def auto_annotate_videos(vid_path, dump_to_db, force_annotate):
         frames, indices = video_to_frames(path, dump_frames=True)
         name = path.parent.name + "_" + path.name
         if name not in my_db.keys() or force_annotate:
-            data = predict.predict_keypoints_locations(frames, name,
+            data = predict.predict_keypoints_locations(frames, args, name,
                                                        is_puppet=False,
                                                        save_intermed=False,
                                                        preloaded_model=my_model)

@@ -6,7 +6,6 @@ from tkinter import filedialog
 import predict
 from PIL import Image, ImageTk
 import numpy as np
-import argparse
 import file_io
 import queue
 import threading
@@ -124,11 +123,11 @@ class ProgressBarPage(tk.Frame):
 
 
 class GUI(tk.Tk):
-    def __init__(self, db, paths, mode):
+    def __init__(self, db, paths, args):
         super().__init__()
         self.db = db
         self.paths = paths
-        self.mode = mode
+        self.args = args
         self.shift = 0
         self.cur_video_index = 0
         self.cur_frame_index = 0
@@ -138,10 +137,10 @@ class GUI(tk.Tk):
         self.queue = queue.Queue()
         self.model = None
         self.graph = None
-        if self.mode == "semi-automatic" or self.mode == "special":
-            model_name = 'unet_tel_aviv'
+        if self.args.mode == "semi-automatic" or self.args.mode == "experimental":
+            model_name = args.u_net
             model_dir = Path("models")
-            model_full_name = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
+            model_full_name = Path.joinpath(model_dir, model_name)
             self.model, self.graph = file_io.load_semantic_seg_model(str(model_full_name))
         self.wm_title("Video Annotator")
         self.resizable(False, False)
@@ -218,7 +217,7 @@ class GUI(tk.Tk):
     def prep_vid_to_frames_packet(self, perform_pred=None):
         path = self.paths[self.cur_video_index]
         if not perform_pred:
-            if self.mode == "semi-auto":
+            if self.args.mode == "semi-auto":
                 perform_pred = True
                 name = self.get_cur_video_name()
                 if name in self.db.keys():
@@ -226,7 +225,7 @@ class GUI(tk.Tk):
                         perform_pred = False
             else:
                 perform_pred = False
-        return ["video_to_frames", path, perform_pred, self.model, self.graph]
+        return ["video_to_frames", path, perform_pred, self.model, self.graph, self.args]
 
     def get_cur_frame_index(self):
         return self.cur_frame_index
@@ -352,12 +351,13 @@ class ThreadedTask(threading.Thread):
             self.handle_shift_video()
 
     def handle_video_to_frames(self):
-        path, perform_pred, preloaded_model, graph = self.msg[1:]
+        path, perform_pred, preloaded_model, graph, args = self.msg[1:]
         frames, indices = video.video_to_frames(path, dump_frames=True)
         name = path.parent.name + "_" + path.name
         my_dict = {}
         if perform_pred:
             data = predict.predict_keypoints_locations(frames,
+                                                       args,
                                                        name,
                                                        is_puppet=False,
                                                        save_intermed=False,
@@ -377,8 +377,8 @@ class ThreadedTask(threading.Thread):
         self.queue.put(["shift_video", frames, indices])
 
 
-def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
-    if mode == "special":
+def annotate_videos(video_path, args):  # contains GUI mainloop
+    if args.mode == "special":
         special_db = Path.joinpath(Path("data"), "telaviv_db.pickle")
         new_db = file_io.load_full_db(special_db)
     else:
@@ -390,7 +390,7 @@ def annotate_videos(video_path, mode="auto", v=0):  # contains GUI mainloop
         for file in video_path.glob("**/*.MP4"):
             paths.append(file)
 
-    app = GUI(new_db, paths, mode)
+    app = GUI(new_db, paths, args)
     app.mainloop()
     return app.get_db()
 

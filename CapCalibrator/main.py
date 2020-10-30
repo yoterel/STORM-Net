@@ -11,7 +11,10 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Calibrates fNIRS sensors location based on video.')
     parser.add_argument("video", help="The path to the video file to calibrate sensors with.")
     parser.add_argument("template", help="The template file path (given in space delimited csv format of size nx3).")
-    parser.add_argument("-gt", "--ground_truth", help="The ground truth file path to compare results to (given in space delimited csv format of size nx3).")
+    parser.add_argument("-storm", "--storm_net", default="telaviv_model_b16.h5", help="A path to a trained storm net keras model")
+    parser.add_argument("-unet", "--u_net", default="unet_tel_aviv.h5",
+                        help="A path to a trained segmentation network model")
+    # parser.add_argument("-gt", "--ground_truth", help="The ground truth file path to compare results to (given in space delimited csv format of size nx3).")
     parser.add_argument("-m", "--mode", type=str, choices=["manual", "semi-auto", "auto", "experimental"],
                         default="semi-auto",
                         help="Controls whether to automatically or manually annotate the stickers in the video.")
@@ -42,6 +45,6 @@ if __name__ == "__main__":
 
 
 
-# cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/good_experiments E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment -m special -v 1'.split()
+# cmd_line = 'E:/University/masters/CapTracking/videos/telaviv/good_experiments E:/Src/CapCalibrator/example_models/example_model3.txt -gt E:/Src/CapCalibrator/example_models/telaviv_experiment -m experimental -v 1'.split()
 # cmd_line = '/disk1/yotam/capnet/openPos/openPos55/GX011592.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m special -gt /disk1/yotam/capnet/openPos/openPos55'.split()
 # cmd_line = '/disk1/yotam/capnet/openPos/real_babies/1778b/GX011447.MP4 /disk1/yotam/capnet/openPos/openPos/openPos50 -m manual -v 1'.split()
