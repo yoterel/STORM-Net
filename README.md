@@ -15,7 +15,7 @@ It contains three tools:
       
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
-- Unity 2019.3 or higher (required by (3), only for compiling the renderer executable)
+- Precompiled binaries for the renderer which can be downloaded from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip). Note these can also be compiled from source using [Unity](https://unity.com/) 2019.3 or higher.
 - Hardware: Although not necessary, the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We recommend using a GPU if fast calibration times are needed.
 
 ## The template model file
@@ -49,8 +49,8 @@ The mode "auto" indicates to the application that the user wants it to automatic
 After creating a template model for a new cap, we strongly recommend fine-tunning our supplied neural network for best results.
 To do this, follow the steps below:
 
-1. Create synthetic data using the [render script](DataSynth/render.py) (this python script requires the template model as input).\
-   We recommend usings a minimum of 30000 iterations and the --transform argument. Notice this script requires an executable path to the renderer, which can be compiled using Unity as mentioned above, we can supply pre-built executables upon demand.
+1. Create synthetic data using the [render script](DataSynth/render.py) (notice this script requires the template model file path and the renderer executable path as input). We recommend usings a minimum of 30000 iterations:\
+   `python render.py path_to_template_model_file path_to_output_folder --exe path_to_renderer_executable --log path_to_output_log --iterations 30000`
 2. Train the network on the images using the [train script](CapCalibrator/train.py)\
    When training is done, a model file will be availble in the [models](CapCalibrator/models) directory.
 3. Use this model in the arguments supplied to the GUI / automatic calibration tools.
@@ -58,12 +58,13 @@ To do this, follow the steps below:
 ## List of mandatory optodes in template file
 
 The following optodes must exist in the template model file:
-- "cz"
-- "righteye"
-- "lefteye"
-- "fp1"
-- "fpz"
-- "fp2"
+- "cz" : used to find standard coordinate and by renderer
+- "righteye" : used to find standard coordinate and by renderer
+- "lefteye" : used to find standard coordinate and by renderer
+- "nosetip" : used by renderer
+- "fp1" : used to find standard coordinate and by renderer
+- "fpz" : used to find standard coordinate and by renderer
+- "fp2" : used to find standard coordinate and by renderer
 Use these names (exactly) for the first field for them to parsed correctly.
 
 ## The standard coordiante system
