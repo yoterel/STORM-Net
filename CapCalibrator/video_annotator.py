@@ -137,7 +137,7 @@ class GUI(tk.Tk):
         self.queue = queue.Queue()
         self.model = None
         self.graph = None
-        if self.args.mode == "semi-automatic" or self.args.mode == "experimental":
+        if self.args.mode == "semi-auto" or self.args.mode == "experimental":
             model_name = args.u_net
             model_dir = Path("models")
             model_full_name = Path.joinpath(model_dir, model_name)
@@ -276,9 +276,14 @@ class GUI(tk.Tk):
         self.go_to_next_coord()
 
     def auto_annotate(self):
-        self.cur_frame_index = 0
-        self.cur_sticker_index = 0
-        self.take_async_action(self.prep_vid_to_frames_packet(True))
+        if self.args.mode == "manual":
+            if self.args.verbosity:
+                print("Automatic annotation is not availble in manual mode. Relaunch the GUI with semi-auto or auto mode.")
+            return
+        else:
+            self.cur_frame_index = 0
+            self.cur_sticker_index = 0
+            self.take_async_action(self.prep_vid_to_frames_packet(True))
 
     def next_video(self):
         if self.cur_video_index < (len(self.paths)-1):

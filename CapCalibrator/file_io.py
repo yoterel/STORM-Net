@@ -2,7 +2,6 @@ import numpy as np
 from utils import pairwise
 import pickle
 import json
-import os
 import keras
 from keras_unet.metrics import iou, iou_thresholded
 import tensorflow as tf
@@ -90,7 +89,7 @@ def save_results(data, output_file, v):
     :param v:
     :return:
     """
-    if not data:
+    if data is None:
         return
     if not output_file:
         output_file = "output.txt"

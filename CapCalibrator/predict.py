@@ -180,7 +180,7 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     if args.verbosity:
         print("Filtering & extracting blobs.")
     for i in range(len(y_pred_np)):
-        key_points = get_blob_keypoints(y_pred_np[i], 4, False, v)
+        key_points = get_blob_keypoints(y_pred_np[i], 4, False, args.verbosity)
         key_points_list.append(key_points.flatten())
     # pad with zeros until we reach 2x4 numbers
     for i in range(len(key_points_list)):
