@@ -3,10 +3,10 @@ All files in the repository are an implementation of the original manuscript and
 ## Introduction
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or a standard cooridnate system that can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
-It contains three seperate tools:
+It contains three tools:
 1. A GUI that allows manual annotation of the data or supervising the automatic method ("semi-supervised") - this is recommended for first time users.
 2. A ready-to-use end-to-end script that performs calibration given a video file - use this when you are comfortable with the GUI and its results.
-3. A bundle of python scripts for finetunning (or training from scratch) the neural networks we provide - this is suggested for advanced users who wish to customize or improve some block in the pipeline. Note this also includes a synthetic data generator implemented in [Unity](https://unity.com/).
+3. A bundle of python scripts for finetunning (or training from scratch) the neural networks we provide - this is suggested for every new phsyical cap your lab uses. Description of how to do this is down below. Note this bundle also includes a synthetic data generator implemented in [Unity](https://unity.com/).
 
 ### Application dependencies:
 - Python 3.6 or higher (required by (1), (2), and (3))
@@ -44,15 +44,15 @@ The mode "semi-auto" indicates to the application that the user wants it to auto
 The mode "auto" indicates to the application that the user wants it to automatically annotate the video without any supervision. This is recommended for live sessions and when the system was oberved to perform well with a certain template model.
 
 
-## How to improve accuracy - strongly recommended when using a new template model
+## Using a new cap (or how to improve accuracy)
 
-After creating a template model, we strongly recommend fine-tunning our supplied neural network.
+After creating a template model for a new cap, we strongly recommend fine-tunning our supplied neural network for best results.
 To do this, follow the steps below:
 
 1. Create synthetic data using the [render script](DataSynth/render.py) (this python script requires the template model as input).\
-   We recommend usings a minimum of 30000 iterations and the --transform argument. Notice this script requires an executable path to the renderer.
+   We recommend usings a minimum of 30000 iterations and the --transform argument. Notice this script requires an executable path to the renderer, which can be compiled using Unity as mentioned above, we can supply pre-built executables upon demand.
 2. Train the network on the images using the [train script](CapCalibrator/train.py)\
-   When training is done, a model file will be availble in the [models](CapCalibrator/models) directory .
+   When training is done, a model file will be availble in the [models](CapCalibrator/models) directory.
 3. Use this model in the arguments supplied to the GUI / automatic calibration tools.
 
 ## The standard coordiante system
