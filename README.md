@@ -4,7 +4,7 @@ All files in the repository are an implementation of the original manuscript and
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or in the original cooridnate system supplied by user, this can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
 It contains three seperate tools:
-1. A GUI that allows supervising the automatic method ("semi-supervised") in a controlled manner - this is recommended for first time users.
+1. A GUI that allows manual annotation of the data or supervising the automatic method ("semi-supervised") - this is recommended for first time users.
 2. A ready-to-use end-to-end script that performs calibration given a video file - use this when you are comfortable with the GUI and its results.
 3. A bundle of python scripts for finetunning (or training from scratch) the neural networks we provide - this is suggested for advanced users who wish to customize or improve some block in the pipeline. Note this also includes a synthetic data generator implemented in [Unity](https://unity.com/).
 
