@@ -61,7 +61,6 @@ The following optodes must exist in the template model file:
 - "cz"
 - "righteye"
 - "lefteye"
-- "nosetip"
 - "fp1"
 - "fpz"
 - "fp2"
