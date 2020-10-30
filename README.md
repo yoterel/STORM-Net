@@ -55,12 +55,23 @@ To do this, follow the steps below:
    When training is done, a model file will be availble in the [models](CapCalibrator/models) directory.
 3. Use this model in the arguments supplied to the GUI / automatic calibration tools.
 
+## List of mandatory optodes in template file
+
+The following optodes must exist in the template model file:
+- "cz"
+- "righteye"
+- "lefteye"
+- "nosetip"
+- "fp1"
+- "fpz"
+- "fp2"
+Use these names (exactly) for the first field for them to parsed correctly.
+
 ## The standard coordiante system
 
 This application outputs data in the following coordiante system (notice it is right-handed):
-x axis is from left to right ear
-y axis is from back to front of head
-z axis is from bottom to top of head
-the origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
-scale is cm. if cz is too close to origin in terms of cm, this function scales it to cm (assuming it is inch)
-
+- x axis is from left to right ear
+- y axis is from back to front of head
+- z axis is from bottom to top of head
+- the origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
+- scale is cm. If "CZ" is too close to origin in terms of cm, this function scales it to cm (assuming it is inch)
