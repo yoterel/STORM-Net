@@ -1,7 +1,7 @@
 # STORM: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS)
 All files in the repository are an implementation of the original manuscript and research which is not yet published.
 ## Introduction
-This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or in the original cooridnate system supplied by user, this can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
+This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or a standard cooridnate system that can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
 It contains three seperate tools:
 1. A GUI that allows manual annotation of the data or supervising the automatic method ("semi-supervised") - this is recommended for first time users.
@@ -18,18 +18,18 @@ It contains three seperate tools:
 - Unity 2019.3 or higher (required by (3), only for compiling the renderer executable)
 - Hardware: the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We strongly recommend using a GPU if fast calibration times are needed.
 
-### The template model file
+## The template model file
 
 The application uses a pre-measured template model file as an input. An example of such file is located under the [example_models](example_models) directory.
 This template model was obtained using a 3D digitizer, but can similarly be obtained in any way as long as the measurements are accurate to a satisfactory degree.
 It is strongly recommended to create your own template model file **per physical cap model you are using in your lab**, this will lead to best accuracies.
 The exact format of this file is now specified.
 The file is a csv space delimited file, where each row contains 4 values:
-1. An index of the optode (an integer numerical value representing the index of this optode. Starts from 0. any other value (strings, etc) will be skipped and not be calibrated).
+1. An index of the optode (an integer numerical value representing the index of this optode. Starts from 0. any other value (strings, etc) will not be calibrated but still appear in the output file in the same standard coordiante system as the rest of the optodes).
 2. 3 numerical values: X, Y, Z representing the location of this optode (note: values must be supplied in cm or inch).
 The coordinate system these values are supplied at are not improtant, as they are transformed internally to a standard right-handed system.
 
-### How to use GUI & Automatic calibration
+## How to use GUI & Automatic calibration
 
 The file [main.py](CapCalibrator/main.py) is the entry point of the application. In the most common use case, this script expects a path to a video file to be analyzed and a "template" model file discussed above.
 
@@ -44,7 +44,7 @@ The mode "semi-auto" indicates to the application that the user wants it to auto
 The mode "auto" indicates to the application that the user wants it to automatically annotate the video without any supervision. This is recommended for live sessions and when the system was oberved to perform well with a certain template model.
 
 
-### How to improve accuracy - strongly recommended when using a new template model
+## How to improve accuracy - strongly recommended when using a new template model
 
 After creating a template model, we strongly recommend fine-tunning our supplied neural network.
 To do this, follow the steps below:
@@ -54,3 +54,13 @@ To do this, follow the steps below:
 2. Train the network on the images using the [train script](CapCalibrator/train.py)\
    When training is done, a model file will be availble in the [models](CapCalibrator/models) directory .
 3. Use this model in the arguments supplied to the GUI / automatic calibration tools.
+
+## The standard coordiante system
+
+This application outputs data in the following coordiante system (notice it is right-handed):
+x axis is from left to right ear
+y axis is from back to front of head
+z axis is from bottom to top of head
+the origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
+scale is cm. if cz is too close to origin in terms of cm, this function scales it to cm (assuming it is inch)
+
