@@ -88,7 +88,9 @@ def video_to_frames(vid_path, dump_frames=False, starting_frame=0, force_reselec
     #     my_string = name + "_{:03d}_frames.pickle".format(starting_frame)
     # else:
     my_string = name + "_frames.pickle"
-    pickle_path = Path.joinpath(Path("data"), my_string)
+    cache_path = Path("cache")
+    cache_path.mkdir(exist_ok=True)
+    pickle_path = Path.joinpath(cache_path, my_string)
     if pickle_path.is_file() and not force_reselect:
         frames, indices = file_io.load_from_pickle(pickle_path)
     else:
@@ -116,7 +118,7 @@ def process_video(args):
     if mode == "experimental":
         if v:
             print("Performing experimental stuff.")
-        new_db = video_annotator.annotate_videos(vid_path, mode, args)
+        new_db = video_annotator.annotate_videos(vid_path, args)
     else:
         if mode == "auto":
             new_db = auto_annotate_videos(vid_path, True, True, args)
@@ -124,7 +126,7 @@ def process_video(args):
             if mode == "semi-auto" or mode == "manual":
                 if v:
                     print("Launching GUI to manually fix/annotate frames.")
-                new_db = video_annotator.annotate_videos(vid_path, mode, args)
+                new_db = video_annotator.annotate_videos(vid_path, args)
     if Path.is_dir(vid_path):
         vid_names = []
         for file in sorted(vid_path.glob("**/*.MP4")):

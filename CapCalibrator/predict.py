@@ -156,7 +156,7 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
         model_name = args.u_net
         model_dir = Path("models")
         model_full_name = Path.joinpath(model_dir, model_name)
-        my_model = file_io.load_semantic_seg_model(str(model_full_name))
+        my_model, graph = file_io.load_semantic_seg_model(str(model_full_name))
     else:
         my_model = preloaded_model
     imgs_list = []
@@ -206,7 +206,7 @@ def predict_keypoints_locations(frames, args, vid_name="", is_puppet=False, save
     :param v: verbosity
     :return: locations as a 2d numpy array in the order "Left Eye, Nose, Right Eye, x1, x2, x3, x4" where x is an arbitrary sticker
     """
-    pickle_path = Path("data", vid_name+"_preds.pickle")
+    pickle_path = Path("cache", vid_name+"_preds.pickle")
     if pickle_path.is_file():
         if args.verbosity:
             print("Loading key points from:", pickle_path)
@@ -224,7 +224,9 @@ def predict_keypoints_locations(frames, args, vid_name="", is_puppet=False, save
         sticker_keypoints = get_sticker_locations(frames, preloaded_model, graph, args)
         key_points = np.concatenate((facial_keypoints, sticker_keypoints), axis=1)
         key_points = np.expand_dims(key_points, axis=0)
-        if (save_intermed):
+        if save_intermed:
+            cache_path = Path("cache")
+            cache_path.mkdir(exist_ok=True)
             f = open(pickle_path, 'wb')
             pickle.dump(key_points, f)
             f.close()

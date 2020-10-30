@@ -47,7 +47,7 @@ class AnnotationPage(tk.Frame):
         doneButton = tk.Button(self, text="Done", width=button_width, padx=pad_x, pady=pad_y, fg="white",
                                bg="#263D42", command=self.controller.destroy)
         self.data_panel = tk.Frame(self, bg="white")
-        self.update_labels()
+        # self.update_labels()
         loadSession.grid(row=0, column=0, sticky="w"+"e")
         saveSession.grid(row=0, column=1, sticky="w"+"e")
         prevVideo.grid(row=0, column=2, sticky="w"+"e")
@@ -378,7 +378,7 @@ class ThreadedTask(threading.Thread):
 
 
 def annotate_videos(video_path, args):  # contains GUI mainloop
-    if args.mode == "special":
+    if args.mode == "experimental":
         special_db = Path.joinpath(Path("data"), "telaviv_db.pickle")
         new_db = file_io.load_full_db(special_db)
     else:
