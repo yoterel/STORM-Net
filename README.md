@@ -58,13 +58,13 @@ To do this, follow the steps below:
 ## List of mandatory optodes in template file
 
 The following optodes must exist in the template model file:
-- "cz" : used to find standard coordinate and by renderer
-- "righteye" : used to find standard coordinate and by renderer
-- "lefteye" : used to find standard coordinate and by renderer
-- "nosetip" : used by renderer
-- "fp1" : used to find standard coordinate and by renderer
-- "fpz" : used to find standard coordinate and by renderer
-- "fp2" : used to find standard coordinate and by renderer
+- "cz" : used to find standard coordinate and by renderer.
+- "righteye" : used to find standard coordinate and by renderer.
+- "lefteye" : used to find standard coordinate and by renderer.
+- "nosetip" : used by renderer.
+- "fp1" : used to find standard coordinate and by renderer.
+- "fpz" : used to find standard coordinate and by renderer. **NOTE**: we actually used a location 1 cm above fpz in our experiments (can be seen marked by a green sticker in the example video) - This was shown to yield better results (but it is not mandatory).
+- "fp2" : used to find standard coordinate and by renderer.\
 Use these names (exactly) for the first field for them to parsed correctly.
 
 ## The standard coordiante system
