@@ -4,3 +4,5 @@
 /plots
 /build
 /dist
+/cache
+*.txt

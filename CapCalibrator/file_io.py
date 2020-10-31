@@ -263,9 +263,8 @@ def load_semantic_seg_model(weights_loc, verbosity=2):
     return new_model, tf.get_default_graph()
 
 
-def load_keras_model(model_dir, pretrained_model_name, learning_rate):
-    pretrained_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(pretrained_model_name))
-    model = keras.models.load_model(str(pretrained_weight_location))
+def load_keras_model(pretrained_model_path, learning_rate):
+    model = keras.models.load_model(str(pretrained_model_path))
     opt = keras.optimizers.Adam(lr=learning_rate)
     model.compile(loss='mean_squared_error', optimizer=opt)
     model.summary()
