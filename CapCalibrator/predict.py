@@ -10,6 +10,7 @@ import dlib
 from imutils import face_utils
 from scipy.spatial.transform import Rotation as R
 import numpy as np
+import logging
 
 
 def is_using_gpu():
@@ -24,11 +25,12 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     """
     predicts rigid transformation of cap object using 2d sticker locations
     :param sticker_locations: a batch of 2d array of sticker locations
+    :param preloaded_model: a pre loaded keras model
+    :param graph: the default tf graph
     :param args: command line arguments
     :return: rotation and scale matrices list
     """
-    if args.verbosity:
-        print("Predicting rotation from key points.")
+    logging.info("Predicting rotation from key points.")
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
@@ -42,7 +44,7 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
         model_name = args.storm_net
         model_dir = Path("models")
         model_full_path = Path.joinpath(model_dir, model_name)
-        model, graph = file_io.load_clean_keras_model(model_full_path, args.verbosity)
+        model, graph = file_io.load_clean_keras_model(model_full_path)
     with graph.as_default():
         y_predict = model.predict(sticker_locations)
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
@@ -51,8 +53,7 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     sc = []
 
     for i in range(len(y_predict)):
-        if args.verbosity:
-            print("Network Euler angels:", [y_predict[i][0], -y_predict[i][1], -y_predict[i][2]])
+        logging.info("Network Euler angels:" + str([y_predict[i][0], -y_predict[i][1], -y_predict[i][2]]))
         rot = R.from_euler('xyz', [y_predict[i][0], -y_predict[i][1], -y_predict[i][2]], degrees=True)
         scale_mat = np.identity(3)
         if y_predict.shape[-1] > 3:
@@ -65,11 +66,10 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     return rs, sc
 
 
-def get_facial_landmarks(frames, v):
+def get_facial_landmarks(frames):
     """
     predicts location of center of eyes and nose tip in a set of images
     :param frames: the images to predict the landmarks on
-    :param v: verbosity
     :return: a 2d numpy array containing x, y coordinates of required landmarks for each frame
     """
     model_path = Path("models", "shape_predictor_68_face_landmarks.dat")
@@ -81,8 +81,7 @@ def get_facial_landmarks(frames, v):
         img_data = np.array(frame)
         rects = detector(img_data, 0)
         if len(rects) > 1:
-            if v:
-                print("Warning: found more than 1 face in frame:", j)
+            logging.info("Warning: found more than 1 face in frame: " + str(j))
             rects = [max(rects, key=lambda x: x.top())]  # select bottom most
         if rects:
             if rects[0].top() < 100:
@@ -110,12 +109,12 @@ def get_facial_landmarks(frames, v):
     return np_kp
 
 
-def get_blob_keypoints(mask, max_key_points, facial_landmarks=False, v=0):
+def get_blob_keypoints(mask, max_key_points, facial_landmarks=False):
     """
     finds blobs in a binary mask image
     :param mask: the mask image
+    :param max_key_points: maximum key points allowed
     :param facial_landmarks: if true, will slightly dilate and erode image
-    :param v: verbosity
     :return: numpy array of locations of center of blobs obeying some heuristics
     """
     # if facial_landmarks:
@@ -135,7 +134,6 @@ def get_blob_keypoints(mask, max_key_points, facial_landmarks=False, v=0):
             cy = int(M['m01'] / M['m00'])
             area = cv2.contourArea(contour)
             keypoints.append((cx, cy, area, i))
-
     keypoints.sort(key=lambda tup: tup[2], reverse=True)
     keypoints = [x for x in keypoints if x[2] > 200]  # area filter
     keypoints = [x for x in keypoints if 300 < x[0] < 700]  # location filter
@@ -150,14 +148,15 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     predicts green sticker locations in a set of frames
     :param frames: the frames to process
     :param preloaded_model: a preloaded keras model to use
-    :param v: verbosity
+    :param graph: default tf graph
+    :param args: cmd line arguments
     :return: locations of stickers in all frames as a 2d numpy array
     """
     if not preloaded_model:
         model_name = args.u_net
         model_dir = Path("models")
         model_full_name = Path.joinpath(model_dir, model_name)
-        my_model, graph = file_io.load_semantic_seg_model(str(model_full_name), args.verbosity)
+        my_model, graph = file_io.load_semantic_seg_model(str(model_full_name))
     else:
         my_model = preloaded_model
     imgs_list = []
@@ -178,10 +177,9 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     y_pred_np = np.where(y_pred_np > threshold, upper, lower)
     y_pred_np = y_pred_np.astype(np.uint8)
     key_points_list = []
-    if args.verbosity:
-        print("Filtering & extracting blobs.")
+    logging.info("Filtering & extracting blobs.")
     for i in range(len(y_pred_np)):
-        key_points = get_blob_keypoints(y_pred_np[i], 4, False, args.verbosity)
+        key_points = get_blob_keypoints(y_pred_np[i], 4, False)
         key_points_list.append(key_points.flatten())
     # pad with zeros until we reach 2x4 numbers
     for i in range(len(key_points_list)):
@@ -204,24 +202,21 @@ def predict_keypoints_locations(frames, args, vid_hash="", is_puppet=False, save
     :param is_puppet: if true a different landmark estimator will be used (color thresholding)
     :param save_intermed: if true intermediate products will be saved to disk
     :param preloaded_model: a preloaded keras model to be used for prediction
-    :param v: verbosity
+    :param graph: tf graph
     :return: locations as a 2d numpy array in the order "Left Eye, Nose, Right Eye, x1, x2, x3, x4" where x is an arbitrary sticker
     """
     pickle_path = Path("cache", vid_hash+"_preds.pickle")
     if pickle_path.is_file():
-        if args.verbosity:
-            print("Loading key points from:", pickle_path)
+        logging.info("Loading key points from: " + str(pickle_path))
         f = open(pickle_path, 'rb')
         key_points = pickle.load(f)
     else:
-        if args.verbosity:
-            print("Detecting facial key points.")
+        logging.info("Detecting facial key points.")
         if is_puppet:
-            facial_keypoints = get_puppet_landmarks(frames, args.verbosity)
+            facial_keypoints = get_puppet_landmarks(frames)
         else:
-            facial_keypoints = get_facial_landmarks(frames, args.verbosity)
-        if args.verbosity:
-            print("Detecting sticker key points.")
+            facial_keypoints = get_facial_landmarks(frames)
+        logging.info("Detecting sticker key points.")
         sticker_keypoints = get_sticker_locations(frames, preloaded_model, graph, args)
         key_points = np.concatenate((facial_keypoints, sticker_keypoints), axis=1)
         key_points = np.expand_dims(key_points, axis=0)
@@ -242,12 +237,12 @@ def predict(model_name, root_dir):
     best_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
     model = keras.models.load_model(str(best_weight_location))
     pickle_file_path = Path.joinpath(data_dir, "data.pickle")
-    x_train, x_val, y_train, y_val, x_test, y_test = utils.deserialize_data(pickle_file_path)
+    x_train, x_val, y_train, y_val, x_test, y_test = file_io.deserialize_data(pickle_file_path)
     utils.center_data(x_test)
     y_predict = model.predict(x_test)
     total_error = mean_squared_error(y_test, y_predict, squared=False)
     angel_error = mean_squared_error(y_test[:, :-2], y_predict[:, :-2], squared=False)
-    print(total_error, angel_error)
+    logging.info(str(total_error) +" "+ str(angel_error))
     # y_predict = np.random.uniform(-4, 4, y_test.shape)
     # testScore = mean_squared_error(y_test, y_predict, multioutput='raw_values')
     # print(testScore)
@@ -262,15 +257,14 @@ def predict_from_mat(model_name, root_dir):
     x = np.expand_dims(mat_contents["db"][0], axis=0)
     y_predict = model.predict(x)
     rot = R.from_euler('xyz', [y_predict[0][0], y_predict[0][1], y_predict[0][2]], degrees=True)
-    print(rot.as_matrix())
-    print(y_predict)
+    logging.info(rot.as_matrix())
+    logging.info(y_predict)
 
 
-def get_puppet_landmarks(frames, v):
+def get_puppet_landmarks(frames):
     """
     predicts location of center of eyes and nose tip in a set of images of a puppet
     :param frames: the images to predict the landmarks on
-    :param v: verbosity
     :return: a 2d numpy array containing x, y coordinates of required landmarks for each frame
     """
     # global image_hsv, pixel
@@ -297,8 +291,7 @@ def get_puppet_landmarks(frames, v):
         purp2 = (160, 158, 164)
         mask = cv2.inRange(frame_HSV, purp1, purp2)
         key_points = get_blob_keypoints(mask, 3, True, 1)
-        if v:
-            print("Found {} blobs in frame {}.".format(len(key_points), i))
+        logging.info("Found {} blobs in frame {}.".format(len(key_points), i))
         if key_points.tolist() != []:
             key_points = key_points[np.argsort(key_points, axis=0)[:, 0]][::-1]  # sort key points according to x value
             if len(key_points.flatten()) == 6 and i <= 5:  # last frames can't possibly contain facial landmarks.
@@ -310,7 +303,3 @@ def get_puppet_landmarks(frames, v):
         key_points_list.append(key_points.flatten())
     np_kp = np.array(key_points_list)
     return np_kp
-
-# model_name = 'scene3_batch16_lr1e4_supershuffle_noise7'
-# model_dir = Path("models")
-# predict()

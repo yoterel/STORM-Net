@@ -8,6 +8,7 @@ from PIL import Image
 import draw
 import file_io
 import pickle
+import logging
 import cv2
 
 root_dir = Path("/disk1/yotam/capnet")
@@ -38,7 +39,7 @@ if not pred_results_file.is_file():
     my_model = file_io.load_semantic_seg_model(str(best_weight_location))
     y_pred_list = []
     for i in range(x.shape[0]):
-        print("predicting on image:", i)
+        logging.info("predicting on image: " + str(i))
         to_predict = np.expand_dims(x[i], axis=0)
         y_pred = my_model.predict(to_predict)
         y_pred_list.append(y_pred)
@@ -55,7 +56,7 @@ else:
     f.close()
 
 draw.plot_semanticseg_results(org_imgs=imgs_np, mask_imgs=masks_np, pred_imgs=y_pred_np, nm_img_to_plot=10, figsize=6)
-print("bye!")
+logging.info("bye!")
 # for image in test_image_dir.glob("*"):
 #     dst = Path.joinpath(output_folder, image.stem + ".png")
 #     new_model.predict_segmentation(

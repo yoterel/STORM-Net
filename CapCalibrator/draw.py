@@ -6,6 +6,7 @@ import cv2
 from pathlib import Path
 import utils
 import file_io
+import logging
 
 image_hsv = None
 pixel = (0, 0, 0) #RANDOM DEFAULT VALUE
@@ -23,7 +24,7 @@ def pick_color(event, x, y, flags, param):
         #HUE, SATURATION, AND VALUE (BRIGHTNESS) RANGES. TOLERANCE COULD BE ADJUSTED.
         upper = np.array([pixel[0] + 10, pixel[1] + 10, pixel[2] + 40])
         lower = np.array([pixel[0] - 10, pixel[1] - 10, pixel[2] - 40])
-        print(lower, upper)
+        logging.info(str(lower) + str(upper))
 
         #A MONOCHROME MASK FOR GETTING A BETTER VISION OVER THE COLORS
         image_mask = cv2.inRange(image_hsv, lower, upper)

@@ -7,6 +7,7 @@ import utils
 import cv2
 import file_io
 import predict
+import logging
 
 
 def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, local_env_size=5, frame_indices=None):
@@ -70,7 +71,7 @@ def measure_blur(frame):
     return cv2.Laplacian(np.array(frame), cv2.CV_64F).var()
 
 
-def video_to_frames(vid_path, vid_hash=None, dump_frames=False, starting_frame=0, force_reselect=False, frame_indices=None, v=0):
+def video_to_frames(vid_path, vid_hash=None, dump_frames=False, starting_frame=0, force_reselect=False, frame_indices=None):
     """
     given a video path, splits it into frames and possibly dumps them as a serialized file
     :param vid_path: the video file path
@@ -79,7 +80,6 @@ def video_to_frames(vid_path, vid_hash=None, dump_frames=False, starting_frame=0
     :param starting_frame: the frame to start from when selecting the frames
     :param force_reselect: if true, performs split even if dump file exists
     :param frame_indices: if specified, selects this list of frames indices from the video
-    :param v: verbosity
     :return: the frames (PIL array) and the indices (zero indexed)
     """
     if frame_indices is not None:
@@ -100,8 +100,7 @@ def video_to_frames(vid_path, vid_hash=None, dump_frames=False, starting_frame=0
     elif pickle_path.is_file() and not force_reselect:
         frames, indices = file_io.load_from_pickle(pickle_path)
     else:
-        if v:
-            print("Selecting frames for video:", vid_path)
+        logging.info("Selecting frames for video: " + str(vid_path))
         frames, indices = select_frames(vid_path,
                                         steps_per_datapoint=10,
                                         starting_frame=starting_frame,
@@ -131,14 +130,13 @@ def process_video(args):
         for file in sorted(vid_paths.glob("**/*.MP4")):
             name = file.parent.name + "_" + file.name
             vid_names.append(name)
-        if args.verbosity:
-            print("Found following video files:", vid_names)
+            logging.info("Found following video files: " + str(vid_names))
         data = np.zeros((len(vid_names), 10, 14))
         for i, vid in enumerate(vid_names):
             try:
                 data[i] = new_db[vid][0]["data"]
             except KeyError:
-                print("Error! did you forget to annotate {} ?".format(vid))
+                logging.info("Error! did you forget to annotate {} ?".format(vid))
                 exit(1)
         return data, vid_names
     else:
@@ -161,7 +159,7 @@ def auto_annotate_videos(args):
     unet_model_dir = Path("models")
     unet_model_name = args.u_net
     unet_model_full_path = Path.joinpath(unet_model_dir, unet_model_name)
-    unet_model, graph = file_io.load_semantic_seg_model(str(unet_model_full_path), args.verbosity)
+    unet_model, graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
     paths = []
     if Path.is_file(vid_path):
         paths.append(vid_path)

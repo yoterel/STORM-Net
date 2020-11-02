@@ -7,6 +7,7 @@ from pathlib import Path
 import video
 import predict
 import geometry
+import logging
 from file_io import save_results
 import sys
 
@@ -24,7 +25,8 @@ def parse_arguments():
     parser.add_argument("-s", "--session_file",
                         help="A file containing processed results for previous videos.")
     parser.add_argument("-out", "--output_file", help="The output csv file with calibrated results (given in MNI coordinates)")
-    parser.add_argument("-v", "--verbosity", type=int, choices=[0, 1, 2], default=2, help="Selects verbosity level")
+    parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
+    parser.add_argument("-log", "--log", help="If specified, log will be output to this file")
     parser.add_argument("-gt", "--ground_truth", help="Use this in experimental mode only")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -48,11 +50,15 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
+    if args.log:
+        logging.basicConfig(filename=args.log, filemode='w', level=args.verbosity.upper())
+    else:
+        logging.basicConfig(level=args.verbosity.upper())
     if args.mode == "semi-auto":
         video.process_video(args)
     else:
         sticker_locations, video_names = video.process_video(args)
         r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
         sensor_locations = geometry.apply_rigid_transform(r_matrix, s_matrix, None, None, video_names, args)
-        projected_data = geometry.project_sensors_to_MNI(sensor_locations, args.verbosity)
-        save_results(projected_data, args.output_file, args.verbosity)
+        projected_data = geometry.project_sensors_to_MNI(sensor_locations)
+        save_results(projected_data, args.output_file)

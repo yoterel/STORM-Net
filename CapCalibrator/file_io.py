@@ -2,6 +2,7 @@ import numpy as np
 from utils import pairwise
 import pickle
 import json
+import logging
 import shutil
 import keras
 from keras_unet.metrics import iou, iou_thresholded
@@ -84,7 +85,7 @@ def read_template_file(template_path):
     return names, data, file_format
 
 
-def save_results(data, output_file, v):
+def save_results(data, output_file):
     """
     saves data into output file
     :param data:
@@ -96,8 +97,7 @@ def save_results(data, output_file, v):
         return
     if not output_file:
         output_file = "output.txt"
-    if v:
-        print("Saving result to output file:", output_file)
+    logging.info("Saving result to output file: " + str(output_file))
     optode_number = len(data[0])
     with open(str(output_file), 'a') as f:
         for i in range(optode_number):
@@ -249,9 +249,8 @@ def deserialize_data(file_path, with_test_set=True):
         return x_train, x_val, y_train, y_val
 
 
-def load_semantic_seg_model(weights_loc, verbosity=2):
-    if verbosity:
-        print("Loading unet model from:", weights_loc)
+def load_semantic_seg_model(weights_loc):
+    logging.info("Loading unet model from: " + str(weights_loc))
     old_model = keras.models.load_model(weights_loc,
                                         custom_objects={'iou': iou, 'iou_thresholded': iou_thresholded})
     old_model.layers.pop(0)
@@ -259,8 +258,8 @@ def load_semantic_seg_model(weights_loc, verbosity=2):
     new_input = keras.layers.Input(input_shape)
     new_outputs = old_model(new_input)
     new_model = keras.engine.Model(new_input, new_outputs)
-    if verbosity:
-        new_model.summary()
+    # if verbosity:
+    #     new_model.summary()
     return new_model, tf.get_default_graph()
 
 
@@ -272,12 +271,11 @@ def load_keras_model(pretrained_model_path, learning_rate):
     return model
 
 
-def load_clean_keras_model(path, v):
-    if v:
-        print("Loading STORM model from:", path)
+def load_clean_keras_model(path):
+    logging.info("Loading STORM model from: " + str(path))
     model = keras.models.load_model(str(path))
-    if v:
-        model.summary()
+    # if v:
+    #     model.summary()
     graph = tf.get_default_graph()
     return model, graph
 

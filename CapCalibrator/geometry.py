@@ -3,6 +3,7 @@ from scipy.spatial.transform import Rotation as R
 import math
 from file_io import read_template_file
 import re
+import logging
 
 
 def align_centroids(a, b):
@@ -171,7 +172,7 @@ def rigid_transform_3d(A, B):
 
     # special reflection case
     if np.linalg.det(R) < 0:
-        print("det(R) < R, reflection detected!, correcting for it ...\n")
+        logging.info("det(R) < R, reflection detected!, correcting for it ...\n")
         Vt[2,:] *= -1
         R = Vt.T * U.T
 
@@ -367,14 +368,14 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
         digi_intra_method_rmse = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
         digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
         digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
-        print("digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
+        logging.info("digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
 
         vid_intra_method_sessions1 = vid2vid_est[::3]
         vid_intra_method_sessions2 = vid2vid_est[1::3]
         vid_intra_method_rmse = [get_rmse(x, y) for x, y in zip(vid_intra_method_sessions1, vid_intra_method_sessions2)]
         vid_intra_method_rmse_avg = np.mean(vid_intra_method_rmse)
         vid_intra_method_rmse_std = np.std(vid_intra_method_rmse)
-        print("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
+        logging.info("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
 
         inter_method_rmse1 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions1)]
         inter_method_rmse2 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions2)]
@@ -382,7 +383,7 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
         inter_method_rmse4 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions2)]
         inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
         inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
-        print("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
+        logging.info("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
         #todo: calculate shifts
         return None
     else:
@@ -403,14 +404,14 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
     return vid_est[0]
 
 
-def project_sensors_to_MNI(sensor_locations, v):
+def project_sensors_to_MNI(sensor_locations):
     """
     project new sensor locations to MNI
     :param sensor_locations:
     :param v:
     :return:
     """
-    print("Projection to MNI is not implemented yet, results will be saved in original template file frame of reference.")
+    logging.info("Projection to MNI is not implemented yet, results will be saved in original template file frame of reference.")
     return sensor_locations
 
 
@@ -563,7 +564,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
             #                     title="test")
             gt_rot_m = R.from_matrix(ret_R)
             gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
-            print("Digitizer Euler angels: ", gt_rot_e)
+            logging.info("Digitizer Euler angels: " + str(gt_rot_e))
             # note: we apply only the mask transformation and report that to downstream.
             # facial alignment was an intermediate result
             estimation = (ret_R @ template_spiral_data.T).T

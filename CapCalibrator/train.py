@@ -4,7 +4,7 @@ from pathlib import Path
 from time import time
 import utils
 import file_io
-
+import logging
 
 def train(args):
     import keras
@@ -18,7 +18,7 @@ def train(args):
     if args.log:
         event_file_path = args.log
         if event_file_path.is_file():
-            print("Warnning: log file already exists. Overwriting.")
+            logging.info("Warnning: log file already exists. Overwriting.")
         stdout = sys.stdout
         # set hyper parameters
         sys.stdout = open(str(event_file_path), 'w+')
@@ -35,22 +35,22 @@ def train(args):
           "reduce_lr_patience": 3,
           "epochs": 1000,
           "verbosity": 1}
-    print(hp.items())
-    print("data path:", data_dir)
+    logging.info(hp.items())
+    logging.info("data path: " + str(data_dir))
     # load data
     if not pickle_file_path.is_file():
-        print("loading raw data")
+        logging.info("loading raw data")
         X, Y = file_io.load_raw_json_db(data_dir)
-        print("creating train/val split")
+        logging.info("creating train/val split")
         x_train, x_val, y_train, y_val = utils.split_data(X, Y, with_test_set=False)
         # X_train = np.expand_dims(X_train, axis=0)
         # X_val = np.expand_dims(X_val, axis=0)
         # y_train = np.expand_dims(y_train, axis=0)
         # y_val = np.expand_dims(y_val, axis=0)
-        print("saving train/val split to cache folder:", cache_dir)
+        logging.info("saving train/val split to cache folder: " + str(cache_dir))
         file_io.serialize_data(pickle_file_path, x_train, x_val, y_train, y_val)
     else:
-        print("loading train/val split from cache folder:", cache_dir)
+        logging.info("loading train/val split from cache folder: " + str(cache_dir))
         x_train, x_val, y_train, y_val = file_io.deserialize_data(pickle_file_path, with_test_set=False)
     input_shape = (x_train.shape[1], x_train.shape[2])
     output_shape = y_train.shape[-1]
@@ -143,4 +143,4 @@ if __name__ == "__main__":
     args = parse_arguments()
     configure_environment(args.gpu_id)
     train(args)
-    print("Done!")
+    logging.info("Done!")

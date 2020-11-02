@@ -14,6 +14,7 @@ import geometry
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import draw
+import logging
 
 
 class CalibrationPage(tk.Frame):
@@ -245,11 +246,11 @@ class GUI(tk.Tk):
             unet_model_name = args.u_net
             unet_model_dir = Path("models")
             unet_model_full_name = Path.joinpath(unet_model_dir, unet_model_name)
-            self.unet_model, self.graph = file_io.load_semantic_seg_model(str(unet_model_full_name), self.args.verbosity)
+            self.unet_model, self.graph = file_io.load_semantic_seg_model(str(unet_model_full_name))
             storm_model_name = args.storm_net
             storm_model_dir = Path("models")
             storm_model_full_name = Path.joinpath(storm_model_dir, storm_model_name)
-            self.storm_model, _ = file_io.load_clean_keras_model(storm_model_full_name, self.args.verbosity)
+            self.storm_model, _ = file_io.load_clean_keras_model(storm_model_full_name)
         self.wm_title("STORM - a fNIRS Calibration Tool")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
@@ -285,8 +286,7 @@ class GUI(tk.Tk):
             elif msg[0] == "shift_video":
                 self.frames, self.indices = msg[1:]
                 self.db[self.get_cur_video_hash()][self.shift]["frame_indices"] = self.indices
-                if self.args.verbosity:
-                    print("new indices:", self.indices)
+                logging.info("new indices: " + str(self.indices))
             elif msg[0] == "load_template_model":
                 self.template_names, self.template_data, self.template_format, self.template_file_name = msg[1:]
                 # self.panels[self.cur_active_panel].update_labels()
@@ -521,8 +521,7 @@ class GUI(tk.Tk):
             if x < h and y < w:
                 self.save_coords(coords=(x, y))
             else:
-                if self.args.verbosity:
-                    print("Must supply values between 0-539 and 0-959")
+                logging.info("Must supply values between 0-539 and 0-959")
 
     def zero_coords(self, event=None):
         current_video = self.get_cur_video_hash()
@@ -569,8 +568,7 @@ class GUI(tk.Tk):
     def shift_video_f(self):
         current_video = self.get_cur_video_hash()
         current_indices = self.db[current_video][self.shift]["frame_indices"]
-        if self.args.verbosity:
-            print("current indices:", current_indices)
+        logging.info("current indices: " + str(current_indices))
         new_indices = current_indices.copy()
         new_indices[self.get_cur_frame_index()] += 1
         self.take_async_action(["shift_video", self.paths, self.cur_video_index, new_indices])
@@ -578,8 +576,7 @@ class GUI(tk.Tk):
     def shift_video_b(self):
         current_video = self.get_cur_video_hash()
         current_indices = self.db[current_video][self.shift]["frame_indices"]
-        if self.args.verbosity:
-            print("current indices:", current_indices)
+        logging.info("current indices: " + str(current_indices))
         new_indices = current_indices.copy()
         new_indices[self.get_cur_frame_index()] -= 1
         self.take_async_action(["shift_video", self.paths, self.cur_video_index, new_indices])
@@ -622,8 +619,7 @@ class GUI(tk.Tk):
             self.db = file_io.load_from_pickle(filename)
             self.take_async_action(self.prep_vid_to_frames_packet())
         else:
-            if self.args.verbosity:
-                print("You must first load a video before you can load any saved sessions.")
+            logging.info("You must first load a video before you can load any saved sessions.")
 
     def save_session(self):
         f = filedialog.asksaveasfile(initialdir="./data", title="Select Session File", mode='wb')
@@ -636,7 +632,7 @@ class GUI(tk.Tk):
             f = filedialog.asksaveasfile(initialdir="./data", title="Select Output File", mode='w')
             if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
                 return
-            file_io.save_results(self.projected_data, Path(f.name), self.args.verbosity)
+            file_io.save_results(self.projected_data, Path(f.name))
 
     def toggle_optodes(self):
         self.selected_optode = 0
@@ -688,7 +684,7 @@ class ThreadedTask(threading.Thread):
         template_names, template_data, data, model, graph, args = self.msg[1:]
         r, s = predict.predict_rigid_transform(data, model, graph, args)
         sensor_locations = geometry.apply_rigid_transform(r, s, template_names, template_data, None, args)
-        projected_data = geometry.project_sensors_to_MNI(sensor_locations, args.verbosity)
+        projected_data = geometry.project_sensors_to_MNI(sensor_locations)
         self.queue.put(["calibrate", projected_data])
 
     def handle_load_template_model(self):
@@ -741,8 +737,7 @@ def annotate_videos(args):  # contains GUI mainloop
     else:
         new_db = file_io.load_full_db()
         paths = None
-    if args.verbosity:
-        print("Launching GUI...")
+    logging.info("Launching GUI...")
     app = GUI(new_db, paths, args)
     app.mainloop()
     return app.get_db(), app.paths
