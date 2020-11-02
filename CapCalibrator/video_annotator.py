@@ -11,6 +11,9 @@ import queue
 import threading
 import utils
 import geometry
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import draw
 
 
 class CalibrationPage(tk.Frame):
@@ -158,16 +161,38 @@ class FinetunePage(tk.Frame):
 class ExperimentViewerPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-        self.title = tk.Label(self,
-                                 text="Not implemented yet",
-                                 font=("Verdana", 12),
-                                 relief="groove",
-                                 anchor="w",
-                                 justify="left")
-        self.button = ttk.Button(self, text="Back",
-                                 command=lambda: controller.show_panel(MainMenu))
-        self.title.pack()
-        self.button.pack()
+        self.controller = controller
+        self.bind("<Left>", self.controller.prev_optode)
+        self.bind("<Right>", self.controller.next_optode)
+        self.bind("<w>", self.controller.increase_elev)
+        self.bind("<a>", self.controller.decrease_azim)
+        self.bind("<s>", self.controller.decrease_elev)
+        self.bind("<d>", self.controller.increase_azim)
+        self.figure_handle = plt.Figure(figsize=(5, 5), dpi=100)
+        self.sub_plot_handle = self.figure_handle.add_subplot(111, projection='3d')
+        self.sub_plot_handle.view_init(self.controller.get_view_elev(), self.controller.get_view_azim())
+        self.canvas = FigureCanvasTkAgg(self.figure_handle, self)
+        self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        self.canvas.draw()
+
+    def update_labels(self):
+        names, data, my_format = self.controller.get_template_info()
+        if names:
+            selected = self.controller.get_selected_optode()
+            data = geometry.to_standard_coordinate_system(names, data)
+            if not self.controller.fiducials_only():
+                spiral_index = names.index(0)
+                data = data[spiral_index:, :]
+                names = names[spiral_index:]
+            try:
+                self.canvas.get_tk_widget().pack_forget()
+                self.sub_plot_handle.cla()
+            except AttributeError:
+                pass
+            self.sub_plot_handle.view_init(elev=self.controller.get_view_elev(), azim=self.controller.get_view_azim())
+            draw.plot_3d_pc(self.sub_plot_handle, data, selected, names)
+            self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+            self.canvas.draw()
 
 
 class ProgressBarPage(tk.Frame):
@@ -200,8 +225,12 @@ class GUI(tk.Tk):
         self.cur_video_index = 0
         self.cur_frame_index = 0
         self.cur_sticker_index = 0
+        self.selected_optode = 0
+        self.view_fiducials_only = False
         self.frames = None
         self.indices = None
+        self.view_elev = 60
+        self.view_azim = -470
         self.queue = queue.Queue()
         self.unet_model = None
         self.storm_model = None
@@ -211,6 +240,7 @@ class GUI(tk.Tk):
         self.template_data = None
         self.template_format = None
         self.projected_data = None
+        self.cur_active_panel = None
         if self.args.mode == "semi-auto" or self.args.mode == "experimental":
             unet_model_name = args.u_net
             unet_model_dir = Path("models")
@@ -249,27 +279,20 @@ class GUI(tk.Tk):
                                "label": np.array([0, 0, 0]),
                                "frame_indices": self.indices}
                     self.db[my_hash] = [my_dict]
-                self.panels[CalibrationPage].update_canvas()
-                self.panels[CalibrationPage].update_labels()
             elif msg[0] == "annotate_frames":
                 my_hash, my_dict = msg[1:]
                 self.db[my_hash] = [my_dict]
-                self.panels[CalibrationPage].update_canvas()
-                self.panels[CalibrationPage].update_labels()
             elif msg[0] == "shift_video":
                 self.frames, self.indices = msg[1:]
                 self.db[self.get_cur_video_hash()][self.shift]["frame_indices"] = self.indices
                 if self.args.verbosity:
                     print("new indices:", self.indices)
-                self.panels[CalibrationPage].update_canvas()
-                self.panels[CalibrationPage].update_labels()
             elif msg[0] == "load_template_model":
                 self.template_names, self.template_data, self.template_format, self.template_file_name = msg[1:]
-                self.panels[CalibrationPage].update_labels()
+                # self.panels[self.cur_active_panel].update_labels()
             # Show result of the task if needed
             self.panels[ProgressBarPage].show_progress(False)
-            self.show_panel(CalibrationPage)
-            self.enable_menu()
+            self.show_panel(self.cur_active_panel)
         except queue.Empty:
             self.after(100, self.process_queue)
 
@@ -279,68 +302,92 @@ class GUI(tk.Tk):
                     "load_template_model": "Loading template model...",
                     "shift_video": "Selecting different frame...",
                     "calibrate": "Calibrating..."}
-        self.disbale_menu()
         self.show_panel(ProgressBarPage)
         self.panels[ProgressBarPage].show_progress(True)
         self.panels[ProgressBarPage].update_status_label(msg_dict[msg[0]])
         ThreadedTask(self.queue, msg).start()
         self.after(100, self.process_queue)
 
-    def update_menubar(self):
+    def update_menubar(self, page):
         menubar = tk.Menu(self)
-        filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label="Load Video", command=self.load_video)
-        filemenu.add_command(label="Load Template Model", command=self.load_template_model)
-        filemenu.add_command(label="Load Session", command=self.load_session)
-        filemenu.add_command(label="Save Session", command=self.save_session)
-        filemenu.add_command(label="Save Calibration", command=self.save_calibration)
-        filemenu.add_separator()
-        filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
-        menubar.add_cascade(label="File", menu=filemenu)
-        videomenu = tk.Menu(menubar, tearoff=0)
-        videomenu.add_command(label="Next Frame", command=self.next_frame, accelerator="Right")
-        videomenu.add_command(label="Previous Frame", command=self.prev_frame, accelerator="Left")
-        videomenu.add_command(label="Set (current) Sticker", command=self.set_coords, accelerator="LMB")
-        videomenu.add_command(label="Zero (current) Sticker", command=self.zero_coords, accelerator="MMB")
-        videomenu.add_command(label="Next Sticker", command=self.next_coords, accelerator="RMB")
-        videomenu.add_command(label="Next Video", command=self.next_video)
-        videomenu.add_command(label="Previous Video", command=self.prev_video)
-        videomenu.add_separator()
-        videomenu.add_command(label="Auto Annotate", command=self.auto_annotate)
-        videomenu.add_command(label="Calibrate", command=self.calibrate)
-        menubar.add_cascade(label="Video", menu=videomenu)
-        if self.paths:
-            filemenu.entryconfig("Load Session", state="normal")
-            filemenu.entryconfig("Save Session", state="normal")
-            menubar.entryconfig("Video", state="normal")
-            if len(self.paths) == 1:
-                videomenu.entryconfig("Next Video", state="disabled")
-                videomenu.entryconfig("Previous Video", state="disabled")
+        if page == "calib":
+            filemenu = tk.Menu(menubar, tearoff=0)
+            filemenu.add_command(label="Load Video", command=self.load_video)
+            filemenu.add_command(label="Load Template Model", command=self.load_template_model)
+            filemenu.add_command(label="Load Session", command=self.load_session)
+            filemenu.add_command(label="Save Session", command=self.save_session)
+            filemenu.add_command(label="Save Calibration", command=self.save_calibration)
+            filemenu.add_separator()
+            filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
+            menubar.add_cascade(label="File", menu=filemenu)
+            videomenu = tk.Menu(menubar, tearoff=0)
+            videomenu.add_command(label="Next Frame", command=self.next_frame, accelerator="Right")
+            videomenu.add_command(label="Previous Frame", command=self.prev_frame, accelerator="Left")
+            videomenu.add_command(label="Set (current) Sticker", command=self.set_coords, accelerator="LMB")
+            videomenu.add_command(label="Zero (current) Sticker", command=self.zero_coords, accelerator="MMB")
+            videomenu.add_command(label="Next Sticker", command=self.next_coords, accelerator="RMB")
+            videomenu.add_command(label="Next Video", command=self.next_video)
+            videomenu.add_command(label="Previous Video", command=self.prev_video)
+            videomenu.add_separator()
+            videomenu.add_command(label="Auto Annotate", command=self.auto_annotate)
+            videomenu.add_command(label="Calibrate", command=self.calibrate)
+            menubar.add_cascade(label="Video", menu=videomenu)
+            if self.paths:
+                filemenu.entryconfig("Load Session", state="normal")
+                filemenu.entryconfig("Save Session", state="normal")
+                menubar.entryconfig("Video", state="normal")
+                if len(self.paths) == 1:
+                    videomenu.entryconfig("Next Video", state="disabled")
+                    videomenu.entryconfig("Previous Video", state="disabled")
+                else:
+                    videomenu.entryconfig("Next Video", state="normal")
+                    videomenu.entryconfig("Previous Video", state="normal")
+                if self.template_file_name:
+                    videomenu.entryconfig("Calibrate", state="normal")
+                else:
+                    videomenu.entryconfig("Calibrate", state="disabled")
             else:
-                videomenu.entryconfig("Next Video", state="normal")
-                videomenu.entryconfig("Previous Video", state="normal")
+                filemenu.entryconfig("Load Session", state="disabled")
+                filemenu.entryconfig("Save Session", state="disabled")
+                menubar.entryconfig("Video", state="disabled")
+            if self.projected_data:
+                filemenu.entryconfig("Save Calibration", state="normal")
+            else:
+                filemenu.entryconfig("Save Calibration", state="disabled")
+        elif page == "exp":
+            filemenu = tk.Menu(menubar, tearoff=0)
+            filemenu.add_command(label="Load Template Model", command=self.load_template_model)
+            filemenu.add_separator()
+            filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
+            menubar.add_cascade(label="File", menu=filemenu)
+            optionsmenu = tk.Menu(menubar, tearoff=0)
+            optionsmenu.add_command(label="Toggle Un-Named Optodes", command=self.toggle_optodes, accelerator="Space")
+            optionsmenu.add_command(label="Next Optode", command=self.next_optode, accelerator="Right")
+            optionsmenu.add_command(label="Prev Optode", command=self.prev_optode, accelerator="Left")
+            menubar.add_cascade(label="Options", menu=optionsmenu)
             if self.template_file_name:
-                videomenu.entryconfig("Calibrate", state="normal")
+                menubar.entryconfig("Options", state="normal")
             else:
-                videomenu.entryconfig("Calibrate", state="disabled")
+                menubar.entryconfig("Options", state="disabled")
         else:
-            filemenu.entryconfig("Load Session", state="disabled")
-            filemenu.entryconfig("Save Session", state="disabled")
-            menubar.entryconfig("Video", state="disabled")
-        if self.projected_data:
-            filemenu.entryconfig("Save Calibration", state="normal")
-        else:
-            filemenu.entryconfig("Save Calibration", state="disabled")
+            menubar = ""
         return menubar
 
     def show_panel(self, cont):
         panel = self.panels[cont]
         panel.tkraise()
         panel.focus_set()
+        if cont != ProgressBarPage:
+            self.cur_active_panel = cont
         if cont == CalibrationPage:
-            self.config(menu=self.update_menubar())
+            self.config(menu=self.update_menubar("calib"))
+            self.panels[cont].update_canvas()
+            self.panels[cont].update_labels()
+        elif cont == ExperimentViewerPage:
+            self.config(menu=self.update_menubar("exp"))
+            self.panels[cont].update_labels()
         else:
-            self.config(menu="")
+            self.config(menu=self.update_menubar(""))
 
     def get_frame_size(self):
         """
@@ -401,6 +448,37 @@ class GUI(tk.Tk):
             my_str = "Not Loaded"
         return my_str
 
+    def get_template_info(self):
+        return self.template_names, self.template_data, self.template_format
+
+    def get_view_elev(self):
+        return self.view_elev
+
+    def get_view_azim(self):
+        return self.view_azim
+
+    def increase_azim(self, event=None):
+        self.view_azim += 10
+        self.panels[ExperimentViewerPage].update_labels()
+
+    def decrease_azim(self, event=None):
+        self.view_azim -= 10
+        self.panels[ExperimentViewerPage].update_labels()
+
+    def increase_elev(self, event=None):
+        self.view_elev += 10
+        self.panels[ExperimentViewerPage].update_labels()
+
+    def decrease_elev(self, event=None):
+        self.view_elev -= 10
+        self.panels[ExperimentViewerPage].update_labels()
+
+    def fiducials_only(self):
+        return self.view_fiducials_only
+
+    def get_selected_optode(self):
+        return self.selected_optode
+
     def get_template_model_file_name(self):
         if self.template_file_name:
             parent = self.template_file_name.parent.name
@@ -416,16 +494,6 @@ class GUI(tk.Tk):
         else:
             my_str = ""
         return my_str
-
-    def disbale_menu(self):
-        for w in self.container.winfo_children():
-            if w.winfo_class() == "Button":
-                w.configure(state="disabled")
-
-    def enable_menu(self):
-        for w in self.container.winfo_children():
-            if w.winfo_class() == "Button":
-                w.configure(state="normal")
 
     def go_to_next_coord(self):
         if self.cur_sticker_index >= 12:
@@ -569,6 +637,33 @@ class GUI(tk.Tk):
             if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
                 return
             file_io.save_results(self.projected_data, Path(f.name), self.args.verbosity)
+
+    def toggle_optodes(self):
+        self.selected_optode = 0
+        self.view_fiducials_only = not self.view_fiducials_only
+        self.panels[ExperimentViewerPage].update_labels()
+
+    def next_optode(self, event=None):
+        if self.view_fiducials_only:
+            spiral_index = self.template_names.index(0)
+            if self.selected_optode < spiral_index - 2:
+                self.selected_optode += 1
+                self.panels[ExperimentViewerPage].update_labels()
+            else:
+                return
+        else:
+            if self.selected_optode < len(self.template_data) - 1:
+                self.selected_optode += 1
+                self.panels[ExperimentViewerPage].update_labels()
+            else:
+                return
+
+    def prev_optode(self, event=None):
+        if self.selected_optode > 0:
+            self.selected_optode -= 1
+            self.panels[ExperimentViewerPage].update_labels()
+        else:
+            return
 
 
 class ThreadedTask(threading.Thread):

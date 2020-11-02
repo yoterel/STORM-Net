@@ -131,7 +131,7 @@ def key_press_callback(event, data, names):
             selected -= 1
         else:
             return
-    elif event.key == "backspce":
+    elif event.key == "backspace":
         selected = 0
     else:
         return
