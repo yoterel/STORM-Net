@@ -96,10 +96,10 @@ class MainMenu(tk.Frame):
         self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
 
         self.tempalte_view_button = ttk.Button(self, text="View Template Model",
-                                               command=lambda: controller.show_panel(CalibrationPage))
+                                               command=lambda: controller.show_panel(ExperimentViewerPage))
 
         self.finetune_button = ttk.Button(self, text="Fine-tune STORM-Net",
-                                          command=lambda: controller.show_panel(CalibrationPage))
+                                          command=lambda: controller.show_panel(FinetunePage))
 
         self.calibration_button = ttk.Button(self, text="Calibrate",
                                              command=lambda: controller.show_panel(CalibrationPage))
@@ -138,6 +138,36 @@ class AboutPage(tk.Frame):
         self.grid_rowconfigure(3, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(2, weight=1)
+
+
+class FinetunePage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.title = tk.Label(self,
+                                 text="Not implemented yet",
+                                 font=("Verdana", 12),
+                                 relief="groove",
+                                 anchor="w",
+                                 justify="left")
+        self.button = ttk.Button(self, text="Back",
+                                 command=lambda: controller.show_panel(MainMenu))
+        self.title.pack()
+        self.button.pack()
+
+
+class ExperimentViewerPage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.title = tk.Label(self,
+                                 text="Not implemented yet",
+                                 font=("Verdana", 12),
+                                 relief="groove",
+                                 anchor="w",
+                                 justify="left")
+        self.button = ttk.Button(self, text="Back",
+                                 command=lambda: controller.show_panel(MainMenu))
+        self.title.pack()
+        self.button.pack()
 
 
 class ProgressBarPage(tk.Frame):
@@ -199,7 +229,7 @@ class GUI(tk.Tk):
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
         self.panels = {}
-        for F in (MainMenu, CalibrationPage, ProgressBarPage, AboutPage):
+        for F in (MainMenu, CalibrationPage, ProgressBarPage, AboutPage, FinetunePage, ExperimentViewerPage):
             panel = F(self.container, self)
             self.panels[F] = panel
             panel.grid(row=0, column=0, sticky="nsew")
