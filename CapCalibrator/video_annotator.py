@@ -226,11 +226,11 @@ class GUI(tk.Tk):
         self.cur_frame_index = 0
         self.cur_sticker_index = 0
         self.selected_optode = 0
+        self.view_elev = 60
+        self.view_azim = -470
         self.view_fiducials_only = False
         self.frames = None
         self.indices = None
-        self.view_elev = 60
-        self.view_azim = -470
         self.queue = queue.Queue()
         self.unet_model = None
         self.storm_model = None
@@ -419,7 +419,7 @@ class GUI(tk.Tk):
         return ["calibrate",
                 self.template_names,
                 self.template_data,
-                self.db[self.get_cur_video_hash()][self.shift]["data"],
+                self.db[self.get_cur_video_hash()][self.shift]["data"].copy(),
                 self.storm_model,
                 self.graph,
                 self.args]
