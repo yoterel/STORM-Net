@@ -3,13 +3,14 @@ All files in the repository are an implementation of the original manuscript and
 ## Introduction
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or a standard cooridnate system that can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
-It contains three tools:
-1. A GUI that allows manual annotation of the data or supervising the automatic method ("semi-supervised") - this is recommended for first time users.
-2. A ready-to-use end-to-end script that performs calibration given a video file - use this when you are comfortable with the GUI and its results.
-3. A bundle of python scripts for finetunning (or training from scratch) the neural networks we provide - this is suggested for every new phsyical cap your lab uses. Description of how to do this is down below. Note this bundle also includes a synthetic data generator implemented in [Unity](https://unity.com/).
+There are 2 modes of operation:
+1. A GUI that allows manual annotation of the data / supervising the automatic method ("semi-supervised") - this is recommended for first time users.
+2. A command-line interface which is a ready-to-use end-to-end script that performs calibration given a video file - use this when you are comfortable with the GUI and its results.
+
+The repository also contains a bundle of python scripts for finetunning (or training from scratch) the neural networks we provide - this is suggested for every new phsyical cap your lab uses. Description of how to do this is down below. Note this bundle also includes a synthetic data generator implemented in [Unity](https://unity.com/). These scripts will be incorporated into the GUI in the near future.
 
 ### Application dependencies:
-- Python 3.6 or higher (required by (1), (2), and (3))
+- Python 3.6 or higher
 - Use the [requirments.txt](requirements.txt) file to obtain all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `pip install -r requirements.txt`
       
@@ -33,13 +34,10 @@ The coordinate system these values are supplied at are not improtant, as they ar
 
 The file [main.py](CapCalibrator/main.py) is the entry point of the application. In the most common use case, this script expects a path to a video file to be analyzed and a "template" model file discussed above.
 
-`python main.py path_to_video_file path_to_template_file --mode manual`\
 `python main.py path_to_video_file path_to_template_file --mode semi-auto`\
 `python main.py path_to_video_file path_to_template_file --mode auto`
 
-The mode "manual" indicates to the application that the user wants to annotate the video manually using the GUI. This is recommended for first time users so they can familiarize themselvse with the application.
-
-The mode "semi-auto" indicates to the application that the user wants it to automatically annotate the video, but also to observe annotation results and to correct them if needed using the GUI. This is recommended when possible.
+The mode "semi-auto" indicates to the application that the user wants to use the GUI and supervise the process of annotation and calibration and to correct it if needed. This is recommended when possible. Note the GUI contains other useful functions such as viewing a template model and finetunning the neural networks.
 
 The mode "auto" indicates to the application that the user wants it to automatically annotate the video without any supervision. This is recommended for live sessions and when the system was oberved to perform well with a certain template model.
 
