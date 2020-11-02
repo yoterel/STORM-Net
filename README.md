@@ -32,14 +32,18 @@ The coordinate system these values are supplied at are not improtant, as they ar
 
 ## How to use GUI & Automatic calibration
 
-The file [main.py](CapCalibrator/main.py) is the entry point of the application. In the most common use case, this script expects a path to a video file to be analyzed and a "template" model file discussed above.
+The file [main.py](CapCalibrator/main.py) is the entry point of the application. Some common use cases are shown below:
 
-`python main.py path_to_video_file path_to_template_file --mode semi-auto`\
-`python main.py path_to_video_file path_to_template_file --mode auto`
+`python main.py --mode semi-auto`\
+`python main.py --mode auto --video path_to_video_file --template path_to_template_file`
 
 The mode "semi-auto" indicates to the application that the user wants to use the GUI and supervise the process of annotation and calibration and to correct it if needed. This is recommended when possible. Note the GUI contains other useful functions such as viewing a template model and finetunning the neural networks.
 
-The mode "auto" indicates to the application that the user wants it to automatically annotate the video without any supervision. This is recommended for live sessions and when the system was oberved to perform well with a certain template model.
+The mode "auto" indicates to the application that the user wants it to automatically annotate the video without any supervision. This is recommended for live sessions and when the system was oberved to perform well with a certain template model. Note that using this mode the application requires two additional paramters which are the path to the raw video file and to a template model file.
+
+For all command line options, see:
+
+`python main.py --help`
 
 
 ## Using a new cap (or how to improve accuracy)
