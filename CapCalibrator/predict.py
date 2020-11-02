@@ -20,7 +20,7 @@ def is_using_gpu():
         return False
 
 
-def predict_rigid_transform(sticker_locations, args):
+def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     """
     predicts rigid transformation of cap object using 2d sticker locations
     :param sticker_locations: a batch of 2d array of sticker locations
@@ -36,11 +36,15 @@ def predict_rigid_transform(sticker_locations, args):
     # utils.shuffle_timeseries(sticker_locations)
     # utils.shuffle_data(sticker_locations)
     # utils.mask_data(sticker_locations)
-    model_name = args.storm_net
-    model_dir = Path("models")
-    model_full_name = Path.joinpath(model_dir, model_name)
-    model = keras.models.load_model(str(model_full_name))
-    y_predict = model.predict(sticker_locations)
+    if preloaded_model:
+        model = preloaded_model
+    else:
+        model_name = args.storm_net
+        model_dir = Path("models")
+        model_full_path = Path.joinpath(model_dir, model_name)
+        model, graph = file_io.load_clean_keras_model(model_full_path, args.verbosity)
+    with graph.as_default():
+        y_predict = model.predict(sticker_locations)
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
     # notice x is not negated - the positive direction in simulation is flipped.
     rs = []
@@ -191,19 +195,19 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     return kp_np
 
 
-def predict_keypoints_locations(frames, args, vid_name="", is_puppet=False, save_intermed=True, preloaded_model=None, graph=None):
+def predict_keypoints_locations(frames, args, vid_hash="", is_puppet=False, save_intermed=True, preloaded_model=None, graph=None):
     """
     predicts all requried keypoints (stickers & facial landmarks) locations from frames.
     :param frames: the frames to process
     :param args: cmd line arguments
-    :param vid_name: a pickle file will be loaded if exists to save time (from previous runs)
+    :param vid_hash: a pickle file will be loaded if exists to save time (from previous runs)
     :param is_puppet: if true a different landmark estimator will be used (color thresholding)
     :param save_intermed: if true intermediate products will be saved to disk
     :param preloaded_model: a preloaded keras model to be used for prediction
     :param v: verbosity
     :return: locations as a 2d numpy array in the order "Left Eye, Nose, Right Eye, x1, x2, x3, x4" where x is an arbitrary sticker
     """
-    pickle_path = Path("cache", vid_name+"_preds.pickle")
+    pickle_path = Path("cache", vid_hash+"_preds.pickle")
     if pickle_path.is_file():
         if args.verbosity:
             print("Loading key points from:", pickle_path)

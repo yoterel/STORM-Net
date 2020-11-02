@@ -8,6 +8,7 @@ from keras.layers import LSTM
 from keras.layers import Conv1D
 from keras.layers import MaxPooling1D
 from keras.layers import Flatten
+import hashlib
 from keras.layers import GlobalMaxPooling1D
 import cv2
 from keras_unet.metrics import iou, iou_thresholded
@@ -333,3 +334,15 @@ def get_local_range(x, local_env_size, frames_to_use):
         else:
             assert (1 == 0)
     return diff_minus, diff_plus
+
+
+def md5_from_vid(path):
+    block_size = 2 ** 14
+    md5 = hashlib.md5()
+    with open(str(path), 'rb') as f:
+        while True:
+            data = f.read(block_size)
+            if not data:
+                break
+            md5.update(data)
+    return md5.hexdigest()

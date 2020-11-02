@@ -70,28 +70,34 @@ def measure_blur(frame):
     return cv2.Laplacian(np.array(frame), cv2.CV_64F).var()
 
 
-def video_to_frames(vid_path, dump_frames=False, starting_frame=0, force_reselect=False, frame_indices=None, v=0):
+def video_to_frames(vid_path, vid_hash=None, dump_frames=False, starting_frame=0, force_reselect=False, frame_indices=None, v=0):
     """
     given a video path, splits it into frames and possibly dumps them as a serialized file
     :param vid_path: the video file path
+    :param vid_hash: the video md5 hash, which is used to retrieve frames from cache faster (if exists)
     :param dump_frames: whether or not to dump the frames as a pickle file
     :param starting_frame: the frame to start from when selecting the frames
     :param force_reselect: if true, performs split even if dump file exists
     :param frame_indices: if specified, selects this list of frames indices from the video
     :param v: verbosity
-    :return:
+    :return: the frames (PIL array) and the indices (zero indexed)
     """
     if frame_indices is not None:
         starting_frame = frame_indices[0]
-    name = vid_path.parent.name + "_" + vid_path.name
-    # if starting_frame != 0:
-    #     my_string = name + "_{:03d}_frames.pickle".format(starting_frame)
-    # else:
-    my_string = name + "_frames.pickle"
+    if vid_hash:
+        hashed_name = vid_hash + "_frames.pickle"
+    else:
+        hashed_name = utils.md5_from_vid(vid_path) + "_frames.pickle"
+    legacy_name = vid_path.parent.name + "_" + vid_path.name
+    my_string = legacy_name + "_frames.pickle"
     cache_path = Path("cache")
     cache_path.mkdir(exist_ok=True)
-    pickle_path = Path.joinpath(cache_path, my_string)
-    if pickle_path.is_file() and not force_reselect:
+    legacy_pickle_path = Path.joinpath(cache_path, my_string)
+    pickle_path = Path.joinpath(cache_path, hashed_name)
+    if legacy_pickle_path.is_file() and not force_reselect:
+        frames, indices = file_io.load_from_pickle(legacy_pickle_path)
+        file_io.move(legacy_pickle_path, pickle_path)
+    elif pickle_path.is_file() and not force_reselect:
         frames, indices = file_io.load_from_pickle(pickle_path)
     else:
         if v:
@@ -111,28 +117,21 @@ def process_video(args):
     :param args:
     :return: sticker locations in a nx14x3 numpy array
     """
-    vid_path = args.video
-    mode = args.mode
-    v = args.verbosity
+    vid_paths = args.video
     new_db = []
-    if mode == "experimental":
-        if v:
-            print("Performing experimental stuff.")
-        new_db = video_annotator.annotate_videos(vid_path, args)
-    else:
-        if mode == "auto":
-            new_db = auto_annotate_videos(vid_path, True, True, args)
-        else:
-            if mode == "semi-auto" or mode == "manual":
-                if v:
-                    print("Launching GUI to manually fix/annotate frames.")
-                new_db = video_annotator.annotate_videos(vid_path, args)
-    if Path.is_dir(vid_path):
+    if args.mode == "semi-auto":
+        video_annotator.annotate_videos(args)
+        return
+    elif args.mode == "experimental":
+        new_db, vid_paths = video_annotator.annotate_videos(args)
+    elif args.mode == "auto":
+        new_db = auto_annotate_videos(args)
+    if Path.is_dir(vid_paths):
         vid_names = []
-        for file in sorted(vid_path.glob("**/*.MP4")):
+        for file in sorted(vid_paths.glob("**/*.MP4")):
             name = file.parent.name + "_" + file.name
             vid_names.append(name)
-        if v:
+        if args.verbosity:
             print("Found following video files:", vid_names)
         data = np.zeros((len(vid_names), 10, 14))
         for i, vid in enumerate(vid_names):
@@ -143,23 +142,26 @@ def process_video(args):
                 exit(1)
         return data, vid_names
     else:
-        return new_db[vid_path.parent.name + "_" + vid_path.name][0]["data"], [vid_path]
+        return new_db[vid_paths.parent.name + "_" + vid_paths.name][0]["data"], [vid_paths]
 
 
-def auto_annotate_videos(vid_path, dump_to_db, force_annotate, args):
+def auto_annotate_videos(args):
     """
     given a video file or folder of video files, automatically annotates the video
-    :param vid_path:
-    :param model_digi_file:
-    :param mode:
-    :return:
+    :param args: command line arguments
+    :return: db
     """
-    db_path = Path("data", "full_db.pickle")
-    model_dir = Path("models")
-    model_name = args.u_net
-    model_full_name = Path.joinpath(model_dir, model_name)
-    my_model = file_io.load_semantic_seg_model(str(model_full_name), args.verbosity)
-    my_db = file_io.load_full_db(db_path)
+    vid_path = args.video
+    force_annotate = True
+    dump_to_db = False
+    if args.session_file:
+        force_annotate = False
+        dump_to_db = True
+    my_db = file_io.load_full_db(args.session_file)
+    unet_model_dir = Path("models")
+    unet_model_name = args.u_net
+    unet_model_full_path = Path.joinpath(unet_model_dir, unet_model_name)
+    unet_model, graph = file_io.load_semantic_seg_model(str(unet_model_full_path), args.verbosity)
     paths = []
     if Path.is_file(vid_path):
         paths.append(vid_path)
@@ -168,15 +170,16 @@ def auto_annotate_videos(vid_path, dump_to_db, force_annotate, args):
             paths.append(file)
     for path in paths:
         frames, indices = video_to_frames(path, dump_frames=True)
-        name = path.parent.name + "_" + path.name
-        if name not in my_db.keys() or force_annotate:
-            data = predict.predict_keypoints_locations(frames, args, name,
+        my_hash = utils.md5_from_vid(path)
+        if my_hash not in my_db.keys() or force_annotate:
+            data = predict.predict_keypoints_locations(frames, args, my_hash,
                                                        is_puppet=False,
                                                        save_intermed=False,
-                                                       preloaded_model=my_model)
-            my_db.setdefault(name, []).append({"data": data,
-                                               "label": np.array([0, 0, 0]),
-                                               "frame_indices": indices})
+                                                       preloaded_model=unet_model,
+                                                       graph=graph)
+            my_db[my_hash] = [{"data": data,
+                               "label": np.array([0, 0, 0]),
+                               "frame_indices": indices}]
     if dump_to_db:
-        file_io.dump_full_db(my_db, db_path)
+        file_io.dump_full_db(my_db, args.session_file)
     return my_db

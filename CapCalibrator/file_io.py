@@ -2,6 +2,7 @@ import numpy as np
 from utils import pairwise
 import pickle
 import json
+import shutil
 import keras
 from keras_unet.metrics import iou, iou_thresholded
 from pathlib import Path
@@ -271,6 +272,16 @@ def load_keras_model(pretrained_model_path, learning_rate):
     return model
 
 
+def load_clean_keras_model(path, v):
+    if v:
+        print("Loading STORM model from:", path)
+    model = keras.models.load_model(str(path))
+    if v:
+        model.summary()
+    graph = tf.get_default_graph()
+    return model, graph
+
+
 def load_from_pickle(pickle_file_path):
     f = open(pickle_file_path, 'rb')
     data = pickle.load(f)
@@ -302,3 +313,7 @@ def load_full_db(db_path=None):
     else:
         db = {}
     return db
+
+
+def move(src, dst):
+    shutil.move(src, dst)

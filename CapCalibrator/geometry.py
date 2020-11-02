@@ -340,7 +340,7 @@ def from_sim_to_standard_space(names, data):
     return from_standard_to_sim_space(names, data)
 
 
-def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
+def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
     if args.mode == "experimental":
         digi2digi_est = get_digi2digi_results(args.template, args.ground_truth)
         vid2vid_est = []
@@ -387,9 +387,12 @@ def apply_rigid_transform(r_matrix, s_matrix, video_names, args, plot=True):
         return None
     else:
         vid_est = []
-        names, data, format = read_template_file(args.template)
-        names = names[0]
-        data = data[0]
+        if template_names:
+            names, data = template_names, template_data
+        else:
+            names, data, format = read_template_file(args.template)
+            names = names[0]
+            data = data[0]
         data = to_standard_coordinate_system(names, data)
         data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
         data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
