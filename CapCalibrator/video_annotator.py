@@ -17,203 +17,24 @@ import draw
 import logging
 
 
-class CalibrationPage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.controller = controller
-        h, w = self.controller.get_frame_size()
-        self.canvas = tk.Canvas(self, height=h, width=w, highlightthickness=0, bg="#263D42")
-        img = ImageTk.PhotoImage(master=self, image=self.controller.get_cur_frame())
-        self.canvas.img = img  # or else image gets garbage collected
-        self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
-        self.canvas.bind("<ButtonPress-1>", self.controller.save_coords)
-        self.canvas.bind("<ButtonPress-2>", self.controller.zero_coords)
-        self.canvas.bind("<ButtonPress-3>", self.controller.next_coords)
-        self.bind("<Left>", self.controller.prev_frame)
-        self.bind("<Right>", self.controller.next_frame)
-        self.data_panel = tk.Frame(self, bg="white")
-        self.canvas.grid(row=0, column=0)
-        self.data_panel.grid(row=0, column=1)
-
-    def update_labels(self):
-        self.clear_labels()
-        shift = 0
-        pad_y = 5
-
-        db = self.controller.get_db()
-        cur_frame_index = self.controller.get_cur_frame_index()
-        cur_sticker_index = self.controller.get_cur_sticker_index()
-        cur_video_name = self.controller.get_cur_video_name()
-        cur_video_hash = self.controller.get_cur_video_hash()
-        template_name = self.controller.get_template_model_file_name()
-        if db:
-            db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :], (7, 2))
-        else:
-            db_to_show = np.zeros((7, 2))
-        sticker_names = ["Left Eye", "Nose Tip", "Right Eye", "CAP1", "CAP2", "CAP3", "CAP4"]
-
-        my_string = "Template Model File: \n{}".format(template_name)
-        label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
-        label.pack(fill="x")
-
-        my_string = "Video File Name: \n{}".format(cur_video_name)
-        label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
-        label.pack(fill="x")
-
-        my_string = "Frame: {}".format(self.controller.get_cur_frame_index())
-        label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
-        label.pack(fill="x")
-
-        for i in range(7):
-            my_string = "{}: {},{}".format(sticker_names[i], int(db_to_show[i, 0]), int(db_to_show[i, 1]))
-            if i == cur_sticker_index // 2:
-                sticker_label = tk.Label(self.data_panel, text=my_string, bg="gray", width=15, anchor="w", pady=pad_y)
+def annotate_videos(args):  # contains GUI mainloop
+    if args.mode == "experimental":
+        special_db = Path.joinpath(Path("data"), "telaviv_db.pickle")
+        new_db = file_io.load_full_db(special_db)
+        paths = []
+        if args.video:
+            if Path.is_file(args.video):
+                paths.append(args.video)
             else:
-                sticker_label = tk.Label(self.data_panel, text=my_string, bg="white", width=15, anchor="w", pady=pad_y)
-            sticker_label.pack(fill="x")
-            if db_to_show[i, 0] != 0 and db_to_show[i, 0] != 0:
-                self.canvas.create_line(int(db_to_show[i, 0]) - 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) + 5,
-                                   540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
-                self.canvas.create_line(int(db_to_show[i, 0]) + 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) - 5,
-                                   540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
-
-    def update_canvas(self):
-        self.canvas.delete("image")
-        self.canvas.delete("cross")
-        img = ImageTk.PhotoImage(master=self.canvas, image=self.controller.get_cur_frame())
-        self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
-        self.canvas.image = img  # keep a reference or it gets deleted
-
-    def clear_labels(self):
-        self.canvas.delete("cross")
-        for widget in self.data_panel.winfo_children():
-            widget.destroy()
-
-
-class MainMenu(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.label = tk.Label(self, text="STORM - a fNIRS Calibration Tool", font=("Verdana", 12))
-        self.canvas = tk.Canvas(self, height=400, width=400, bg="#263D42")
-        img = ImageTk.PhotoImage(master=self, file="resource/render.png")
-        self.canvas.img = img  # or else image gets garbage collected
-        self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
-
-        self.tempalte_view_button = ttk.Button(self, text="View Template Model",
-                                               command=lambda: controller.show_panel(ExperimentViewerPage))
-
-        self.finetune_button = ttk.Button(self, text="Fine-tune STORM-Net",
-                                          command=lambda: controller.show_panel(FinetunePage))
-
-        self.calibration_button = ttk.Button(self, text="Calibrate",
-                                             command=lambda: controller.show_panel(CalibrationPage))
-        self.about_button = ttk.Button(self, text="About",
-                                             command=lambda: controller.show_panel(AboutPage))
-
-        self.label.grid(row=1, column=1, columnspan=4)
-        self.canvas.grid(row=2, column=1, columnspan=4)
-        self.tempalte_view_button.grid(row=3, column=1, sticky="w" + "e")
-        self.finetune_button.grid(row=3, column=2, sticky="w" + "e")
-        self.calibration_button.grid(row=3, column=3, sticky="w" + "e")
-        self.about_button.grid(row=3, column=4, sticky="w" + "e")
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(4, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(5, weight=1)
-
-
-class AboutPage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.title = tk.Label(self,
-                                 text="STORM: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS).\n"
-                                      "Research: Yotam Erel, Sagi Jaffe-Dax, Yaara Yeshurun-Dishon, Amit H. Bermano\n"
-                                      "Implementation: Yotam Erel\n"
-                                      "This program is free for personal, non-profit or academic use.",
-                                 font=("Verdana", 12),
-                                 relief="groove",
-                                 anchor="w",
-                                 justify="left")
-        self.button = ttk.Button(self, text="Back",
-                                 command=lambda: controller.show_panel(MainMenu))
-        self.title.grid(row=1, column=1)
-        self.button.grid(row=2, column=1)
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(2, weight=1)
-
-
-class FinetunePage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.title = tk.Label(self,
-                                 text="Not implemented yet",
-                                 font=("Verdana", 12),
-                                 relief="groove",
-                                 anchor="w",
-                                 justify="left")
-        self.button = ttk.Button(self, text="Back",
-                                 command=lambda: controller.show_panel(MainMenu))
-        self.title.pack()
-        self.button.pack()
-
-
-class ExperimentViewerPage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.controller = controller
-        self.bind("<Left>", self.controller.prev_optode)
-        self.bind("<Right>", self.controller.next_optode)
-        self.bind("<w>", self.controller.increase_elev)
-        self.bind("<a>", self.controller.decrease_azim)
-        self.bind("<s>", self.controller.decrease_elev)
-        self.bind("<d>", self.controller.increase_azim)
-        self.figure_handle = plt.Figure(figsize=(5, 5), dpi=100)
-        self.sub_plot_handle = self.figure_handle.add_subplot(111, projection='3d')
-        self.sub_plot_handle.view_init(self.controller.get_view_elev(), self.controller.get_view_azim())
-        self.canvas = FigureCanvasTkAgg(self.figure_handle, self)
-        self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-        self.canvas.draw()
-
-    def update_labels(self):
-        names, data, my_format = self.controller.get_template_info()
-        if names:
-            selected = self.controller.get_selected_optode()
-            data = geometry.to_standard_coordinate_system(names, data)
-            if not self.controller.fiducials_only():
-                spiral_index = names.index(0)
-                data = data[spiral_index:, :]
-                names = names[spiral_index:]
-            try:
-                self.canvas.get_tk_widget().pack_forget()
-                self.sub_plot_handle.cla()
-            except AttributeError:
-                pass
-            self.sub_plot_handle.view_init(elev=self.controller.get_view_elev(), azim=self.controller.get_view_azim())
-            draw.plot_3d_pc(self.sub_plot_handle, data, selected, names)
-            self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-            self.canvas.draw()
-
-
-class ProgressBarPage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.status_label = tk.Label(self, text="", bg=controller['bg'], pady=10)
-        self.prog_bar = ttk.Progressbar(self, orient=tk.HORIZONTAL, length=300, mode="indeterminate")
-
-        self.status_label.pack(side="top")
-        self.prog_bar.pack(side="top")
-
-    def show_progress(self, show):
-        if show:
-            self.prog_bar.start(10)
-        else:
-            self.prog_bar.stop()
-            self.status_label.config(text="")
-
-    def update_status_label(self, label):
-        self.status_label.config(text=label)
+                for file in args.video.glob("**/*.MP4"):
+                    paths.append(file)
+    else:
+        new_db = file_io.load_full_db()
+        paths = None
+    logging.info("Launching GUI...")
+    app = GUI(new_db, paths, args)
+    app.mainloop()
+    return app.get_db(), app.paths
 
 
 class GUI(tk.Tk):
@@ -280,6 +101,8 @@ class GUI(tk.Tk):
                                "label": np.array([0, 0, 0]),
                                "frame_indices": self.indices}
                     self.db[my_hash] = [my_dict]
+                    self.cur_sticker_index = 0
+                    self.cur_frame_index = 0
             elif msg[0] == "annotate_frames":
                 my_hash, my_dict = msg[1:]
                 self.db[my_hash] = [my_dict]
@@ -309,6 +132,11 @@ class GUI(tk.Tk):
         self.after(100, self.process_queue)
 
     def update_menubar(self, page):
+        """
+        updates menubar according to current page
+        :param page: the current page
+        :return: the menubar
+        """
         menubar = tk.Menu(self)
         if page == "calib":
             filemenu = tk.Menu(menubar, tearoff=0)
@@ -323,6 +151,8 @@ class GUI(tk.Tk):
             videomenu = tk.Menu(menubar, tearoff=0)
             videomenu.add_command(label="Next Frame", command=self.next_frame, accelerator="Right")
             videomenu.add_command(label="Previous Frame", command=self.prev_frame, accelerator="Left")
+            videomenu.add_command(label="Shift Current Frame Forward", command=self.shift_cur_frame_forward, accelerator="Shift + Right")
+            videomenu.add_command(label="Shift Current Frame Backward", command=self.shift_cur_frame_backward, accelerator="Shift + Left")
             videomenu.add_command(label="Set (current) Sticker", command=self.set_coords, accelerator="LMB")
             videomenu.add_command(label="Zero (current) Sticker", command=self.zero_coords, accelerator="MMB")
             videomenu.add_command(label="Next Sticker", command=self.next_coords, accelerator="RMB")
@@ -333,16 +163,19 @@ class GUI(tk.Tk):
             videomenu.add_command(label="Calibrate", command=self.calibrate)
             menubar.add_cascade(label="Video", menu=videomenu)
             if self.paths:
+                # a video is loaded
                 filemenu.entryconfig("Load Session", state="normal")
                 filemenu.entryconfig("Save Session", state="normal")
                 menubar.entryconfig("Video", state="normal")
                 if len(self.paths) == 1:
+                    # a single video was loaded
                     videomenu.entryconfig("Next Video", state="disabled")
                     videomenu.entryconfig("Previous Video", state="disabled")
                 else:
                     videomenu.entryconfig("Next Video", state="normal")
                     videomenu.entryconfig("Previous Video", state="normal")
                 if self.template_file_name:
+                    # a template file was loaded
                     videomenu.entryconfig("Calibrate", state="normal")
                 else:
                     videomenu.entryconfig("Calibrate", state="disabled")
@@ -351,6 +184,7 @@ class GUI(tk.Tk):
                 filemenu.entryconfig("Save Session", state="disabled")
                 menubar.entryconfig("Video", state="disabled")
             if self.projected_data:
+                # calibration was performed
                 filemenu.entryconfig("Save Calibration", state="normal")
             else:
                 filemenu.entryconfig("Save Calibration", state="disabled")
@@ -538,8 +372,6 @@ class GUI(tk.Tk):
                                             icon='warning')
             if result != 'yes':
                 return
-        self.cur_frame_index = 0
-        self.cur_sticker_index = 0
         self.take_async_action(self.prep_annotate_frame_packet())
 
     def calibrate(self):
@@ -565,21 +397,21 @@ class GUI(tk.Tk):
             self.cur_sticker_index = 0
             self.take_async_action(self.prep_vid_to_frames_packet())
 
-    def shift_video_f(self):
+    def shift_cur_frame_forward(self, event=None):
         current_video = self.get_cur_video_hash()
         current_indices = self.db[current_video][self.shift]["frame_indices"]
         logging.info("current indices: " + str(current_indices))
         new_indices = current_indices.copy()
         new_indices[self.get_cur_frame_index()] += 1
-        self.take_async_action(["shift_video", self.paths, self.cur_video_index, new_indices])
+        self.take_async_action(["shift_video", self.paths[self.cur_video_index], new_indices])
 
-    def shift_video_b(self):
+    def shift_cur_frame_backward(self, event=None):
         current_video = self.get_cur_video_hash()
         current_indices = self.db[current_video][self.shift]["frame_indices"]
         logging.info("current indices: " + str(current_indices))
         new_indices = current_indices.copy()
         new_indices[self.get_cur_frame_index()] -= 1
-        self.take_async_action(["shift_video", self.paths, self.cur_video_index, new_indices])
+        self.take_async_action(["shift_video", self.paths[self.cur_video_index], new_indices])
 
     def next_frame(self, event=None):
         if self.cur_frame_index < 9:
@@ -715,32 +547,215 @@ class ThreadedTask(threading.Thread):
         self.queue.put(["annotate_frames", my_hash, my_dict])
 
     def handle_shift_video(self):
-        paths, cur_video_index, new_indices = self.msg[1:]
-        frames, indices = video.video_to_frames(paths[cur_video_index],
+        path, new_indices = self.msg[1:]
+        my_hash = utils.md5_from_vid(path)
+        frames, indices = video.video_to_frames(path,
+                                                vid_hash=my_hash,
                                                 dump_frames=True,
                                                 frame_indices=new_indices,
                                                 force_reselect=True)
         self.queue.put(["shift_video", frames, indices])
 
 
-def annotate_videos(args):  # contains GUI mainloop
-    if args.mode == "experimental":
-        special_db = Path.joinpath(Path("data"), "telaviv_db.pickle")
-        new_db = file_io.load_full_db(special_db)
-        paths = []
-        if args.video:
-            if Path.is_file(args.video):
-                paths.append(args.video)
+class CalibrationPage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        h, w = self.controller.get_frame_size()
+        self.canvas = tk.Canvas(self, height=h, width=w, highlightthickness=0, bg="#263D42")
+        img = ImageTk.PhotoImage(master=self, image=self.controller.get_cur_frame())
+        self.canvas.img = img  # or else image gets garbage collected
+        self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
+        self.canvas.bind("<ButtonPress-1>", self.controller.save_coords)
+        self.canvas.bind("<ButtonPress-2>", self.controller.zero_coords)
+        self.canvas.bind("<ButtonPress-3>", self.controller.next_coords)
+        self.bind("<Left>", self.controller.prev_frame)
+        self.bind("<Right>", self.controller.next_frame)
+        self.bind("<Shift-Left>", self.controller.shift_cur_frame_backward)
+        self.bind("<Shift-Right>", self.controller.shift_cur_frame_forward)
+        self.data_panel = tk.Frame(self, bg="white")
+        self.canvas.grid(row=0, column=0)
+        self.data_panel.grid(row=0, column=1)
+
+    def update_labels(self):
+        self.clear_labels()
+        shift = 0
+        pad_y = 5
+
+        db = self.controller.get_db()
+        cur_frame_index = self.controller.get_cur_frame_index()
+        cur_sticker_index = self.controller.get_cur_sticker_index()
+        cur_video_name = self.controller.get_cur_video_name()
+        cur_video_hash = self.controller.get_cur_video_hash()
+        template_name = self.controller.get_template_model_file_name()
+        if db:
+            db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :], (7, 2))
+        else:
+            db_to_show = np.zeros((7, 2))
+        sticker_names = ["Left Eye", "Nose Tip", "Right Eye", "CAP1", "CAP2", "CAP3", "CAP4"]
+
+        my_string = "Template Model File: \n{}".format(template_name)
+        label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
+        label.pack(fill="x")
+
+        my_string = "Video File Name: \n{}".format(cur_video_name)
+        label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
+        label.pack(fill="x")
+
+        my_string = "Frame: {}".format(self.controller.get_cur_frame_index())
+        label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
+        label.pack(fill="x")
+
+        for i in range(7):
+            my_string = "{}: {},{}".format(sticker_names[i], int(db_to_show[i, 0]), int(db_to_show[i, 1]))
+            if i == cur_sticker_index // 2:
+                sticker_label = tk.Label(self.data_panel, text=my_string, bg="gray", width=15, anchor="w", pady=pad_y)
             else:
-                for file in args.video.glob("**/*.MP4"):
-                    paths.append(file)
-    else:
-        new_db = file_io.load_full_db()
-        paths = None
-    logging.info("Launching GUI...")
-    app = GUI(new_db, paths, args)
-    app.mainloop()
-    return app.get_db(), app.paths
+                sticker_label = tk.Label(self.data_panel, text=my_string, bg="white", width=15, anchor="w", pady=pad_y)
+            sticker_label.pack(fill="x")
+            if db_to_show[i, 0] != 0 and db_to_show[i, 0] != 0:
+                self.canvas.create_line(int(db_to_show[i, 0]) - 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) + 5,
+                                   540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
+                self.canvas.create_line(int(db_to_show[i, 0]) + 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) - 5,
+                                   540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
+
+    def update_canvas(self):
+        self.canvas.delete("image")
+        self.canvas.delete("cross")
+        img = ImageTk.PhotoImage(master=self.canvas, image=self.controller.get_cur_frame())
+        self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
+        self.canvas.image = img  # keep a reference or it gets deleted
+
+    def clear_labels(self):
+        self.canvas.delete("cross")
+        for widget in self.data_panel.winfo_children():
+            widget.destroy()
+
+
+class MainMenu(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.label = tk.Label(self, text="STORM - a fNIRS Calibration Tool", font=("Verdana", 12))
+        self.canvas = tk.Canvas(self, height=400, width=400, bg="#263D42")
+        img = ImageTk.PhotoImage(master=self, file="resource/render.png")
+        self.canvas.img = img  # or else image gets garbage collected
+        self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
+
+        self.tempalte_view_button = ttk.Button(self, text="View Template Model",
+                                               command=lambda: controller.show_panel(ExperimentViewerPage))
+
+        self.finetune_button = ttk.Button(self, text="Fine-tune STORM-Net",
+                                          command=lambda: controller.show_panel(FinetunePage))
+
+        self.calibration_button = ttk.Button(self, text="Calibrate",
+                                             command=lambda: controller.show_panel(CalibrationPage))
+        self.about_button = ttk.Button(self, text="About",
+                                             command=lambda: controller.show_panel(AboutPage))
+
+        self.label.grid(row=1, column=1, columnspan=4)
+        self.canvas.grid(row=2, column=1, columnspan=4)
+        self.tempalte_view_button.grid(row=3, column=1, sticky="w" + "e")
+        self.finetune_button.grid(row=3, column=2, sticky="w" + "e")
+        self.calibration_button.grid(row=3, column=3, sticky="w" + "e")
+        self.about_button.grid(row=3, column=4, sticky="w" + "e")
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(4, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(5, weight=1)
+
+
+class AboutPage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.title = tk.Label(self,
+                                 text="STORM: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS).\n"
+                                      "Research: Yotam Erel, Sagi Jaffe-Dax, Yaara Yeshurun-Dishon, Amit H. Bermano\n"
+                                      "Implementation: Yotam Erel\n"
+                                      "This program is free for personal, non-profit or academic use.",
+                                 font=("Verdana", 12),
+                                 relief="groove",
+                                 anchor="w",
+                                 justify="left")
+        self.button = ttk.Button(self, text="Back",
+                                 command=lambda: controller.show_panel(MainMenu))
+        self.title.grid(row=1, column=1)
+        self.button.grid(row=2, column=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(3, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(2, weight=1)
+
+
+class FinetunePage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.title = tk.Label(self,
+                                 text="Not implemented yet",
+                                 font=("Verdana", 12),
+                                 relief="groove",
+                                 anchor="w",
+                                 justify="left")
+        self.button = ttk.Button(self, text="Back",
+                                 command=lambda: controller.show_panel(MainMenu))
+        self.title.pack()
+        self.button.pack()
+
+
+class ExperimentViewerPage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        self.bind("<Left>", self.controller.prev_optode)
+        self.bind("<Right>", self.controller.next_optode)
+        self.bind("<w>", self.controller.increase_elev)
+        self.bind("<a>", self.controller.decrease_azim)
+        self.bind("<s>", self.controller.decrease_elev)
+        self.bind("<d>", self.controller.increase_azim)
+        self.figure_handle = plt.Figure(figsize=(5, 5), dpi=100)
+        self.sub_plot_handle = self.figure_handle.add_subplot(111, projection='3d')
+        self.sub_plot_handle.view_init(self.controller.get_view_elev(), self.controller.get_view_azim())
+        self.canvas = FigureCanvasTkAgg(self.figure_handle, self)
+        self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        self.canvas.draw()
+
+    def update_labels(self):
+        names, data, my_format = self.controller.get_template_info()
+        if names:
+            selected = self.controller.get_selected_optode()
+            data = geometry.to_standard_coordinate_system(names, data)
+            if not self.controller.fiducials_only():
+                spiral_index = names.index(0)
+                data = data[spiral_index:, :]
+                names = names[spiral_index:]
+            try:
+                self.canvas.get_tk_widget().pack_forget()
+                self.sub_plot_handle.cla()
+            except AttributeError:
+                pass
+            self.sub_plot_handle.view_init(elev=self.controller.get_view_elev(), azim=self.controller.get_view_azim())
+            draw.plot_3d_pc(self.sub_plot_handle, data, selected, names)
+            self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+            self.canvas.draw()
+
+
+class ProgressBarPage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.status_label = tk.Label(self, text="", bg=controller['bg'], pady=10)
+        self.prog_bar = ttk.Progressbar(self, orient=tk.HORIZONTAL, length=300, mode="indeterminate")
+
+        self.status_label.pack(side="top")
+        self.prog_bar.pack(side="top")
+
+    def show_progress(self, show):
+        if show:
+            self.prog_bar.start(10)
+        else:
+            self.prog_bar.stop()
+            self.status_label.config(text="")
+
+    def update_status_label(self, label):
+        self.status_label.config(text=label)
 
 
 # def parse_arguments():
