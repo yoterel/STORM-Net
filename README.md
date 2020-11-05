@@ -46,14 +46,25 @@ For all command line options, see:
 `python main.py --help`
 
 
-## Using a new cap (or how to improve accuracy)
+## Using a new cap - how to improve accuracy
 
 After creating a template model for a new cap, we strongly recommend fine-tunning our supplied neural network for best results.
 To do this, follow the steps below:
 
 1. Create synthetic data using the [render script](DataSynth/render.py) (notice this script requires the template model file path and the renderer executable path as input). We recommend usings a minimum of 30000 iterations:\
    `python render.py path_to_template_model_file path_to_output_folder --exe path_to_renderer_executable --log path_to_output_log --iterations 30000`
-2. Train the network on the images using the [train script](CapCalibrator/train.py)\
+   
+   For all command line options see:
+   
+   `python render.py --help`
+   
+2. Train the network on the images using the [train script](CapCalibrator/train.py). We recommend using a gpu for this for speedy training:\
+   `python train.py my_new_model_name path_to_synthetic_data_folder --gpu_id 2`
+   
+   For al command line options see:
+   
+   `python train.py --help`
+   
    When training is done, a model file will be availble in the [models](CapCalibrator/models) directory.
 3. Use this model in the arguments supplied to the GUI / automatic calibration tools.
 
