@@ -28,7 +28,7 @@ The exact format of this file is now specified.
 The file is a csv space delimited file, where each row contains 4 values:
 1. An index of the optode (an integer numerical value representing the index of this optode. Starts from 0. any other value (strings, etc) will not be calibrated but still appear in the output file in the same standard coordiante system as the rest of the optodes).
 2. 3 numerical values: X, Y, Z representing the location of this optode (note: values must be supplied in cm or inch).
-The coordinate system these values are supplied at are not improtant, as they are transformed internally to a standard right-handed system.
+The coordinate system these values are supplied in are not improtant, as they are transformed internally to a standard right-handed system, and output coordinates are in this new cooridnate system (described below).
 
 ## How to use GUI & Automatic calibration
 
@@ -58,10 +58,10 @@ To do this, follow the steps below:
    
    `python render.py --help`
    
-2. Train the network on the images using the [train script](CapCalibrator/train.py). We recommend using a gpu for this for speedy training:\
+2. Train the network on the images using the [train script](CapCalibrator/train.py). We recommend using a gpu to speed up the training process:\
    `python train.py my_new_model_name path_to_synthetic_data_folder --gpu_id 2`
    
-   For al command line options see:
+   For all command line options see:
    
    `python train.py --help`
    
