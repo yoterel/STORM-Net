@@ -79,13 +79,13 @@ The following optodes must exist in the template model file (and their locations
 - "fpz" : used to find standard coordinate and by renderer. **NOTE**: we actually used a location 1 cm above fpz in our experiments (can be seen marked by a green sticker in the example video) - This was shown to yield better results (but it is not mandatory).
 - "fp2" : used to find standard coordinate and by renderer.
 
-Use these names (exactly, without double quoutes) for the first field for them to parsed correctly.
+Use these names (exactly, without double quoutes) as the first field for them to be parsed correctly.
 
 ## The standard coordiante system
 
 This application outputs data in the following coordiante system (notice it is right-handed):
-- x axis is from left to right ear
-- y axis is from back to front of head
-- z axis is from bottom to top of head
-- the origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
-- scale is cm. If "CZ" is too close to origin in terms of cm, the code scales it to cm (by assuming it is measured in inches).
+- X axis is from left to right ear
+- Y axis is from back to front of head
+- Z axis is from bottom to top of head
+- The origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
+- Scale is cm. If "CZ" is too close to origin in terms of cm, the code scales it to cm (by assuming it is measured in inches).
