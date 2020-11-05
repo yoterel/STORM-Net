@@ -156,9 +156,7 @@ def auto_annotate_videos(args):
         force_annotate = False
         dump_to_db = True
     my_db = file_io.load_full_db(args.session_file)
-    unet_model_dir = Path("models")
-    unet_model_name = args.u_net
-    unet_model_full_path = Path.joinpath(unet_model_dir, unet_model_name)
+    unet_model_full_path = Path(args.u_net)
     unet_model, graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
     paths = []
     if Path.is_file(vid_path):

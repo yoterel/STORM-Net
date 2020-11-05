@@ -41,9 +41,7 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     if preloaded_model:
         model = preloaded_model
     else:
-        model_name = args.storm_net
-        model_dir = Path("models")
-        model_full_path = Path.joinpath(model_dir, model_name)
+        model_full_path = Path(args.storm_net)
         model, graph = file_io.load_clean_keras_model(model_full_path)
     with graph.as_default():
         y_predict = model.predict(sticker_locations)
@@ -153,10 +151,8 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     :return: locations of stickers in all frames as a 2d numpy array
     """
     if not preloaded_model:
-        model_name = args.u_net
-        model_dir = Path("models")
-        model_full_name = Path.joinpath(model_dir, model_name)
-        my_model, graph = file_io.load_semantic_seg_model(str(model_full_name))
+        model_full_path = Path(args.u_net)
+        my_model, graph = file_io.load_semantic_seg_model(str(model_full_path))
     else:
         my_model = preloaded_model
     imgs_list = []

@@ -19,8 +19,8 @@ def parse_arguments():
                         help="Controls operation mode, in semi-auto/auto mode GUI is launched/not launched.")
     parser.add_argument("-vid", "--video", help="The path to the video file to calibrate sensors with. Required if mode is auto.")
     parser.add_argument("-t", "--template", help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
-    parser.add_argument("-stormnet", "--storm_net", default="telaviv_model_b16.h5", help="A path to a trained storm net keras model")
-    parser.add_argument("-unet", "--u_net", default="unet_tel_aviv.h5",
+    parser.add_argument("-stormnet", "--storm_net", default="models/telaviv_model_b16.h5", help="A path to a trained storm net keras model")
+    parser.add_argument("-unet", "--u_net", default="models/unet_tel_aviv.h5",
                         help="A path to a trained segmentation network model")
     parser.add_argument("-s", "--session_file",
                         help="A file containing processed results for previous videos.")

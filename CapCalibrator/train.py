@@ -6,6 +6,7 @@ import utils
 import file_io
 import logging
 
+
 def train(args):
     import keras
     from tensorflow.python.keras.callbacks import TensorBoard
@@ -122,19 +123,22 @@ def configure_environment(gpu_id):
 def parse_arguments():
     parser = argparse.ArgumentParser(description='This script fine-tunes STORM-Net')
     parser.add_argument("model_name", help="The name to give the newly trained model (without extension).")
-    parser.add_argument("pretrained_model_path", help="The path to the pretrained model file")
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
+    parser.add_argument("--pretrained_model_path", default="models/telaviv_model_b16.h5", help="The path to the pretrained model file")
     parser.add_argument("--gpu_id", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
-    parser.add_argument("--tensorboard", help="If present, writes training stats to this file path (readable with tensorboard)")
+    parser.add_argument("--tensorboard", help="If present, writes training stats to this path (readable with tensorboard)")
     parser.add_argument("--log", help="If present, stdout will be redirected to this log file path.")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
     # cmd_line = 'telaviv_model_b17 models/telaviv_model_b16.h5 data/telaviv_model'.split()
     args = parser.parse_args()
-    args.pretrained_model_path = Path(args.pretrained_model_path)
+    if args.pretrained_model_path:
+        args.pretrained_model_path = Path(args.pretrained_model_path)
     if args.log:
         args.log = Path(args.log)
+    if args.tensorboard:
+        args.tensorboard = Path(args.tensorboard)
     args.data_path = Path(args.data_path)
     return args
 

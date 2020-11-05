@@ -64,14 +64,10 @@ class GUI(tk.Tk):
         self.projected_data = None
         self.cur_active_panel = None
         if self.args.mode == "semi-auto" or self.args.mode == "experimental":
-            unet_model_name = args.u_net
-            unet_model_dir = Path("models")
-            unet_model_full_name = Path.joinpath(unet_model_dir, unet_model_name)
-            self.unet_model, self.graph = file_io.load_semantic_seg_model(str(unet_model_full_name))
-            storm_model_name = args.storm_net
-            storm_model_dir = Path("models")
-            storm_model_full_name = Path.joinpath(storm_model_dir, storm_model_name)
-            self.storm_model, _ = file_io.load_clean_keras_model(storm_model_full_name)
+            unet_model_full_path = Path(args.u_net)
+            self.unet_model, self.graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
+            storm_model_full_path = Path(args.storm_net)
+            self.storm_model, _ = file_io.load_clean_keras_model(storm_model_full_path)
         self.wm_title("STORM - a fNIRS Calibration Tool")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
@@ -101,8 +97,8 @@ class GUI(tk.Tk):
                                "label": np.array([0, 0, 0]),
                                "frame_indices": self.indices}
                     self.db[my_hash] = [my_dict]
-                    self.cur_sticker_index = 0
-                    self.cur_frame_index = 0
+                self.cur_sticker_index = 0
+                self.cur_frame_index = 0
             elif msg[0] == "annotate_frames":
                 my_hash, my_dict = msg[1:]
                 self.db[my_hash] = [my_dict]
