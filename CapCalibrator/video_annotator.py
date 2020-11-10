@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import draw
 import logging
+import webbrowser
 
 
 def annotate_videos(args):  # contains GUI mainloop
@@ -57,6 +58,11 @@ class GUI(tk.Tk):
         self.unet_model = None
         self.storm_model = None
         self.graph = None
+        self.pretrained_stormnet_path = None
+        self.renderer_executable = None
+        self.synth_output_dir = None
+        self.renderer_log_file = None
+        self.finetune_log_file = None
         self.template_file_name = None
         self.template_names = None
         self.template_data = None
@@ -120,7 +126,9 @@ class GUI(tk.Tk):
                     "annotate_frames": "Predicting landmarks...This might take some time if GPU is not being used.\nUsing GPU: {}".format(predict.is_using_gpu()),
                     "load_template_model": "Loading template model...",
                     "shift_video": "Selecting different frame...",
-                    "calibrate": "Calibrating..."}
+                    "calibrate": "Calibrating...",
+                    "render": "Creating synthetic data, This might take a while...",
+                    "finetune": "Fine-tunning STORM-Net. This might take a while..."}
         self.show_panel(ProgressBarPage)
         self.panels[ProgressBarPage].show_progress(True)
         self.panels[ProgressBarPage].update_status_label(msg_dict[msg[0]])
@@ -199,25 +207,74 @@ class GUI(tk.Tk):
                 menubar.entryconfig("Options", state="normal")
             else:
                 menubar.entryconfig("Options", state="disabled")
+        elif page == "finetune":
+            filemenu = tk.Menu(menubar, tearoff=0)
+            filemenu.add_command(label="Load Template Model", command=self.load_template_model)
+            filemenu.add_separator()
+            filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
+            menubar.add_cascade(label="File", menu=filemenu)
+            optionsmenu = tk.Menu(menubar, tearoff=0)
+            optionsmenu.add_command(label="Render Synthetic Data", command=self.render)
+            optionsmenu.add_command(label="Finetune STORM-net", command=self.finetune)
+            menubar.add_cascade(label="Options", menu=optionsmenu)
+            if self.template_file_name:
+                menubar.entryconfig("Options", state="normal")
+            else:
+                menubar.entryconfig("Options", state="disabled")
+            if self.renderer_executable and self.synth_output_dir and self.template_file_name:
+                optionsmenu.entryconfig("Render Synthetic Data", state="normal")
+                optionsmenu.entryconfig("Finetune STORM-net", state="normal")
+            else:
+                optionsmenu.entryconfig("Render Synthetic Data", state="disabled")
+                optionsmenu.entryconfig("Finetune STORM-net", state="disabled")
         else:
             menubar = ""
         return menubar
 
-    def show_panel(self, cont):
-        panel = self.panels[cont]
+    def show_panel(self, pan):
+        """
+        shows a panel and possibly updates its display
+        :param pan: the panel to show
+        :return:
+        """
+        panel = self.panels[pan]
         panel.tkraise()
         panel.focus_set()
-        if cont != ProgressBarPage:
-            self.cur_active_panel = cont
-        if cont == CalibrationPage:
+        if pan != ProgressBarPage:
+            self.cur_active_panel = pan
+        if pan == CalibrationPage:
             self.config(menu=self.update_menubar("calib"))
-            self.panels[cont].update_canvas()
-            self.panels[cont].update_labels()
-        elif cont == ExperimentViewerPage:
+            self.panels[pan].update_canvas()
+            self.panels[pan].update_labels()
+        elif pan == ExperimentViewerPage:
             self.config(menu=self.update_menubar("exp"))
-            self.panels[cont].update_labels()
+            self.panels[pan].update_labels()
+        elif pan == FinetunePage:
+            self.config(menu=self.update_menubar("finetune"))
+            self.panels[pan].update_labels()
         else:
             self.config(menu=self.update_menubar(""))
+
+    def select_from_filesystem(self, isdir, initial_dir, title):
+        """
+        selects a filesystem object and returns its path
+        :param isdir: is object to select a dir? (else assumes it is a file)
+        :param initial_dir: the initial popup dialog dir
+        :param title: the title of the popup dialog
+        :return: the path to the object or None if failure occurs
+        """
+        if isdir:
+            folder = filedialog.askdirectory(initialdir=initial_dir, title=title)
+            if not folder:
+                return None
+            else:
+                return Path(folder)
+        else:
+            file = filedialog.askopenfilename(initialdir=initial_dir, title=title)
+            if not file:
+                return None
+            else:
+                return Path(file)
 
     def get_frame_size(self):
         """
@@ -315,7 +372,52 @@ class GUI(tk.Tk):
             name = self.template_file_name.name
             my_str = "{}/{}".format(parent, name)
         else:
-            my_str = "Not Loaded"
+            my_str = "Not Set"
+        return my_str
+
+    def get_renderer_file_name(self):
+        if self.renderer_executable:
+            parent = self.renderer_executable.parent.name
+            name = self.renderer_executable.name
+            my_str = "{}/{}".format(parent, name)
+        else:
+            my_str = "Not Set"
+        return my_str
+
+    def get_synth_output_folder_name(self):
+        if self.synth_output_dir:
+            parent = self.synth_output_dir.parent.name
+            name = self.synth_output_dir.name
+            my_str = "{}/{}".format(parent, name)
+        else:
+            my_str = "Not Set"
+        return my_str
+
+    def get_renderer_log_file_name(self):
+        if self.renderer_log_file:
+            parent = self.renderer_log_file.parent.name
+            name = self.renderer_log_file.name
+            my_str = "{}/{}".format(parent, name)
+        else:
+            my_str = "Not Set"
+        return my_str
+
+    def get_finetune_log_file_name(self):
+        if self.finetune_log_file:
+            parent = self.finetune_log_file.parent.name
+            name = self.finetune_log_file.name
+            my_str = "{}/{}".format(parent, name)
+        else:
+            my_str = "Not Set"
+        return my_str
+
+    def get_pretrained_stormnet_path(self):
+        if self.pretrained_stormnet_path:
+            parent = self.pretrained_stormnet_path.parent.name
+            name = self.pretrained_stormnet_path.name
+            my_str = "{}/{}".format(parent, name)
+        else:
+            my_str = "Not Set"
         return my_str
 
     def get_cur_video_hash(self):
@@ -424,41 +526,91 @@ class GUI(tk.Tk):
             self.panels[CalibrationPage].update_labels()
 
     def load_video(self):
-        filename = filedialog.askopenfilename(initialdir=".", title="Select Video File")
-        if not filename:
-            return
-        file = Path(filename)
-        if file.suffix.lower() in [".mp4", ".avi"]:
-            self.paths = [file]
-            self.take_async_action(self.prep_vid_to_frames_packet())
+        obj = self.select_from_filesystem(False, ".", "Select Video File")
+        if obj:
+            if obj.suffix.lower() in [".mp4", ".avi"]:
+                self.paths = [obj]
+                self.take_async_action(self.prep_vid_to_frames_packet())
 
     def load_template_model(self):
-        filename = filedialog.askopenfilename(initialdir=".", title="Select Template Model File")
-        if not filename:
-            return
-        file = Path(filename)
-        self.take_async_action(["load_template_model", file])
+        obj = self.select_from_filesystem(False, ".", "Select Template Model File")
+        if obj:
+            self.take_async_action(["load_template_model", obj])
+
+    def load_renderer_executable(self):
+        obj = self.select_from_filesystem(False, "./..", "Select Renderer Executable File")
+        if obj:
+            self.renderer_executable = obj
+            self.show_panel(self.cur_active_panel)
+
+    def load_synth_output_folder(self):
+        obj = self.select_from_filesystem(True, "./..", "Select Synthetic Data Output Directory")
+        if obj:
+            self.synth_output_dir = obj
+            self.show_panel(self.cur_active_panel)
+
+    def load_renderer_log_file(self):
+        obj = filedialog.asksaveasfile(initialdir="./..", title="Select Renderer Log File Location", mode='w+')
+        if obj:
+            self.renderer_log_file = Path(obj)
+            self.show_panel(self.cur_active_panel)
+
+    def load_finetune_log_file(self):
+        obj = filedialog.asksaveasfile(initialdir="./..", title="Select Finetune Procedure Log File Location", mode='w+')
+        if obj:
+            self.finetune_log_file = Path(obj)
+            self.show_panel(self.cur_active_panel)
+
+    def load_pretrained_model(self):
+        obj = filedialog.asksaveasfile(initialdir="./..", title="Select Pretrained Model Location", mode='w+')
+        if obj:
+            self.pretrained_stormnet_path = Path(obj)
+            self.show_panel(self.cur_active_panel)
+
+    def set_default_render(self):
+        self.take_async_action(["load_template_model", Path("./../example_models/example_model.txt")])
+        self.renderer_log_file = Path("./cache/render_log.txt")
+        self.synth_output_dir = Path("./cache/synth_data")
+        self.synth_output_dir.mkdir(parents=True, exist_ok=True)
+        self.renderer_executable = Path("./../DataSynth/build/DataSynth.exe")
+        self.panels[self.cur_active_panel].render_set_defaults()
+        self.show_panel(self.cur_active_panel)
+
+    def set_default_finetune(self):
+        self.pretrained_stormnet_path = Path("./models/telaviv_model_b16.h5")
+        self.finetune_log_file = Path("./cache/finetune_log.txt")
+        self.synth_output_dir = Path("./cache/synth_data")
+        self.synth_output_dir.mkdir(parents=True, exist_ok=True)
+        self.panels[self.cur_active_panel].finetune_set_defaults()
+        self.show_panel(self.cur_active_panel)
+
+    def render(self):
+        # todo: render
+        self.take_async_action(["render"])
+
+    def finetune(self):
+        #todo: finetune
+        self.take_async_action(["finetune"])
 
     def load_session(self):
         if self.paths:
-            filename = filedialog.askopenfilename(initialdir=".", title="Select Session File")
-            if not filename:
-                return
-            self.db = file_io.load_from_pickle(filename)
-            self.take_async_action(self.prep_vid_to_frames_packet())
+            obj = self.select_from_filesystem(False, ".", "Select Session File")
+            if obj:
+                self.db = file_io.load_from_pickle(obj)
+                self.take_async_action(self.prep_vid_to_frames_packet())
         else:
             logging.info("You must first load a video before you can load any saved sessions.")
 
     def save_session(self):
-        f = filedialog.asksaveasfile(initialdir="./data", title="Select Session File", mode='wb')
-        if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
+        f = filedialog.asksaveasfile(initialdir=".", title="Select Session File", mode='wb')
+        if f is None:
             return
         file_io.dump_to_pickle(Path(f.name), self.db)
 
     def save_calibration(self):
         if self.projected_data:
-            f = filedialog.asksaveasfile(initialdir="./data", title="Select Output File", mode='w')
-            if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
+            f = filedialog.asksaveasfile(initialdir=".", title="Select Output File", mode='w')
+            if f is None:
                 return
             file_io.save_results(self.projected_data, Path(f.name))
 
@@ -672,29 +824,17 @@ class AboutPage(tk.Frame):
                                  relief="groove",
                                  anchor="w",
                                  justify="left")
+        self.subtitle = tk.Label(self, text="https://github.com/yoterel/STORM", fg="blue", cursor="hand2")
         self.button = ttk.Button(self, text="Back",
                                  command=lambda: controller.show_panel(MainMenu))
         self.title.grid(row=1, column=1)
-        self.button.grid(row=2, column=1)
+        self.subtitle.grid(row=2, column=1)
+        self.subtitle.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/yoterel/STORM"))
+        self.button.grid(row=3, column=1)
         self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(4, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(2, weight=1)
-
-
-class FinetunePage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.title = tk.Label(self,
-                                 text="Not implemented yet",
-                                 font=("Verdana", 12),
-                                 relief="groove",
-                                 anchor="w",
-                                 justify="left")
-        self.button = ttk.Button(self, text="Back",
-                                 command=lambda: controller.show_panel(MainMenu))
-        self.title.pack()
-        self.button.pack()
 
 
 class ExperimentViewerPage(tk.Frame):
@@ -753,6 +893,172 @@ class ProgressBarPage(tk.Frame):
     def update_status_label(self, label):
         self.status_label.config(text=label)
 
+
+class FinetunePage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        self.output_log_render = tk.BooleanVar
+        self.output_log_finetune = tk.BooleanVar
+        self.render_monitor_progress = tk.BooleanVar
+        self.finetune_monitor_progress = tk.BooleanVar
+
+        self.render_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
+        self.finetune_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
+        self.render_frame_title = tk.Label(self, text="Render Synthetic Data", pady=10)
+        self.finetune_frame_title = tk.Label(self, text="Finetune STORM-Net", pady=10)
+        self.template_name_static = tk.Label(self.render_frame, text="", pady=10)
+        self.template_name = tk.Label(self.render_frame, text="", bg=controller['bg'], pady=10)
+        self.template_name_button = tk.Button(self.render_frame, text="...",
+                                              command=self.controller.load_template_model)
+        self.renderer_name_static = tk.Label(self.render_frame, text="", pady=10)
+        self.renderer_name = tk.Label(self.render_frame, text="", bg=controller['bg'], pady=10)
+        self.renderer_name_button = tk.Button(self.render_frame, text="...",
+                                              command=self.controller.load_renderer_executable)
+        self.output_folder_static = tk.Label(self.render_frame, text="", pady=10)
+        self.output_folder = tk.Label(self.render_frame, text="", bg=controller['bg'], pady=10)
+        self.output_folder_button = tk.Button(self.render_frame, text="...",
+                                              command=self.controller.load_synth_output_folder)
+        self.output_log_checkbox = tk.Checkbutton(self.render_frame, text="Output log?",
+                                                  variable=self.output_log_render, command=self.update_labels)
+        self.output_log_button = tk.Button(self.render_frame, text="...",
+                                           command=self.controller.load_renderer_log_file)
+        self.output_log_name = tk.Label(self.render_frame, text="", bg=controller['bg'], pady=10)
+        self.iterations_number_label = tk.Label(self.render_frame, text="Number Of Iterations", pady=10)
+        self.iterations_number = tk.Entry(self.render_frame, text="", bg=controller['bg'])
+        self.render_monitor_progress_checkbox = tk.Checkbutton(self.render_frame, text="Monitor Progress?",
+                                                        variable=self.render_monitor_progress, command=self.update_labels)
+        self.render_button = tk.Button(self.render_frame, text="Render", command=self.controller.render)
+        self.render_default_button = tk.Button(self.render_frame, text="Default Settings",
+                                               command=self.controller.set_default_render)
+        self.model_name_label = tk.Label(self.finetune_frame, text="Model Name: ", pady=10)
+        self.model_name = tk.Entry(self.finetune_frame)
+        self.premodel_name_static = tk.Label(self.finetune_frame, text="", pady=10)
+        self.premodel_name = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
+        self.premodel_button = tk.Button(self.finetune_frame, text="...",
+                                         command=self.controller.load_pretrained_model)
+        self.output_folder_static1 = tk.Label(self.finetune_frame, text="", pady=10)
+        self.output_folder1 = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
+        self.output_folder_button1 = tk.Button(self.finetune_frame, text="...",
+                                               command=self.controller.load_synth_output_folder)
+        self.output_log_checkbox1 = tk.Checkbutton(self.finetune_frame, text="Output log?",
+                                                   variable=self.output_log_finetune, command=self.update_labels)
+        self.output_log_button1 = tk.Button(self.finetune_frame, text="...",
+                                            command=self.controller.load_finetune_log_file)
+        self.output_log_name1 = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
+        self.gpu_label = tk.Label(self.finetune_frame, text="GPU ID to use: ", pady=10)
+        self.gpu = tk.Entry(self.finetune_frame, text="", bg=controller['bg'])
+        self.finetune_monitor_progress_checkbox = tk.Checkbutton(self.finetune_frame, text="Monitor Progress?",
+                                                                 variable=self.finetune_monitor_progress,
+                                                                 command=self.update_labels)
+        self.finetune_default_button = tk.Button(self.finetune_frame, text="Default Settings",
+                                                 command=self.controller.set_default_finetune)
+        self.finetune_button = tk.Button(self.finetune_frame, text="Finetune", command=self.controller.finetune)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(3, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(3, weight=1)
+
+        self.render_frame_title.grid(row=1, column=1, sticky='W')
+        self.finetune_frame_title.grid(row=1, column=2, sticky='W')
+        self.render_frame.grid(row=2, column=1, sticky='N')
+        self.finetune_frame.grid(row=2, column=2, sticky='N')
+
+        self.template_name_static.grid(row=0, column=0, sticky='W')
+        self.template_name_button.grid(row=0, column=1)
+        self.template_name.grid(row=0, column=2, sticky='W')
+
+        self.renderer_name_static.grid(row=1, column=0, sticky='W')
+        self.renderer_name_button.grid(row=1, column=1)
+        self.renderer_name.grid(row=1, column=2, sticky='W')
+
+        self.output_folder_static.grid(row=2, column=0, sticky='W')
+        self.output_folder_button.grid(row=2, column=1)
+        self.output_folder.grid(row=2, column=2, sticky='W')
+
+        self.output_log_checkbox.grid(row=3, column=0, sticky='W')
+        self.output_log_button.grid(row=3, column=1)
+        self.output_log_name.grid(row=3, column=2, sticky='W')
+
+        self.iterations_number_label.grid(row=4, column=0, sticky='W')
+        self.iterations_number.grid(row=4, column=2, sticky='W')
+
+        self.render_monitor_progress_checkbox.grid(row=5, column=0, sticky='W')
+        self.render_default_button.grid(row=5, column=1)
+        self.render_button.grid(row=5, column=2)
+
+        self.model_name_label.grid(row=0, column=0, sticky='W')
+        self.model_name.grid(row=0, column=2, sticky='W')
+
+        self.premodel_name_static.grid(row=2, column=0, sticky='W')
+        self.premodel_button.grid(row=2, column=1)
+        self.premodel_name.grid(row=2, column=2, sticky='W')
+
+        self.output_folder_static1.grid(row=3, column=0, sticky='W')
+        self.output_folder_button1.grid(row=3, column=1)
+        self.output_folder1.grid(row=3, column=2, sticky='W')
+
+        self.output_log_checkbox1.grid(row=4, column=0, sticky='W')
+        self.output_log_button1.grid(row=4, column=1)
+        self.output_log_name1.grid(row=4, column=2, sticky='W')
+
+        self.gpu_label.grid(row=5, column=0, sticky='W')
+        self.gpu.grid(row=5, column=2, sticky='W')
+
+        self.finetune_monitor_progress_checkbox.grid(row=6, column=0, sticky='W')
+        self.finetune_default_button.grid(row=6, column=1)
+        self.finetune_button.grid(row=6, column=2)
+
+        self.update_labels()
+
+    def render_set_defaults(self):
+        self.set_text(self.iterations_number, "30000")
+        self.output_log_checkbox.select()
+
+    def finetune_set_defaults(self):
+        self.set_text(self.gpu, "-1")
+        self.set_text(self.model_name, "my_new_model")
+        self.output_log_checkbox1.select()
+
+    def set_text(self, item, text):
+        item.delete(0, tk.END)
+        item.insert(0, text)
+        return
+
+    def update_labels(self):
+        template_file_str = self.controller.get_template_model_file_name()
+        renderer_file_str = self.controller.get_renderer_file_name()
+        output_folder_str = self.controller.get_synth_output_folder_name()
+        render_log_file_str = self.controller.get_renderer_log_file_name()
+        finetune_log_file_str = self.controller.get_finetune_log_file_name()
+        pretrained_model_str = self.controller.get_pretrained_stormnet_path()
+        # new_model_name_str = self.controller.get_new_model_name()
+        # iterations_str = self.iterations_number.get()
+        # gpu_id_str = self.gpu.get()
+
+        self.template_name_static.config(text="Template Model File: ")
+        self.template_name.config(text=template_file_str)
+        self.renderer_name_static.config(text="Renderer: ")
+        self.renderer_name.config(text=renderer_file_str)
+        self.output_folder_static.config(text="Synthesized Data Output Folder: ")
+        self.output_folder.config(text=output_folder_str)
+        if self.output_log_render:
+            self.output_log_name.config(text=render_log_file_str)
+        else:
+            self.output_log_name.config(text="Disabled")
+        # self.model_name.config(text=new_model_name_str)
+        # self.iterations_number.config(text=iterations_str)
+        # self.gpu.config(text=gpu_id_str)
+        self.premodel_name_static.config(text="Pretrained Model: ")
+        self.premodel_name.config(text=pretrained_model_str)
+        self.output_folder_static1.config(text="Synthesized Data Output Folder: ")
+        self.output_folder1.config(text=output_folder_str)
+        if self.output_log_finetune:
+            self.output_log_name1.config(text=finetune_log_file_str)
+        else:
+            self.output_log_name1.config(text="Disabled")
+        # my_str = "Template Model File: {} \n Renderer Executable: {} \n Iterations: {}"
+        # self.status_label.config(text=label)
 
 # def parse_arguments():
 #     parser = argparse.ArgumentParser(description='Automatically annotates FNIRS videos on disk.')
