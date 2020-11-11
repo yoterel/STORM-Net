@@ -118,7 +118,7 @@ def process_video(args):
     """
     vid_paths = args.video
     new_db = []
-    if args.mode == "semi-auto":
+    if args.mode == "gui":
         video_annotator.annotate_videos(args)
         return
     elif args.mode == "experimental":

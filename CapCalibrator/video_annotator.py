@@ -19,6 +19,7 @@ import draw
 import logging
 import webbrowser
 import render
+import train
 
 
 def annotate_videos(args):  # contains GUI mainloop
@@ -53,17 +54,19 @@ class GUI(tk.Tk):
         self.cur_sticker_index = 0
         self.selected_optode = 0
         self.view_elev = 60
-        self.view_azim = -470
+        self.view_azim = 220
         self.view_fiducials_only = False
         self.frames = None
         self.indices = None
         self.queue = queue.Queue(maxsize=10)
         self.periodic_queue = queue.Queue(maxsize=10)
-        self.periodic_thread = None
+        self.render_thread = None
+        self.finetune_thread = None
         self.unet_model = None
         self.storm_model = None
         self.graph = None
         self.pretrained_stormnet_path = None
+        self.finetunning = False
         self.renderer_executable = None
         self.synth_output_dir = None
         self.renderer_log_file = None
@@ -74,8 +77,8 @@ class GUI(tk.Tk):
         self.template_format = None
         self.projected_data = None
         self.cur_active_panel = None
-        self.periodic_thread_alive = False
-        if self.args.mode == "semi-auto" or self.args.mode == "experimental":
+        self.render_thread_alive = False
+        if self.args.mode == "gui" or self.args.mode == "experimental":
             unet_model_full_path = Path(args.u_net)
             self.unet_model, self.graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
             storm_model_full_path = Path(args.storm_net)
@@ -100,17 +103,31 @@ class GUI(tk.Tk):
 
     def process_periodic_queue(self):
         """
-        periodically consumes from periodic queue as lon as periodic thread is alive.
-        note: cleans queue and exists if periodic thread sent "stopped" msg
+        periodically consumes from periodic queue as long as some periodic thread is alive.
+        note: cleans queue and exists if periodic thread sent a done msg
         :return:
         """
         while not self.periodic_queue.empty():
             msg = self.periodic_queue.get(False)
-            if msg == "stopped":
-                self.periodic_thread_alive = False
-            else:
-                self.panels[FinetunePage].set_renderer_log_text(msg)
-        if self.periodic_thread_alive:
+            if msg[0] == "render_data":
+                text = msg[1]
+                self.panels[FinetunePage].set_renderer_log_text(text)
+            elif msg[0] == "render_done":
+                self.render_thread_alive = False
+                self.render_thread = None
+                self.panels[FinetunePage].update_render_progress_bar(False)
+            elif msg[0] == "finetune_data":
+                epoch, loss = msg[1:]
+                self.panels[FinetunePage].set_finetune_log_text(epoch, loss)
+            elif msg[0] == "finetune_done":
+                self.finetunning = False
+                self.finetune_thread = None
+                self.panels[FinetunePage].update_finetune_progress_bar(False)
+        if self.render_thread_alive:
+            self.panels[FinetunePage].update_render_progress_bar(True)
+            self.after(100, self.process_periodic_queue)
+        elif self.finetunning:
+            self.panels[FinetunePage].update_finetune_progress_bar(True)
             self.after(100, self.process_periodic_queue)
         else:
             while not self.periodic_queue.empty():
@@ -166,15 +183,23 @@ class GUI(tk.Tk):
                     "calibrate": "Calibrating...",
                     "render": "Creating synthetic data, This might take a while...",
                     "finetune": "Fine-tunning STORM-Net. This might take a while..."}
+
         if periodic:
-            if msg == "stop":
-                if self.periodic_thread:
-                    self.periodic_thread.join()
-                    self.periodic_thread = None
-            else:
-                self.periodic_thread_alive = True
-                self.periodic_thread = ThreadedPeriodicTask(self.periodic_queue, msg)
-                self.periodic_thread.start()
+            if msg[0] == "render_stop":
+                if self.render_thread:
+                    self.render_thread.join()
+            elif msg[0] == "render_start":
+                self.render_thread_alive = True
+                self.render_thread = ThreadedPeriodicTask(self.periodic_queue, msg)
+                self.render_thread.start()
+                self.after(100, self.process_periodic_queue)
+            elif msg[0] == "finetune_stop":
+                if self.finetune_thread:
+                    self.finetune_thread.join()
+            elif msg[0] == "finetune_start":
+                self.finetunning = True
+                self.finetune_thread = ThreadedPeriodicTask(self.periodic_queue, msg)
+                self.finetune_thread.start()
                 self.after(100, self.process_periodic_queue)
         else:
             self.show_panel(ProgressBarPage)
@@ -636,6 +661,9 @@ class GUI(tk.Tk):
         self.panels[self.cur_active_panel].finetune_set_defaults()
         self.show_panel(self.cur_active_panel)
 
+    def get_gpu_id(self):
+        return self.args.gpu_id
+
     def load_renderer_executable(self):
         obj = self.select_from_filesystem(False, True, "./..", "Select Renderer Executable File")
         if obj:
@@ -666,9 +694,9 @@ class GUI(tk.Tk):
             self.pretrained_stormnet_path = Path(obj)
             self.show_panel(self.cur_active_panel)
 
-    def finetune_monitor_progress(self):
-        # todo
-        return
+    def finetune_kill_thread(self):
+        self.take_async_action(["finetune_stop"], periodic=True)
+
 
     def render_monitor_progress(self):
         """
@@ -676,13 +704,13 @@ class GUI(tk.Tk):
         :return:
         """
         if not self.panels[FinetunePage].render_monitor_progress.get():
-            self.take_async_action("stop", periodic=True)
+            self.take_async_action(["render_stop"], periodic=True)
             # self.panels[FinetunePage].renderer_log_text.configure(state='normal')
             # self.panels[FinetunePage].renderer_log_text.delete(1.0, tk.END)
             # self.panels[FinetunePage].renderer_log_text.configure(state='disabled')
         else:
-            if not self.periodic_thread_alive and self.is_renderer_active() and self.renderer_log_file.is_file():
-                self.take_async_action(self.renderer_log_file.absolute(), periodic=True)
+            if not self.render_thread_alive and self.is_renderer_active() and self.renderer_log_file.is_file():
+                self.take_async_action(["render_start", self.renderer_log_file.absolute()], periodic=True)
 
     def is_renderer_active(self):
         if self.renderer_executable:
@@ -710,8 +738,11 @@ class GUI(tk.Tk):
         elif self.is_renderer_active():
             logging.info("Renderer executable already running.")
             return
-        elif self.periodic_thread_alive:
+        elif self.render_thread_alive:
             logging.info("Already monitoring a log file.")
+            return
+        elif self.finetunning:
+            logging.info("Cannot render while fine-tunning is already in progress.")
             return
         else:
             iterations = self.panels[self.cur_active_panel].iterations_number.get()
@@ -748,11 +779,33 @@ class GUI(tk.Tk):
                       self.renderer_log_file,
                       iterations)
         if self.panels[self.cur_active_panel].render_monitor_progress.get():
-            self.take_async_action(self.renderer_log_file.absolute(), periodic=True)
+            self.take_async_action(["render_start", self.renderer_log_file.absolute()], periodic=True)
 
     def finetune(self):
-        # todo: finetune
-        self.take_async_action(["finetune"])
+        model_name = self.panels[self.cur_active_panel].model_name.get()
+        if model_name == "":
+            logging.info("Missing new model name.")
+            return
+        if self.pretrained_stormnet_path is None:
+            logging.info("Missing pre-trained model path.")
+            return
+        elif self.synth_output_dir is None:
+            logging.info("Missing synthetic data output folder")
+            return
+        elif self.finetune_log_file is None:
+            logging.info("Missing log file path.")
+            return
+        elif self.is_renderer_active():
+            logging.info("Cannot fine-tune while renderer executable is running.")
+            return
+        elif self.finetunning:
+            logging.info("Fine-tuning is already in progress.")
+            return
+        else:
+            self.take_async_action(self.prep_fintune_packet(model_name), periodic=True)
+
+    def prep_fintune_packet(self, model_name):
+        return ["finetune_start", model_name, self.pretrained_stormnet_path, self.synth_output_dir, self.finetune_log_file]
 
     ### ExperimentViewerPage ###
     def toggle_optodes(self):
@@ -809,20 +862,32 @@ class GUI(tk.Tk):
 
 
 class ThreadedPeriodicTask(threading.Thread):
-    def __init__(self, queue, path):
+    def __init__(self, queue, msg):
         threading.Thread.__init__(self)
         self.queue = queue
-        self.path = path
+        self.msg = msg
         self.stoprequest = threading.Event()
 
     def join(self, timeout=None):
         self.stoprequest.set()
 
     def run(self):
-        while not self.path.is_file() and not self.stoprequest.isSet():
+        if self.msg[0] == "finetune_start":
+            self.handle_finetune()
+        elif self.msg[0] == "render_start":
+            self.handle_render()
+
+    def handle_finetune(self):
+        model_name, pretrained_stormnet_path, synth_output_dir, finetune_log_file = self.msg[1:]
+        train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, self.queue,
+                    self.stoprequest)
+
+    def handle_render(self):
+        path = self.msg[1]
+        while not path.is_file() and not self.stoprequest.isSet():
             time.sleep(0.1)
-        if self.path.is_file():
-            logfile = open(str(self.path), "r")
+        if path.is_file():
+            logfile = open(str(path), "r")
             '''generator function that yields new lines in a file
             '''
             # seek the end of the file
@@ -839,8 +904,8 @@ class ThreadedPeriodicTask(threading.Thread):
                     self.join()
                 else:
                     if not self.queue.full():
-                        self.queue.put(line)
-        self.queue.put("stopped")
+                        self.queue.put(["render_data", line])
+        self.queue.put(["render_done"])
 
 
 class ThreadedTask(threading.Thread):
@@ -848,7 +913,6 @@ class ThreadedTask(threading.Thread):
         threading.Thread.__init__(self)
         self.queue = queue
         self.msg = msg
-        self.watch_render_log = False
 
     def run(self):
         if self.msg[0] == "video_to_frames":
@@ -905,6 +969,7 @@ class ThreadedTask(threading.Thread):
                                                 frame_indices=new_indices,
                                                 force_reselect=True)
         self.queue.put(["shift_video", frames, indices])
+
 
 class CalibrationPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -1105,8 +1170,6 @@ class FinetunePage(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.render_monitor_progress = tk.BooleanVar(self)
-        self.finetune_monitor_progress = tk.BooleanVar(self)
-        self.watch_log = False
         self.render_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
         self.finetune_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
         self.render_frame_title = tk.Label(self, text="Render Synthetic Data", pady=10)
@@ -1135,8 +1198,10 @@ class FinetunePage(tk.Frame):
         self.render_default_button = tk.Button(self.render_frame, text="Default Settings",
                                                command=self.controller.set_default_render)
         self.render_button = tk.Button(self.render_frame, text="Render", command=self.controller.render)
-        self.renderer_log_text = tk.scrolledtext.ScrolledText(self.render_frame, wrap=tk.WORD, height=10)
+        self.renderer_log_text = tk.scrolledtext.ScrolledText(self.render_frame, wrap=tk.WORD, height=10, width=45)
         self.renderer_log_text.configure(state='disabled')
+        self.render_progressbar = ttk.Progressbar(self.render_frame, orient=tk.HORIZONTAL, length=100, mode="indeterminate")
+
         self.model_name_label = tk.Label(self.finetune_frame, text="Model Name: ", pady=10)
         self.model_name = tk.Entry(self.finetune_frame)
         self.premodel_name_static = tk.Label(self.finetune_frame, text="", pady=10)
@@ -1151,14 +1216,17 @@ class FinetunePage(tk.Frame):
         self.output_log_button1 = tk.Button(self.finetune_frame, text="...",
                                             command=self.controller.load_finetune_log_file)
         self.output_log_name1 = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
-        self.gpu_label = tk.Label(self.finetune_frame, text="GPU ID to use: ", pady=10)
-        self.gpu = tk.Entry(self.finetune_frame, text="", bg=controller['bg'])
-        self.finetune_monitor_progress_checkbox = tk.Checkbutton(self.finetune_frame, text="Monitor Progress?",
-                                                                 variable=self.finetune_monitor_progress,
-                                                                 command=self.controller.finetune_monitor_progress)
+        self.gpu_label = tk.Label(self.finetune_frame, text="", pady=10)
+        self.gpu_static = tk.Label(self.finetune_frame, text="", bg=controller['bg'])
+        self.finetune_kill_button = tk.Button(self.finetune_frame, text="Kill Finetune Thread",
+                                              command=self.controller.finetune_kill_thread)
         self.finetune_default_button = tk.Button(self.finetune_frame, text="Default Settings",
                                                  command=self.controller.set_default_finetune)
         self.finetune_button = tk.Button(self.finetune_frame, text="Finetune", command=self.controller.finetune)
+        self.finetune_log_text = tk.scrolledtext.ScrolledText(self.finetune_frame, wrap=tk.WORD, height=10, width=45)
+        self.finetune_log_text.configure(state='disabled')
+        self.finetune_progressbar = ttk.Progressbar(self.finetune_frame, orient=tk.HORIZONTAL, length=100,
+                                                    mode="indeterminate")
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(3, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -1192,6 +1260,7 @@ class FinetunePage(tk.Frame):
         self.render_default_button.grid(row=5, column=1)
         self.render_button.grid(row=5, column=2)
         self.renderer_log_text.grid(row=6, columnspan=3)
+        self.render_progressbar.grid(row=7, columnspan=3)
 
         self.model_name_label.grid(row=0, column=0, sticky='W')
         self.model_name.grid(row=0, column=2, sticky='W')
@@ -1209,12 +1278,13 @@ class FinetunePage(tk.Frame):
         self.output_log_name1.grid(row=4, column=2, sticky='W')
 
         self.gpu_label.grid(row=5, column=0, sticky='W')
-        self.gpu.grid(row=5, column=2, sticky='W')
+        self.gpu_static.grid(row=5, column=2, sticky='W')
 
-        self.finetune_monitor_progress_checkbox.grid(row=6, column=0, sticky='W')
+        self.finetune_kill_button.grid(row=6, column=0, sticky='W')
         self.finetune_default_button.grid(row=6, column=1)
         self.finetune_button.grid(row=6, column=2)
-
+        self.finetune_log_text.grid(row=7, columnspan=3)
+        self.finetune_progressbar.grid(row=8, columnspan=3)
         self.update_labels()
 
     def render_set_defaults(self):
@@ -1222,13 +1292,22 @@ class FinetunePage(tk.Frame):
         self.render_monitor_progress_checkbox.select()
 
     def finetune_set_defaults(self):
-        self.set_entry_text(self.gpu, "-1")
+        # self.set_entry_text(self.gpu, "-1")
         self.set_entry_text(self.model_name, "my_new_model")
 
     def set_entry_text(self, item, text):
         item.delete(0, tk.END)
         item.insert(0, text)
         return
+
+    def set_finetune_log_text(self, epoch, loss):
+        msg = "epoch: {}, val_loss: {}".format(epoch, loss)
+        fully_scrolled_down = self.finetune_log_text.yview()[1] == 1.0
+        self.finetune_log_text.configure(state='normal')
+        self.finetune_log_text.insert(tk.END, msg + "\n")
+        if fully_scrolled_down:
+            self.finetune_log_text.see("end")
+        self.finetune_log_text.configure(state='disabled')
 
     def set_renderer_log_text(self, msg):
         fully_scrolled_down = self.renderer_log_text.yview()[1] == 1.0
@@ -1238,6 +1317,18 @@ class FinetunePage(tk.Frame):
             self.renderer_log_text.see("end")
         self.renderer_log_text.configure(state='disabled')
 
+    def update_render_progress_bar(self, active):
+        if active:
+            self.render_progressbar.step(10)
+        else:
+            self.render_progressbar.stop()
+
+    def update_finetune_progress_bar(self, active):
+        if active:
+            self.finetune_progressbar.step(10)
+        else:
+            self.finetune_progressbar.stop()
+
     def update_labels(self):
         template_file_str = self.controller.get_template_model_file_name()
         renderer_file_str = self.controller.get_renderer_file_name()
@@ -1245,9 +1336,7 @@ class FinetunePage(tk.Frame):
         render_log_file_str = self.controller.get_renderer_log_file_name()
         finetune_log_file_str = self.controller.get_finetune_log_file_name()
         pretrained_model_str = self.controller.get_pretrained_stormnet_path()
-        # new_model_name_str = self.controller.get_new_model_name()
-        # iterations_str = self.iterations_number.get()
-        # gpu_id_str = self.gpu.get()
+        gpu_id_str = str(self.controller.get_gpu_id())
 
         self.template_name_static.config(text="Template Model File: ")
         self.template_name.config(text=template_file_str)
@@ -1263,6 +1352,9 @@ class FinetunePage(tk.Frame):
         self.output_folder1.config(text=output_folder_str)
         self.output_log_label1.config(text="Finetune Log File: ")
         self.output_log_name1.config(text=finetune_log_file_str)
+
+        self.gpu_label.config(text="GPU ID to use (-1 for CPU): ")
+        self.gpu_static.config(text=gpu_id_str)
         # my_str = "Template Model File: {} \n Renderer Executable: {} \n Iterations: {}"
         # self.status_label.config(text=label)
 

@@ -88,7 +88,7 @@ def create_fc2_model(input_shape, output_shape, learning_rate):
     model.add(Dense(output_shape))
     opt = keras.optimizers.Adam(lr=learning_rate)
     model.compile(loss='mean_squared_error', optimizer=opt)
-    model.summary()
+    # model.summary()
     return model
 
 
@@ -147,10 +147,11 @@ def center_data(x):
     b = x
     zero_indices = np.copy(b == 0)
     for ndx in range(b.shape[0]):
-        xvec_cent = np.true_divide(b[ndx, :, ::2].sum(1), (b[ndx, :, ::2] != 0).sum(1))
-        xvec_cent = np.nan_to_num(xvec_cent)
-        yvec_cent = np.true_divide(b[ndx, :, 1::2].sum(1), (b[ndx, :, 1::2] != 0).sum(1))
-        yvec_cent = np.nan_to_num(yvec_cent)
+        with np.errstate(all='ignore'):  # we replace nans with zero immediately after possible division by zero
+            xvec_cent = np.true_divide(b[ndx, :, ::2].sum(1), (b[ndx, :, ::2] != 0).sum(1))
+            xvec_cent = np.nan_to_num(xvec_cent)
+            yvec_cent = np.true_divide(b[ndx, :, 1::2].sum(1), (b[ndx, :, 1::2] != 0).sum(1))
+            yvec_cent = np.nan_to_num(yvec_cent)
         b[ndx, :, ::2] += np.expand_dims(0.5 - xvec_cent, axis=1)
         b[ndx, :, 1::2] += np.expand_dims(0.5 - yvec_cent, axis=1)
     b[zero_indices] = 0

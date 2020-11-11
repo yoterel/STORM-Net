@@ -283,7 +283,7 @@ def load_keras_model(pretrained_model_path, learning_rate):
     model = keras.models.load_model(str(pretrained_model_path))
     opt = keras.optimizers.Adam(lr=learning_rate)
     model.compile(loss='mean_squared_error', optimizer=opt)
-    model.summary()
+    # model.summary()
     return model
 
 
