@@ -4,7 +4,7 @@ All files in the repository are an implementation of the original manuscript and
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or a standard cooridnate system that can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
 There are 2 modes of operation:
-1. A GUI that allows manual annotation of the data / supervising the automatic method ("semi-supervised") - this is recommended for first time users.
+1. A GUI that allows manual annotation of the data / supervising the automatic method - this is recommended for first time users.
 2. A command-line interface which is a ready-to-use end-to-end script that performs calibration given a video file - use this when you are comfortable with the GUI and its results.
 
 The repository also contains a bundle of python scripts for finetunning (or training from scratch) the neural networks we provide - this is suggested for every new phsyical cap your lab uses. Description of how to do this is down below. Note this bundle also includes a synthetic data generator implemented in [Unity](https://unity.com/). These scripts will be incorporated into the GUI in the near future.
@@ -34,10 +34,10 @@ The coordinate system these values are supplied in are not improtant, as they ar
 
 The file [main.py](CapCalibrator/main.py) is the entry point of the application. Some common use cases are shown below:
 
-`python main.py --mode semi-auto`\
+`python main.py --mode gui`\
 `python main.py --mode auto --video path_to_video_file --template path_to_template_file`
 
-The mode "semi-auto" indicates to the application that the user wants to use the GUI and supervise the process of annotation and calibration and to correct it if needed. This is recommended when possible. Note the GUI contains other useful functions such as viewing a template model and finetunning the neural networks.
+The mode "gui" indicates to the application that the user wants to use the GUI and supervise the process of annotation and calibration and to correct it if needed. This is recommended when possible. Note the GUI contains other useful functions such as viewing a template model and finetunning the neural networks.
 
 The mode "auto" indicates to the application that the user wants it to automatically annotate the video without any supervision. This is recommended for live sessions and when the system was oberved to perform well with a certain template model. Note that using this mode the application requires two additional paramters which are the path to the raw video file and to a template model file.
 
@@ -51,14 +51,14 @@ For all command line options, see:
 After creating a template model for a new cap, we strongly recommend fine-tunning our supplied neural network for best results.
 To do this, follow the steps below:
 
-1. Create synthetic data using the [render script](DataSynth/render.py) (notice this script requires the template model file path and the renderer executable path as input). We recommend usings a minimum of 30000 iterations:\
+1. Create synthetic data using the GUI or the [render script](DataSynth/render.py) (notice this script requires the template model file path and the renderer executable path as input). We recommend usings a minimum of 30000 iterations:\
    `python render.py path_to_template_model_file path_to_output_folder --exe path_to_renderer_executable --log path_to_output_log --iterations 30000`
    
    For all command line options see:
    
    `python render.py --help`
    
-2. Train the network on the images using the [train script](CapCalibrator/train.py). We recommend using a gpu to speed up the training process:\
+2. Train the network on the images using the GUI or the [train script](CapCalibrator/train.py). We recommend using a gpu to speed up the training process:\
    `python train.py my_new_model_name path_to_synthetic_data_folder --gpu_id 2`
    
    For all command line options see:
