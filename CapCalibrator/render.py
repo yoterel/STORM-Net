@@ -2,11 +2,10 @@ import argparse
 from pathlib import Path
 import subprocess
 import sys
-sys.path.insert(0, '../CapCalibrator')
 from file_io import read_template_file
 from geometry import to_standard_coordinate_system
 from geometry import fix_yaw
-
+import logging
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Renders training images for fNIRS alighment')
@@ -36,30 +35,36 @@ def parse_arguments():
     return args
 
 
-def save_intermediate(names, data):
-    temp_folder_path = Path("temp")
-    temp_file_path = Path.joinpath(temp_folder_path, "template_transformed.txt")
-    temp_folder_path.mkdir(parents=True, exist_ok=True)
-    f = open(str(temp_file_path), "w+")
+def create_temporary_template(names, data, template_file):
+    template_file.parent.mkdir(parents=True, exist_ok=True)
+    f = open(str(template_file), "w+")
     for i, name in enumerate(names):
         line = "{} {:.3f} {:.3f} {:.3f}\n".format(name, data[i, 0], data[i, 1], data[i, 2])
         f.write(line)
     f.close()
 
 
-def launch_renderer(args):
-    cmd = str(args.exe) + \
-          " -logFile {}".format(str(args.log.resolve())) +\
-          " -iterations {}".format(args.iterations) +\
-          " -input_file {}".format(str(args.template.resolve())) +\
-          " -output_folder {}".format(str(args.output.resolve())) +\
+def launch_renderer(exe_path, log_path, iterations, template, output, images=None):
+    cmd = str(exe_path) + \
+          " -logFile {}".format(str(log_path.resolve())) +\
+          " -iterations {}".format(iterations) +\
+          " -input_file {}".format(str(template.resolve())) +\
+          " -output_folder {}".format(str(output.resolve())) +\
           " -batchmode"
-    if args.images:
+    if images:
         cmd += " -save_image True"
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    print("Renderer launched as daemon.")
+    logging.info("Renderer launched as daemon.")
 
 
+def render(template_names, template_data, output_folder, exe_path, log_path, iterations):
+    data = to_standard_coordinate_system(template_names, template_data)
+    data = fix_yaw(template_names, data)
+    template_file_path = Path("cache", "template_transformed.txt")
+    create_temporary_template(template_names, data, template_file_path)
+    launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder)
+    
+    
 if __name__ == "__main__":
     args = parse_arguments()
     names, data, file_format = read_template_file(args.template)
@@ -68,9 +73,7 @@ if __name__ == "__main__":
         data = data[:, 0, :]  # select first sensor
     names = names[0]  # select first (and only) session
     if not args.no_transform:
-        data = to_standard_coordinate_system(names, data)
-        data = fix_yaw(names, data)
-        save_intermediate(names, data)
-        args.template = Path("temp", "template_transformed.txt")
-    launch_renderer(args)
-    print("See", args.log.resolve(), "for detailed renderer log.")
+        render(names, data, args.output, args.exe, args.log, args.iterations)
+    else:
+        launch_renderer(args.exe, args.log, args.iterations, args.template, args.output, args.images)
+    logging.info("See", args.log.resolve(), "for detailed renderer log.")

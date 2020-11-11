@@ -1,5 +1,6 @@
 import numpy as np
 from utils import pairwise
+import subprocess
 import pickle
 import json
 import logging
@@ -83,6 +84,21 @@ def read_template_file(template_path):
             names[0][names.index(1):] = [x for x in range(end)]
         data = [np.array(data)]
     return names, data, file_format
+
+
+def delete_content_of_folder(folder_path):
+    for file in folder_path.glob("*"):
+        file.unlink()
+
+
+def is_process_active(process_name):
+    call = 'TASKLIST', '/FI', 'imagename eq %s' % process_name
+    # use buildin check_output right away
+    output = subprocess.check_output(call).decode()
+    # check in last line for process name
+    last_line = output.strip().split('\r\n')[-1]
+    # because Fail message could be translated
+    return last_line.lower().startswith(process_name.lower())
 
 
 def save_results(data, output_file):
