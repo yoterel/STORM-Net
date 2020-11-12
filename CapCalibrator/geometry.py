@@ -532,8 +532,11 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
         experiment_file_list.append(experiment_folder_path)
 
     for exp_file in experiment_file_list:
+        logging.info(exp_file.name)
         file_names, file_data, file_format = read_template_file(exp_file)
         for session in zip(file_names, file_data):
+            if not session[0]:
+                continue
             names = session[0]
             data = session[1][:, 0, :]# - session[1][:, 1, :]  # subtract second sensor
             data = to_standard_coordinate_system(names, data)

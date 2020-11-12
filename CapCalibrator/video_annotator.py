@@ -24,7 +24,7 @@ import train
 
 def annotate_videos(args):  # contains GUI mainloop
     if args.mode == "experimental":
-        special_db = Path.joinpath(Path("data"), "telaviv_db.pickle")
+        special_db = Path.joinpath(Path("cache"), "telaviv_db.pickle")
         new_db = file_io.load_full_db(special_db)
         paths = []
         if args.video:
@@ -39,7 +39,7 @@ def annotate_videos(args):  # contains GUI mainloop
     logging.info("Launching GUI...")
     app = GUI(new_db, paths, args)
     app.mainloop()
-    return app.get_db(), app.paths
+    return app.get_db()
 
 
 class GUI(tk.Tk):
@@ -87,7 +87,7 @@ class GUI(tk.Tk):
         self.wm_title("STORM - a fNIRS Calibration Tool")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
-        photo = ImageTk.PhotoImage(file="resource/icon.png")
+        photo = ImageTk.PhotoImage(master=self, file="resource/icon.png")
         self.iconphoto(False, photo)
         self.configure(background='white')
         self.container = tk.Frame(self)
@@ -100,6 +100,8 @@ class GUI(tk.Tk):
             self.panels[F] = panel
             panel.grid(row=0, column=0, sticky="nsew")
         self.show_panel(MainMenu)
+        if self.paths:
+            self.take_async_action(self.prep_vid_to_frames_packet())
 
     def process_periodic_queue(self):
         """
@@ -359,10 +361,11 @@ class GUI(tk.Tk):
                     return Path(file.name)
 
     ### CalibrationPage ###
-    def prep_vid_to_frames_packet(self):
+    def prep_vid_to_frames_packet(self, indices=None):
         path = self.paths[self.cur_video_index]
         return ["video_to_frames",
-                path]
+                path,
+                indices]
 
     def prep_annotate_frame_packet(self):
         path = self.paths[self.cur_video_index]
@@ -939,9 +942,9 @@ class ThreadedTask(threading.Thread):
         self.queue.put(["load_template_model", template_names[0], template_data[0], template_format, path])
 
     def handle_video_to_frames(self):
-        path = self.msg[1]
+        path, indices = self.msg[1:]
         my_hash = utils.md5_from_vid(path)
-        frames, indices = video.video_to_frames(path, vid_hash=my_hash, dump_frames=True)
+        frames, indices = video.video_to_frames(path, vid_hash=my_hash, dump_frames=True, frame_indices=indices)
         self.queue.put(["video_to_frames", frames, indices, my_hash])
 
     def handle_annotate_frames(self):
@@ -1003,10 +1006,10 @@ class CalibrationPage(tk.Frame):
         cur_video_hash = self.controller.get_cur_video_hash()
         template_name = self.controller.get_template_model_file_name()
         storm_net_name = self.controller.get_pretrained_stormnet_path()
+        db_to_show = np.zeros((7, 2))
         if db:
-            db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :], (7, 2))
-        else:
-            db_to_show = np.zeros((7, 2))
+            if cur_video_hash in db.keys():
+                db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :], (7, 2))
         sticker_names = ["Left Eye", "Nose Tip", "Right Eye", "CAP1", "CAP2", "CAP3", "CAP4"]
 
         my_string = "Template Model File: \n{}".format(template_name)

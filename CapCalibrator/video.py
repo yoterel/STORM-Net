@@ -122,25 +122,29 @@ def process_video(args):
         video_annotator.annotate_videos(args)
         return
     elif args.mode == "experimental":
-        new_db, vid_paths = video_annotator.annotate_videos(args)
+        new_db = video_annotator.annotate_videos(args)
     elif args.mode == "auto":
         new_db = auto_annotate_videos(args)
     if Path.is_dir(vid_paths):
         vid_names = []
+        vid_hashes = []
         for file in sorted(vid_paths.glob("**/*.MP4")):
             name = file.parent.name + "_" + file.name
             vid_names.append(name)
-            logging.info("Found following video files: " + str(vid_names))
+            vid_hashes.append(utils.md5_from_vid(file))
+        logging.info("Found following video files: " + str(vid_names))
         data = np.zeros((len(vid_names), 10, 14))
-        for i, vid in enumerate(vid_names):
+        for i, vid in enumerate(vid_hashes):
             try:
                 data[i] = new_db[vid][0]["data"]
             except KeyError:
-                logging.info("Error! did you forget to annotate {} ?".format(vid))
+                logging.info("Error! did you forget to annotate {} ?".format(vid_names[i]))
                 exit(1)
         return data, vid_names
     else:
-        return new_db[vid_paths.parent.name + "_" + vid_paths.name][0]["data"], [vid_paths]
+        name = vid_paths.parent.name + "_" + vid_paths.name
+        hash = utils.md5_from_vid(vid_paths)
+        return new_db[hash][0]["data"], [name]
 
 
 def auto_annotate_videos(args):

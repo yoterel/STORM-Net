@@ -34,10 +34,14 @@ def parse_arguments():
         args.template = None
         args.output_file = None
         args.session_file = None
+        args.ground_truth = None
     else:
-        args.video = Path(args.video)
-        args.template = Path(args.template)
-        args.session_file = Path(args.session_file)
+        if args.video:
+            args.video = Path(args.video)
+        if args.template:
+            args.template = Path(args.template)
+        if args.session_file:
+            args.session_file = Path(args.session_file)
         if Path.is_dir(args.template):
             args.template = args.template.glob("*.txt").__next__()
         if args.ground_truth:
