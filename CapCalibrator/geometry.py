@@ -343,7 +343,7 @@ def from_sim_to_standard_space(names, data):
 
 def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
     if args.mode == "experimental":
-        digi2digi_est = get_digi2digi_results(args.template, args.ground_truth)
+        digi2digi_est, digi2digi_rot = get_digi2digi_results(args.template, args.ground_truth)
         vid2vid_est = []
         names, data, format = read_template_file(args.template)
         names = names[0]
@@ -351,20 +351,38 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
         data = to_standard_coordinate_system(names, data)
         data_spiral = data[names.index(0):, :]  # select spiral
         # data_sim = from_standard_to_sim_space(names, data)
-        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
+
+        digi_intra_method_sessions1 = []
+        digi_intra_method_sessions2 = []
+        digi_rot_sessions1 = []
+        digi_rot_sessions2 = []
+        digi_rot_sessions3 = []
+
+        vid_rot_sessions1 = []
+        vid_rot_sessions2 = []
+        vid_rot_sessions3 = []
+
+        for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
+            subject_name, session_name = vid.split("_")
+            session_number = int(re.findall(r'\d+', session_name)[0]) - 1
+
             transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
             # transformed_data = from_sim_to_standard_space(names, transformed_data_sim.T)
             vid2vid_est.append(transformed_data_sim.T)
-        digi_intra_method_sessions1 = []
-        digi_intra_method_sessions2 = []
+            rot = R.from_matrix(rot_mat)
 
-        for video_name in video_names:
-            subject_name, session_name = video_name.split("_")
-            session_number = int(re.findall(r'\d+', session_name)[0]) - 1
             if session_number == 0:
                 digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
+                digi_rot_sessions1.append(digi2digi_rot[subject_name][session_number])
+                vid_rot_sessions1.append(rot.as_euler('xyz', degrees=True))
             if session_number == 1:
                 digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
+                digi_rot_sessions2.append(digi2digi_rot[subject_name][session_number])
+                vid_rot_sessions2.append(rot.as_euler('xyz', degrees=True))
+            if session_number == 2:
+                digi_rot_sessions3.append(digi2digi_rot[subject_name][session_number])
+                vid_rot_sessions3.append(rot.as_euler('xyz', degrees=True))
+
         digi_intra_method_rmse = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
         digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
         digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
@@ -384,7 +402,29 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
         inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
         inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
         logging.info("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
-        #todo: calculate shifts
+
+        # if we are missing a session, remove it from other experiments too
+        pop_indices = [i for i, x in enumerate(digi_rot_sessions3) if x is None]
+        for index in pop_indices:
+            digi_rot_sessions1.pop(index)
+            digi_rot_sessions2.pop(index)
+            digi_rot_sessions3.pop(index)
+            vid_rot_sessions1.pop(index)
+            vid_rot_sessions2.pop(index)
+            vid_rot_sessions3.pop(index)
+
+        #  calc shifts in every direction for each method
+        digi2digi_shift = np.array(
+            [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
+        vid2vid_shift = np.array(
+            [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
+
+        #  correlate the shifts
+        x_corr = np.corrcoef(digi2digi_shift[:, 0], vid2vid_shift[:, 0], rowvar=False)
+        y_corr = np.corrcoef(digi2digi_shift[:, 1], vid2vid_shift[:, 1], rowvar=False)
+        z_corr = np.corrcoef(digi2digi_shift[:, 2], vid2vid_shift[:, 2], rowvar=False)
+
+        logging.info("Shift correlation (x, y, z): {:.3f}, {:.3f}, {:.3f}".format(x_corr[0, 1], y_corr[0, 1], z_corr[0, 1]))
         return None
     else:
         vid_est = []
@@ -395,8 +435,12 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
             names = names[0]
             data = data[0]
         data = to_standard_coordinate_system(names, data)
-        data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-        data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
+        if 0 in names:
+            data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
+            data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
+        else:
+            data_origin = data
+            data_optodes = np.zeros(3)
         for rot_mat, scale_mat in zip(r_matrix, s_matrix):
             transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
             data_optodes = transformed_data_sim.T
@@ -524,9 +568,10 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
     template_spiral_data = template_data[template_names.index(0):, :]  # select spiral
 
     experiment_file_list = []
-    estimations = {}
+    optode_estimations = {}
+    rot_estimations = {}
     if experiment_folder_path.is_dir():
-        for exp_file in experiment_folder_path.glob("*.txt"):
+        for exp_file in sorted(experiment_folder_path.glob("*.txt")):
             experiment_file_list.append(exp_file)
     else:
         experiment_file_list.append(experiment_folder_path)
@@ -536,6 +581,8 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
         file_names, file_data, file_format = read_template_file(exp_file)
         for session in zip(file_names, file_data):
             if not session[0]:
+                optode_estimations.setdefault(exp_file.stem, []).append(None)
+                rot_estimations.setdefault(exp_file.stem, []).append(None)
                 continue
             names = session[0]
             data = session[1][:, 0, :]# - session[1][:, 1, :]  # subtract second sensor
@@ -571,7 +618,8 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
             # note: we apply only the mask transformation and report that to downstream.
             # facial alignment was an intermediate result
             estimation = (ret_R @ template_spiral_data.T).T
-            estimations.setdefault(exp_file.stem, []).append(estimation)
+            optode_estimations.setdefault(exp_file.stem, []).append(estimation)
+            rot_estimations.setdefault(exp_file.stem, []).append(gt_rot_e)
         # rmse = get_rmse(estimation, file_spiral_data)
         # print("template-digitizer error (transform using fiducials):", rmse)
         # vis_estimation = (ret_R @ template_face_data.T).T + ret_t
@@ -588,7 +636,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
         # print("digi2digi rmse between session 1 and session 3:", rmse)
         # rmse = get_rmse(estimations[1], estimations[2])
         # print("digi2digi rmse between session 2 and session 3:", rmse)
-    return estimations
+    return optode_estimations, rot_estimations
 
 
 # names, base_model_data, format = read_template_file(args.template)

@@ -938,7 +938,10 @@ class ThreadedTask(threading.Thread):
 
     def handle_load_template_model(self):
         path = self.msg[1]
-        template_names, template_data, template_format = geometry.read_template_file(path)
+        try:
+            template_names, template_data, template_format = geometry.read_template_file(path)
+        except (TypeError, IndexError) as e:
+            template_names, template_data, template_format, path = [None], [None], None, None
         self.queue.put(["load_template_model", template_names[0], template_data[0], template_format, path])
 
     def handle_video_to_frames(self):

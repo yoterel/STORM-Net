@@ -68,7 +68,7 @@ def read_template_file(template_path):
                 sensor2_data.append(np.array([x, y, z]))
             data.append(np.stack((sensor1_data, sensor2_data), axis=1))
     else:  # princeton
-        for line in contents_split:
+        for line in non_empty_lines:
             name, x, y, z = line.split()
             x = float(x)
             y = float(y)
@@ -79,7 +79,7 @@ def read_template_file(template_path):
             except ValueError as verr:
                 name = name.lower()
             names[0].append(name)
-        if 0 not in names[0]:
+        if 0 not in names[0] and 1 in names[0]:
             end = names[0][-1]
             names[0][names.index(1):] = [x for x in range(end)]
         data = [np.array(data)]
