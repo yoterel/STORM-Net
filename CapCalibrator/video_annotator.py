@@ -558,6 +558,12 @@ class GUI(tk.Tk):
                                             icon='warning')
             if result != 'yes':
                 return
+        result = messagebox.askyesno("Project to MNI?",
+                                     "Would you like the calibrated data to be projected to MNI coordinates?")
+        if result:
+            self.args.mni = True
+        else:
+            self.args.mni = False
         self.take_async_action(self.prep_calibrate_packet())
 
     def next_video(self):
@@ -933,7 +939,10 @@ class ThreadedTask(threading.Thread):
         template_names, template_data, data, model, graph, args = self.msg[1:]
         r, s = predict.predict_rigid_transform(data, model, graph, args)
         sensor_locations = geometry.apply_rigid_transform(r, s, template_names, template_data, None, args)
-        projected_data = geometry.project_sensors_to_MNI(sensor_locations)
+        if args.mni:
+            projected_data = geometry.project_sensors_to_MNI(sensor_locations)
+        else:
+            projected_data = sensor_locations
         self.queue.put(["calibrate", projected_data])
 
     def handle_load_template_model(self):

@@ -4,6 +4,7 @@ import math
 from file_io import read_template_file
 import re
 import logging
+import MNI
 
 
 def align_centroids(a, b):
@@ -448,17 +449,6 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
     return vid_est[0]
 
 
-def project_sensors_to_MNI(sensor_locations):
-    """
-    project new sensor locations to MNI
-    :param sensor_locations:
-    :param v:
-    :return:
-    """
-    logging.info("Projection to MNI is not implemented yet, results will be saved in original template file frame of reference.")
-    return sensor_locations
-
-
 def get_rmse(A, B):
     """
     gets rmse between 2 point clouds nx3
@@ -639,6 +629,38 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
     return optode_estimations, rot_estimations
 
 
+def project_sensors_to_MNI(sensor_locations):
+    """
+    project new sensor locations to MNI
+    :param sensor_locations: a list of names, data of all sensor locations
+    :return:
+    """
+    names = sensor_locations[0]
+    data = sensor_locations[1]
+    if 0 in names:
+        unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+        unsorted_origin_names = np.array(names[:names.index(0)])
+        others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
+    else:  # someone forgot to pass data for projection...
+        unsorted_origin_xyz = data
+        unsorted_origin_names = np.array(names)
+        others_xyz = np.zeros(3)
+
+    # these names are written in an order the algorithm expects (and MNI template data was written in)
+    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
+                                    "fp1", "fp2", "fz", "f3",
+                                    "f4", "f7", "f8", "cz",
+                                    "c3", "c4", "t3", "t4",
+                                    "pz", "p3", "p4", "t5",
+                                    "t6", "o1", "o2"])
+
+    # sort our anchors using the order above
+    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
+    origin_xyz = unsorted_origin_xyz[sorting_indices]
+    otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
+    #todo: report head points to caller? report standard deviation to caller ?
+    sensor_locations[1][names.index(0):, :] = otherC
+    return sensor_locations
 # names, base_model_data, format = read_template_file(args.template)
 #     face_data, face_indices = get_face_data(names, base_model_data)
 #     sticker_data = get_sticker_data(names, base_model_data)

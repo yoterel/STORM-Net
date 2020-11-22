@@ -15,6 +15,8 @@ def parse_arguments():
                         help="Controls operation mode of application")
     parser.add_argument("-vid", "--video", help="The path to the video file to calibrate sensors with. Required if mode is auto.")
     parser.add_argument("-t", "--template", help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
+    parser.add_argument("--mni", action="store_true",
+                        help="If specified, output will be projected to (adult) MNI coordinates")
     parser.add_argument("-stormnet", "--storm_net", default="models/telaviv_model_b16.h5", help="A path to a trained storm net keras model")
     parser.add_argument("-unet", "--u_net", default="models/unet_tel_aviv.h5",
                         help="A path to a trained segmentation network model")
@@ -83,5 +85,8 @@ if __name__ == "__main__":
         sticker_locations, video_names = video.process_video(args)
         r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
         sensor_locations = geometry.apply_rigid_transform(r_matrix, s_matrix, None, None, video_names, args)
-        projected_data = geometry.project_sensors_to_MNI(sensor_locations)
+        if args.mni:
+            projected_data = geometry.project_sensors_to_MNI(sensor_locations)
+        else:
+            projected_data = sensor_locations
         save_results(projected_data, args.output_file)
