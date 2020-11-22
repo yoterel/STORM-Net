@@ -1,19 +1,7 @@
 import unittest
 import numpy as np
-import cv2
 from scipy.spatial.transform import Rotation as R
 import geometry
-
-def last_rt(P, Q):
-    affine_matrix = cv2.estimateAffine3D(P, Q, confidence=0.99)
-    SR = affine_matrix[1][:, :-1]
-    T = affine_matrix[1][:, -1]
-    s = np.linalg.norm(SR, axis=1)
-    S = np.identity(3) * s
-    S_divide = np.copy(S)
-    S_divide[S_divide == 0] = 1
-    R = SR / S_divide
-    return T, S, R, SR
 
 
 class MyTestCase(unittest.TestCase):
