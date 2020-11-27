@@ -7,6 +7,7 @@ from geometry import to_standard_coordinate_system
 from geometry import fix_yaw
 import logging
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Renders training images for fNIRS alighment')
     parser.add_argument("template", help="Path to raw template file. For exact format see documentation.")
@@ -15,11 +16,10 @@ def parse_arguments():
     parser.add_argument("--exe", default="renderer.exe", help="The path to the renderer executable.")
     parser.add_argument("--log", default="log.txt", help="The path to the output log file from renderer.")
     parser.add_argument("--no_transform", default=False, action='store_true', help="If specified, the data from the input template model will *NOT* be transformed to standard coordinate system before rendering. This is not recommended.")
-    parser.add_argument("--images", "--save_images", default=False, action='store_true', help="Renderer will output images (in addition to formatted data)")
+    parser.add_argument("--save_images", default=False, action='store_true', help="Renderer will output images (in addition to formatted data)")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    # cmd_line = './../example_models/example_model.txt ./output --exe ./windows_build/DataSynth.exe --log ./windows_build/log.txt --iterations 30000'.split()
     args = parser.parse_args()
     args.exe = Path(args.exe)
     args.log = Path(args.log)
@@ -44,7 +44,7 @@ def create_temporary_template(names, data, template_file):
     f.close()
 
 
-def launch_renderer(exe_path, log_path, iterations, template, output, images=None):
+def launch_renderer(exe_path, log_path, iterations, template, output, images):
     cmd = str(exe_path) + \
           " -logFile {}".format(str(log_path.resolve())) +\
           " -iterations {}".format(iterations) +\
@@ -57,12 +57,12 @@ def launch_renderer(exe_path, log_path, iterations, template, output, images=Non
     logging.info("Renderer launched as daemon.")
 
 
-def render(template_names, template_data, output_folder, exe_path, log_path, iterations):
+def render(template_names, template_data, output_folder, exe_path, log_path, iterations, images):
     data = to_standard_coordinate_system(template_names, template_data)
     data = fix_yaw(template_names, data)
     template_file_path = Path("cache", "template_transformed.txt")
     create_temporary_template(template_names, data, template_file_path)
-    launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder)
+    launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder, images)
     
     
 if __name__ == "__main__":
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         data = data[:, 0, :]  # select first sensor
     names = names[0]  # select first (and only) session
     if not args.no_transform:
-        render(names, data, args.output, args.exe, args.log, args.iterations)
+        render(names, data, args.output, args.exe, args.log, args.iterations, args.save_images)
     else:
         launch_renderer(args.exe, args.log, args.iterations, args.template, args.output, args.images)
     logging.info("See", args.log.resolve(), "for detailed renderer log.")

@@ -40,7 +40,7 @@ def to_standard_coordinate_system(names, data):
     left_eye_index = names.index('lefteye')
     right_eye_index = names.index('righteye')
     cz_index = names.index('cz')
-    fpz_index = names.index('fpz')
+    fpz_index = names.index('fpz')  # todo: figure out better way to know z axis. this requires user to measure fpz...
     fp1_index = names.index('fp1')
     fp2_index = names.index('fp2')
     # swap x axis with the best candidate
