@@ -786,7 +786,8 @@ class GUI(tk.Tk):
                       self.synth_output_dir,
                       self.renderer_executable,
                       self.renderer_log_file,
-                      iterations)
+                      iterations,
+                      False)
         if self.panels[self.cur_active_panel].render_monitor_progress.get():
             self.take_async_action(["render_start", self.renderer_log_file.absolute()], periodic=True)
 

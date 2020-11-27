@@ -261,7 +261,7 @@ public class ImageSynthesis : MonoBehaviour {
     void saveJson(string filename, Camera cam, bool[] valid_stickers, int width, int height)
     {
         Vector3[] stickers_locs = new Vector3[7];
-        string[] names = new string[] { "AL", "NZ", "AR", "FP1", "FPZ", "FP2", "CZ"};
+        string[] names = new string[] { "lefteye", "nosetip", "righteye", "left_triangle", "middle_triangle", "right_triangle", "top" };
         for (int i = 0; i < 7; i++)
         {
             Vector3 sticker_3dloc = GameObject.Find(names[i]).transform.position;

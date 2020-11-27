@@ -87,32 +87,6 @@ def get_euler_angles(gt_data, model_data):
     return gt_rot_e
 
 
-def rigid_transform_svd(P, Q):
-    assert P.shape == Q.shape
-    n, dim = P.shape
-
-    centeredP = P - P.mean(axis=0)
-    centeredQ = Q - Q.mean(axis=0)
-
-    C = np.dot(np.transpose(centeredP), centeredQ) / n
-
-    V, S, W = np.linalg.svd(C)
-    d = (np.linalg.det(V) * np.linalg.det(W)) < 0.0
-
-    if d:
-        S[-1] = -S[-1]
-        V[:, -1] = -V[:, -1]
-
-    R = np.dot(V, W)
-
-    varP = np.var(P, axis=0).sum()
-    c = 1 / varP * np.sum(S)  # scale factor
-
-    t = Q.mean(axis=0) - P.mean(axis=0).dot(c * R)
-
-    return c, R, t
-
-
 def rigid_transform_3d_nparray(A, B):
     """
     finds best rigid transformation between pc a and pc b (in terms of rmse)
@@ -228,225 +202,138 @@ def fix_yaw(names, data):
     return new_data.T
 
 
-def get_sim_data(model_data):##ed=0, n_len=0, n_dep=0, new=False):
+def from_standard_to_sim_space(names, data):
     """
-    :param ed: distance between eyes in cm
-    :param n_len: nose tip distance from its origin
-    :param n_dep: nose tip depth compared to eyes
-    :return: base-line simulation data with x axis flipped
-    """
-    # my_sim_data = np.array([[ed / 2, 6, 0],  # AL
-    #                         [0, 7.21 + n_dep, n_len],  # NZ
-    #                         [-ed / 2, 6, 0],  # AR
-    #                         [3, 8, 3.13],  # FP1
-    #                         [0, 8, 5],  # FPZ
-    #                         [-3, 8, 3.13],  # FP2
-    #                         [0, 0, 10]  # CZ
-    #                         ])
-    tx = (model_data[0, 0] + model_data[2, 0]) / 2
-    ty = model_data[6, 1]
-    tz = (model_data[0, 2] + model_data[2, 2]) / 2
-    sim_data = model_data - np.array([tx, ty, tz])
-    sim_data[:, 0] *= -1
-    return sim_data
-
-    # my_new_sim_data = np.array([[2.44, 5.69, 0],
-    #                             [0.13, 7.34, -1.21],
-    #                             [-2.2, 6.12, 0.02],
-    #                             [3.5, 9.75, 4.66],
-    #                             [0.36, 9.33, 6.68],
-    #                             [-3.77, 9.74, 4.87],
-    #                             [-0.53, 0, 10.98]])
-    # my_new_sim_data[3:] += [-0.16, -2.11, 0]  # lazy to subtract mask position
-    # my_sim_data = my_new_sim_data
-    # my_sim_data[:, 0] *= -1  # flip x axis, simulator uses right hand rule
-    # return my_sim_data
-
-
-def find_best_params(data):
-    """
-    estimates rotation & translation, and rmse error of estimation between data and simulation data
-    :param data: locations of face & cap stickers nx3
+    transforms data to simulation space (inverts x axis)
+    :param names:
+    :param data:
     :return:
     """
-    tx = (data[0, 0] + data[2, 0]) / 2
-    ty = data[6, 1]
-    tz = (data[0, 2] + data[2, 2]) / 2
-    return np.array([tx, ty, tz])
-
-
-    # short_sim_data = get_sim_data(data)
-    # data_t = np.mat(np.transpose(data[3:]))
-    # sim_data_t = np.mat(np.transpose(short_sim_data[3:]))
-    # r, t = rigid_transform_3d(data_t, sim_data_t)
-    # recovered_sim_data_t = (r * data_t) + np.tile(t, (1, len(short_sim_data[3:])))
-    # short_rmse = calc_rmse_error(recovered_sim_data_t, sim_data_t)
-    # return r, t, short_rmse
-    # min_rmse = np.inf
-    # best_R = np.zeros((3, 3))
-    # best_T = np.zeros((1, 3))
-    # eye_distances = np.linspace(3.8, 5.4, num=10)
-    # nose_lengths = np.linspace(-1.74, -2.24, num=10)
-    # nose_depths = np.linspace(-0.5, 0.5, num=10)
-    # for ed in eye_distances:
-    #     for nl in nose_lengths:
-    #         for nd in nose_depths:
-    #             sim_data = get_sim_data(ed, nl, nd)
-    #             data_t = np.mat(np.transpose(data))
-    #             sim_data_t = np.mat(np.transpose(sim_data))
-    #             r, t = rigid_transform_3d(data_t, sim_data_t)
-    #             recovered_sim_data_t = (r * data_t) + np.tile(t, (1, len(sim_data)))
-    #             rmse = calc_rmse_error(recovered_sim_data_t, sim_data_t)
-    #             if rmse < min_rmse:
-    #                 min_rmse, best_R, best_T, best_ed, best_nl, best_nd = rmse, r, t, ed, nl, nd
-    # return best_R, best_T, best_ed, best_nl, best_nd, min_rmse
-
-
-def get_sticker_data(names, data):
-    if "fp1" in names:  #newest format
-        indices = [names.index("fp1"),
-                   names.index("fpz"),
-                   names.index("fp2"),
-                   names.index("cz")
-                   ]
-        return data[indices, :]
-    if "AL" in names:  # some old format
-        indices = np.array([4, 5, 6, 1])
-        return data[indices, :]
-    else:  # stickers are not directly measured
-        cz = (data[names.index("32"), :] + data[names.index("43"), :]) / 2
-        fp1 = (data[names.index("1"), :] + data[names.index("2"), :]) / 2
-        fpz = (data[names.index("3"), :] + data[names.index("7"), :]) / 2
-        fp2 = (data[names.index("4"), :] + data[names.index("5"), :]) / 2
-        return np.vstack((fp1, fpz, fp2, cz))
-
-
-def get_face_data(names, data):
-    if "nose" in names:
-        face_synonyms = ["lefteye", "nose", "righteye"]
-    else:
-        if "nosetip" in names:
-            face_synonyms = ["lefteye", "nosetip", "righteye"]
-        else:
-            face_synonyms = ["AL", "Nz", "AR"]
-    face_indices = [names.index(face_synonyms[0]), names.index(face_synonyms[1]), names.index(face_synonyms[2])]
-    face_data = data[face_indices, :]
-    return face_data, face_indices
-
-
-def from_standard_to_sim_space(names, data):
     data[:, 0] *= -1
     return data
 
 
 def from_sim_to_standard_space(names, data):
+    """
+    transforms data to standard space (inverts x axis)
+    :param names:
+    :param data:
+    :return:
+    """
     return from_standard_to_sim_space(names, data)
+
+
+def reproduce_experiments(r_matrix, s_matrix, video_names, args):
+    """
+    reproduces original experiments reported in paper, results are printed to log
+    :param r_matrix: see caller
+    :param s_matrix: see caller
+    :param video_names: see caller
+    :param args: see caller
+    :return: -
+    """
+    digi2digi_est, digi2digi_rot = get_digi2digi_results(args.template, args.ground_truth)
+    vid2vid_est = []
+    names, data, format = read_template_file(args.template)
+    names = names[0]
+    data = data[0]
+    data = to_standard_coordinate_system(names, data)
+    data_spiral = data[names.index(0):, :]  # select spiral
+    # data_sim = from_standard_to_sim_space(names, data)
+
+    digi_intra_method_sessions1 = []
+    digi_intra_method_sessions2 = []
+    digi_rot_sessions1 = []
+    digi_rot_sessions2 = []
+    digi_rot_sessions3 = []
+
+    vid_rot_sessions1 = []
+    vid_rot_sessions2 = []
+    vid_rot_sessions3 = []
+
+    for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
+        subject_name, session_name = vid.split("_")
+        session_number = int(re.findall(r'\d+', session_name)[0]) - 1
+
+        transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
+        # transformed_data = from_sim_to_standard_space(names, transformed_data_sim.T)
+        vid2vid_est.append(transformed_data_sim.T)
+        rot = R.from_matrix(rot_mat)
+
+        if session_number == 0:
+            digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
+            digi_rot_sessions1.append(digi2digi_rot[subject_name][session_number])
+            vid_rot_sessions1.append(rot.as_euler('xyz', degrees=True))
+        if session_number == 1:
+            digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
+            digi_rot_sessions2.append(digi2digi_rot[subject_name][session_number])
+            vid_rot_sessions2.append(rot.as_euler('xyz', degrees=True))
+        if session_number == 2:
+            digi_rot_sessions3.append(digi2digi_rot[subject_name][session_number])
+            vid_rot_sessions3.append(rot.as_euler('xyz', degrees=True))
+
+    digi_intra_method_rmse = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
+    digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
+    digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
+    logging.info(
+        "digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
+
+    vid_intra_method_sessions1 = vid2vid_est[::3]
+    vid_intra_method_sessions2 = vid2vid_est[1::3]
+    vid_intra_method_rmse = [get_rmse(x, y) for x, y in zip(vid_intra_method_sessions1, vid_intra_method_sessions2)]
+    vid_intra_method_rmse_avg = np.mean(vid_intra_method_rmse)
+    vid_intra_method_rmse_std = np.std(vid_intra_method_rmse)
+    logging.info("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
+
+    inter_method_rmse1 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions1)]
+    inter_method_rmse2 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions2)]
+    inter_method_rmse3 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions1)]
+    inter_method_rmse4 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions2)]
+    inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+    inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+    logging.info("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
+
+    # if we are missing a session, remove it from other experiments too
+    pop_indices = [i for i, x in enumerate(digi_rot_sessions3) if x is None]
+    for index in pop_indices:
+        digi_rot_sessions1.pop(index)
+        digi_rot_sessions2.pop(index)
+        digi_rot_sessions3.pop(index)
+        vid_rot_sessions1.pop(index)
+        vid_rot_sessions2.pop(index)
+        vid_rot_sessions3.pop(index)
+
+    # calc t-test statistics
+    a_vid = np.array(vid_intra_method_rmse)
+    a_dig = np.array(digi_intra_method_rmse)
+    a_intra = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
+                      axis=0)
+    t1, p1 = ttest_rel(a_vid, a_dig)
+    logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
+    t2, p2 = ttest_rel(a_dig, a_intra)
+    logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
+
+    #  calc shifts in every direction for each method
+    digi2digi_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
+    vid2vid_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
+
+    #  correlate the shifts
+    x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
+    y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
+    z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
+
+    logging.info(
+        "Shift correlation (x, px, y, py, z, pz):"
+        "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
 
 
 def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
     if args.mode == "experimental":
-        digi2digi_est, digi2digi_rot = get_digi2digi_results(args.template, args.ground_truth)
-        vid2vid_est = []
-        names, data, format = read_template_file(args.template)
-        names = names[0]
-        data = data[0]
-        data = to_standard_coordinate_system(names, data)
-        data_spiral = data[names.index(0):, :]  # select spiral
-        # data_sim = from_standard_to_sim_space(names, data)
-
-        digi_intra_method_sessions1 = []
-        digi_intra_method_sessions2 = []
-        digi_rot_sessions1 = []
-        digi_rot_sessions2 = []
-        digi_rot_sessions3 = []
-
-        vid_rot_sessions1 = []
-        vid_rot_sessions2 = []
-        vid_rot_sessions3 = []
-
-        for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
-            subject_name, session_name = vid.split("_")
-            session_number = int(re.findall(r'\d+', session_name)[0]) - 1
-
-            transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
-            # transformed_data = from_sim_to_standard_space(names, transformed_data_sim.T)
-            vid2vid_est.append(transformed_data_sim.T)
-            rot = R.from_matrix(rot_mat)
-
-            if session_number == 0:
-                digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
-                digi_rot_sessions1.append(digi2digi_rot[subject_name][session_number])
-                vid_rot_sessions1.append(rot.as_euler('xyz', degrees=True))
-            if session_number == 1:
-                digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
-                digi_rot_sessions2.append(digi2digi_rot[subject_name][session_number])
-                vid_rot_sessions2.append(rot.as_euler('xyz', degrees=True))
-            if session_number == 2:
-                digi_rot_sessions3.append(digi2digi_rot[subject_name][session_number])
-                vid_rot_sessions3.append(rot.as_euler('xyz', degrees=True))
-
-        digi_intra_method_rmse = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
-        digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
-        digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
-        logging.info("digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
-
-        vid_intra_method_sessions1 = vid2vid_est[::3]
-        vid_intra_method_sessions2 = vid2vid_est[1::3]
-        vid_intra_method_rmse = [get_rmse(x, y) for x, y in zip(vid_intra_method_sessions1, vid_intra_method_sessions2)]
-        vid_intra_method_rmse_avg = np.mean(vid_intra_method_rmse)
-        vid_intra_method_rmse_std = np.std(vid_intra_method_rmse)
-        logging.info("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
-
-        inter_method_rmse1 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions1)]
-        inter_method_rmse2 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions2)]
-        inter_method_rmse3 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions1)]
-        inter_method_rmse4 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions2)]
-        inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
-        inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
-        logging.info("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
-
-        # if we are missing a session, remove it from other experiments too
-        pop_indices = [i for i, x in enumerate(digi_rot_sessions3) if x is None]
-        for index in pop_indices:
-            digi_rot_sessions1.pop(index)
-            digi_rot_sessions2.pop(index)
-            digi_rot_sessions3.pop(index)
-            vid_rot_sessions1.pop(index)
-            vid_rot_sessions2.pop(index)
-            vid_rot_sessions3.pop(index)
-
-        # calc t-test statistics
-        a_vid = np.array(vid_intra_method_rmse)
-        a_dig = np.array(digi_intra_method_rmse)
-        a_intra = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]), axis=0)
-        t1, p1 = ttest_rel(a_vid, a_dig)
-        logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
-        t2, p2 = ttest_rel(a_dig, a_intra)
-        logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
-
-        #  calc shifts in every direction for each method
-        digi2digi_shift = np.array(
-            [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
-        vid2vid_shift = np.array(
-            [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
-
-        #  correlate the shifts
-        x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
-        y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
-        z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
-
-        logging.info(
-            "Shift correlation (x, px, y, py, z, pz):"
-            "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
-
-        #  correlate the shifts
-        # x_corr = np.corrcoef(digi2digi_shift[:, 0], vid2vid_shift[:, 0], rowvar=False)
-        # y_corr = np.corrcoef(digi2digi_shift[:, 1], vid2vid_shift[:, 1], rowvar=False)
-        # z_corr = np.corrcoef(digi2digi_shift[:, 2], vid2vid_shift[:, 2], rowvar=False)
-        # logging.info("Shift correlation (x, y, z): {:.3f}, {:.3f}, {:.3f}".format(x_corr[0, 1], y_corr[0, 1], z_corr[0, 1]))
-
+        reproduce_experiments(r_matrix, s_matrix, video_names, args)
         return None
-    else:
+    else:  # mode = gui / cli
         vid_est = []
         if template_names:
             names, data = template_names, template_data
@@ -680,90 +567,4 @@ def project_sensors_to_MNI(sensor_locations):
     #todo: report head points to caller? report standard deviation to caller ?
     sensor_locations[1][names.index(0):, :] = otherC
     return sensor_locations
-# names, base_model_data, format = read_template_file(args.template)
-#     face_data, face_indices = get_face_data(names, base_model_data)
-#     sticker_data = get_sticker_data(names, base_model_data)
-#     # sensor_indices = [i for i in range(len(base_model_data)) if i not in face_indices]
-#     # sensor_data = base_model_data[sensor_indices, :]
-#     fiducials_data = np.vstack((face_data, sticker_data))
-#     t_fit = find_best_params(fiducials_data)
-#     s_fit = np.array([-1, 1, 1])
-#     base_model_data_in_sim_space = (base_model_data - t_fit) * s_fit
-#     # rot_m = R.from_matrix(r_fit)
-#     # rot_e = rot_m.as_euler('xyz', degrees=True)
-#
-#     #  get base model data to simulation space
-#     # base_model_data_in_sim_space = (r_fit * base_model_data.T) + np.tile(t_fit, (1, len(base_model_data)))
-#     temp_sticker_data = get_sticker_data(names, base_model_data_in_sim_space)
-#     if plot:
-#         sim_data = get_sim_data(fiducials_data)
-#         # visualize.visualize_pc(np.vstack((base_model_data_in_sim_space[face_indices, :], temp_sticker_data)),
-#         #                        ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "CZ"],
-#         #                        sim_data,
-#         #                        ["Left_Eye", "Nose", "Right_Eye", "FP1", "FPZ", "FP2", "Cz"],
-#         #                        title="Base model data vs simulation baseline data in sim-space")
-#
-#     #  apply network transformation
-#     transformed_base_model_data = r_matrix @ (s_matrix @ base_model_data_in_sim_space.T)
-#     # visualize_pc(transformed_base_model_data.T[mask_indices, :],
-#     #              ["Cz", "FP1", "FPZ", "FP2"],
-#     #              sim_data[mask_indices, :],
-#     #              ["Cz", "FP1", "FPZ", "FP2"],
-#     #              title="Prediction(base model) & simulation data in sim-space")
-#
-#     # get back to real space (inverse of sim transformation)
-#     transformed_base_model_data_in_real_space = (transformed_base_model_data.T * s_fit) + t_fit
-#     if args.ground_truth:
-#         gt_names, gt_data = read_template_file(args.ground_truth)
-#         gt_sticker_data = get_sticker_data(gt_names, gt_data)
-#         transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
-#         # correct for translation (useful for viz & RMSE)
-#         transformed_sticker_data = align_centroids(transformed_sticker_data, gt_sticker_data)
-#         # if plot:
-#             # visualize.visualize_pc(points_blue=transformed_sticker_data,
-#             #              names_blue=["FP1", "FPZ", "FP2", "Cz"],
-#             #              points_red=gt_sticker_data,
-#             #              names_red=["FP1", "FPZ", "FP2", "Cz"],
-#             #              title="Prediction(base model) & gt in real-space - translation corrected")
-#         rmse_1 = calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T)
-#         base_data = np.mat(np.transpose(sticker_data))
-#         gt_data = np.mat(np.transpose(gt_sticker_data))
-#         ret_R, ret_t = rigid_transform_3d(base_data, gt_data)
-#         if args.verbosity > 1:
-#             print("Stickers RMSE error (prediction, gt):", rmse_1)
-#             print("Here is the translation between GT and base model:", ret_t)
-#         recovered_gt = (ret_R * base_data) + np.tile(ret_t, (1, len(base_data.T)))
-#         rmse_2 = calc_rmse_error(recovered_gt, gt_data)
-#         gt_rot_m = R.from_matrix(ret_R)
-#         gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
-#         pred_rot_m = R.from_matrix(r_matrix)
-#         pred_rot_e = pred_rot_m.as_euler('xyz', degrees=True)
-#         if args.verbosity:
-#             print("Euler Angles RMSE (Horns, Network):", mean_squared_error(gt_rot_e, pred_rot_e, squared=False))
-#         if args.verbosity > 1:
-#             print("Horns Euler angels:", gt_rot_e)
-#             print("Network Euler angels:", pred_rot_e)
-#             print("RMSE error (horn's(baseline), gt):", rmse_2)
-        # if plot:
-            # visualize.visualize_pc(recovered_gt.T,
-            #              ["FP1", "FPZ", "FP2", "Cz"],
-            #              gt_data.T,
-            #              ["FP1", "FPZ", "FP2", "Cz"],
-            #              title="Horn's(baseline) & Ground Truth data in real-space")
-        # test_rotation = [10, 8.3, 3]
-        # # test_scale = np.identity(3)
-        # rot = R.from_euler('xyz', test_rotation, degrees=True)
-        # rot_m = rot.as_matrix()
-        # transformed_base_model_data = rot_m * base_model_data_in_sim_space
-        # transformed_base_model_data_in_real_space = r_fit.T * (
-        #             transformed_base_model_data - np.tile(t_fit, (1, len(base_model_data))))
-        # transformed_sticker_data = get_sticker_data(names, transformed_base_model_data_in_real_space.T)
-        # # # correct for translation (useful for viz)
-        # transformed_sticker_data = align_centroids(from_data=transformed_sticker_data, to_data=gt_sticker_data)
-        # if plot:
-        #     visualize.visualize_pc(points_blue=transformed_sticker_data,
-        #                  names_blue=["FP1", "FPZ", "FP2", "Cz"],
-        #                  points_red=gt_sticker_data,
-        #                  names_red=["FP1", "FPZ", "FP2", "Cz"],
-        #                  title="test")
-        # print("test_rmse:", calc_rmse_error(transformed_sticker_data.T, gt_sticker_data.T))
+

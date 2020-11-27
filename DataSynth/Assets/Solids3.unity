@@ -1853,7 +1853,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 5
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 132.498, y: -30, z: 0}
 --- !u!1 &510209580
 GameObject:
@@ -1890,7 +1890,7 @@ Transform:
   - {fileID: 935834531}
   - {fileID: 601138337}
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &573758879
 GameObject:
@@ -2899,7 +2899,7 @@ RectTransform:
   m_Children:
   - {fileID: 573758880}
   m_Father: {fileID: 0}
-  m_RootOrder: 4
+  m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
@@ -3449,7 +3449,7 @@ GameObject:
   - component: {fileID: 1016441553}
   - component: {fileID: 1016441552}
   m_Layer: 13
-  m_Name: FP2
+  m_Name: right_triangle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3780,7 +3780,7 @@ Transform:
   - {fileID: 673338854}
   - {fileID: 338028004}
   m_Father: {fileID: 0}
-  m_RootOrder: 3
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!43 &1105559866
 Mesh:
@@ -4360,7 +4360,7 @@ GameObject:
   - component: {fileID: 1251055767}
   - component: {fileID: 1251055766}
   m_Layer: 14
-  m_Name: CZ
+  m_Name: top
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4891,7 +4891,7 @@ GameObject:
   - component: {fileID: 1420967169}
   - component: {fileID: 1420967168}
   m_Layer: 9
-  m_Name: NZ
+  m_Name: nosetip
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5790,7 +5790,7 @@ GameObject:
   - component: {fileID: 1679170817}
   - component: {fileID: 1679170816}
   m_Layer: 8
-  m_Name: AL
+  m_Name: lefteye
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6406,7 +6406,7 @@ GameObject:
   - component: {fileID: 1738678125}
   - component: {fileID: 1738678124}
   m_Layer: 11
-  m_Name: FP1
+  m_Name: left_triangle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6491,7 +6491,7 @@ GameObject:
   - component: {fileID: 1772565082}
   - component: {fileID: 1772565081}
   m_Layer: 10
-  m_Name: AR
+  m_Name: righteye
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6576,7 +6576,7 @@ GameObject:
   - component: {fileID: 1911889268}
   - component: {fileID: 1911889267}
   m_Layer: 12
-  m_Name: FPZ
+  m_Name: middle_triangle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

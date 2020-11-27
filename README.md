@@ -52,7 +52,7 @@ After creating a template model for a new cap, we strongly recommend fine-tunnin
 To do this, follow the steps below:
 
 1. Create synthetic data using the GUI or the [render script](DataSynth/render.py) (notice this script requires the template model file path and the renderer executable path as input). We recommend usings a minimum of 30000 iterations:\
-   `python render.py path_to_template_model_file path_to_output_folder --exe path_to_renderer_executable --log path_to_output_log --iterations 30000`
+   `python render.py path_to_template_model_file path_to_output_folder --exe path_to_renderer_executable --log path_to_output_log --iterations 100000`
    
    For all command line options see:
    
@@ -66,20 +66,54 @@ To do this, follow the steps below:
    `python train.py --help`
    
    When training is done, a model file will be availble in the [models](CapCalibrator/models) directory.
+   
+   Note: we strongly suggest to train until validation loss reaches atleast 0.1 - do not stop before this.
 3. Use this model in the arguments supplied to the GUI / automatic calibration tools.
 
 ## List of mandatory optodes in template file
 
 The following optodes must exist in the template model file (and their locations should corropond with real 10-20 locations as much as possible):
-- "cz" : used to find standard coordinate and by renderer.
-- "righteye" : used to find standard coordinate and by renderer.
-- "lefteye" : used to find standard coordinate and by renderer.
-- "nosetip" : used by renderer.
-- "fp1" : used to find standard coordinate and by renderer.
-- "fpz" : used to find standard coordinate and by renderer. **NOTE**: we actually used a location 1 cm above fpz in our experiments (can be seen marked by a green sticker in the example video) - This was shown to yield better results (but it is not mandatory).
-- "fp2" : used to find standard coordinate and by renderer.
+- "left_triangle" : the left most sticker location, use fp1 if possible. Used by the renderer.
+- "middle_triangle" : the middle sticker location, use fpz location + 1cm upwards if possible. Used by the renderer.
+- "right_triangle" : the right most sticker location, use fp2 if possible. Used by the renderer.
+- "top" : the sticker on the top of the head, use cz if possible.
+- "cz" : used to find standard coordinate system, and projecting to MNI after calibration is done (if user rquires).
+- "righteye" : used to find standard coordinate system and by renderer.
+- "lefteye" : used to find standard coordinate system and by renderer.
+- "nosetip" : used to find standard coordinate system and by renderer.
+- "fp1" : used to find standard coordinate system.
+- "fpz" : used to find standard coordinate system.
+- "fp2" : used to find standard coordinate system.
+
+**Four** of the following optodes must exist in the template model file if MNI projection is required (either if using our implementation of the projection, **or not**):
+- "cz"
+- "nosebridge"
+- "inion"
+- "rightear"
+- "leftear"
+- "fp1"
+- "fp2"
+- "fpz"
+- "f7"
+- "f8"
+- "f3"
+- "f4"
+- "c3"
+- "c4"
+- "t3"
+- "t4"
+- "pz"
+- "p3"
+- "p4"
+- "t5"
+- "t6"
+- "o1"
+- "o2"
 
 Use these names (exactly, without double quoutes) as the first field for them to be parsed correctly.
+The stickers can be placed anywhere **on the cap** as long as the three frontal ones are not colinear, but we recommend using fp1, fpz + 1cm, fp2, cz as their location.
+"fpz + 1cm": we actually used a location 1 cm above fpz in our experiments (can be seen marked by a green sticker in the example video) - eliminating the risk of coliniearity (but it is not mandatory).
+
 
 ## The standard coordiante system
 

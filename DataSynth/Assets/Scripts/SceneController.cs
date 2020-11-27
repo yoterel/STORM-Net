@@ -43,7 +43,7 @@ public class SceneController : MonoBehaviour
 
     void Awake()
     {
-        stickerNames = new string[] { "AL", "NZ", "AR", "FP1", "FPZ", "FP2", "CZ" };
+        stickerNames = new string[] { "lefteye", "nosetip", "righteye", "left_triangle", "middle_triangle", "right_triangle", "top" };
         Dictionary<string, Vector3> stickerDictionary = new Dictionary<string, Vector3>();
         foreach (string sticker in stickerNames)
         {
@@ -156,7 +156,7 @@ public class SceneController : MonoBehaviour
         }
         else
         {
-            string[] alias = { "lefteye", "nosetip", "righteye", "fp1", "fpz", "fp2", "cz" };
+            string[] alias = { "lefteye", "nosetip", "righteye", "left_triangle", "middle_triangle", "right_triangle", "top" };
             string fileData = System.IO.File.ReadAllText(inputFile);
             string[] lines = fileData.Split("\n"[0]);
             for (int i = 0; i < lines.Length; i++)
@@ -209,22 +209,22 @@ public class SceneController : MonoBehaviour
         }
         if (positions[3].x < positions[5].x)
         {
-            System.Console.WriteLine("Sanity check failed. fp1 sticker x smaller than fp2 sticker.");
+            System.Console.WriteLine("Sanity check failed. Left-Triangle sticker x smaller than Right-Triangle sticker.");
             return false;
         }
         if (positions[6].y != 0f)
         {
-            System.Console.WriteLine("Sanity check failed. CZ is not centered in y axis.");
+            System.Console.WriteLine("Sanity check failed. Top sticker is not centered in y axis.");
             return false;
         }
         if (positions[1].y < positions[0].y || positions[1].y < positions[2].y)
         {
-            System.Console.WriteLine("Sanity check failed. Nose sticker is inside of skull.");
+            System.Console.WriteLine("Sanity check failed. Middle-Triangle sticker is inside of skull.");
             return false;
         }
         if (positions[6].z < positions[4].z)
         {
-            System.Console.WriteLine("Sanity check failed. CZ is not the highest sticker in z direction.");
+            System.Console.WriteLine("Sanity check failed. Top sticker is not the highest sticker in z direction.");
             return false;
         }
         return true;
@@ -285,31 +285,31 @@ public class SceneController : MonoBehaviour
             sticker.transform.position = initial_sticker_positions[i];
         }
         //set eye distance randomly but keep them in same plane as user data
-        GameObject AR = GameObject.Find("AR");
-        GameObject AL = GameObject.Find("AL");
-        Vector3 diff = AR.transform.position - AL.transform.position;
-        Vector3 add = AR.transform.position + AL.transform.position;
+        GameObject righteye = GameObject.Find("righteye");
+        GameObject lefteye = GameObject.Find("lefteye");
+        Vector3 diff = righteye.transform.position - lefteye.transform.position;
+        Vector3 add = righteye.transform.position + lefteye.transform.position;
         Vector3 direction = diff.normalized;
         Vector3 middle_point = add / 2;
         float eye_dist = Random.Range(4f, 5.5f); //hard coded pupilary distance range
-        AR.transform.position = middle_point + (direction * eye_dist / 2);
-        AL.transform.position = middle_point - (direction * eye_dist / 2);
+        righteye.transform.position = middle_point + (direction * eye_dist / 2);
+        lefteye.transform.position = middle_point - (direction * eye_dist / 2);
         //set nose exactly between the 2 eyes in x axis
-        GameObject NZ = GameObject.Find("NZ");
-        Vector3 temp = NZ.transform.position;
+        GameObject nosetip = GameObject.Find("nosetip");
+        Vector3 temp = nosetip.transform.position;
         temp.x = middle_point.x;
-        NZ.transform.position = temp;
+        nosetip.transform.position = temp;
         //set additional random nose parameters ("drop" & "depth"), this goes ontop user data
         float nose_drop = Random.Range(0f, 1f);
         float nose_depth = Random.Range(-0.5f, 0.5f);
-        NZ.transform.position += NZ.transform.TransformDirection(Vector3.back) * nose_drop;
-        NZ.transform.position += NZ.transform.TransformDirection(Vector3.up) * nose_depth;
+        nosetip.transform.position += nosetip.transform.TransformDirection(Vector3.back) * nose_drop;
+        nosetip.transform.position += nosetip.transform.TransformDirection(Vector3.up) * nose_depth;
         //sanity check: if nose passes eye depth, clip it to eye depth.
-        if (NZ.transform.position.y < AR.transform.position.y)
+        if (nosetip.transform.position.y < righteye.transform.position.y)
         {
-            temp = NZ.transform.position;
-            temp.y = AR.transform.position.y;
-            NZ.transform.position = temp;
+            temp = nosetip.transform.position;
+            temp.y = righteye.transform.position.y;
+            nosetip.transform.position = temp;
         }
     }
     void setMaskProperties()
@@ -483,26 +483,5 @@ public class SceneController : MonoBehaviour
         front_to_up = 0,
         up_to_front = 1
     };
-    /*
-    float map_range(float s_range_low, float s_range_high, float d_range_low, float d_range_high, float value)
-    {
-        float m = (d_range_high - d_range_low) / (s_range_high - s_range_low); // slope
-        float b = d_range_low - (m * s_range_low);
-        float my_range = m * value + b;
-        return my_range;
-    }
-    */
-    //void setCapStickersProperties(float mag)
-    //{
-    //    //string[] names = new string[] {"FP1", "FPZ", "FP2", "CZ"};
-    //    //for (int i = 0; i < names.Length; i++)
-    //    //{
-    //    //    GameObject sticker = GameObject.Find(names[i]);
-    //    //    sticker.transform.localPosition = Vector3.zero;
-    //    //    Vector2 my_random_vector = Random.insideUnitCircle * mag;
-    //    //    sticker.transform.position += sticker.transform.TransformDirection(Vector3.right) * my_random_vector.x;
-    //    //    sticker.transform.position += sticker.transform.TransformDirection(Vector3.forward) * my_random_vector.y;
-    //    //}
-    //}
 }
 
