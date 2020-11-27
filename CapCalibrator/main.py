@@ -12,7 +12,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Calibrates fNIRS sensors location based on video.')
     parser.add_argument("-m", "--mode", type=str, choices=["gui", "auto", "experimental"],
                         default="gui",
-                        help="Controls operation mode of application")
+                        help="Controls operation mode of application.")
     parser.add_argument("-vid", "--video", help="The path to the video file to calibrate sensors with. Required if mode is auto.")
     parser.add_argument("-t", "--template", help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
     parser.add_argument("--mni", action="store_true",

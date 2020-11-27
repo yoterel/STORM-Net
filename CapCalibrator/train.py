@@ -8,30 +8,43 @@ import keras.callbacks as cb
 
 
 class CustomLogging(cb.Callback):
-    def __init__(self, queue, stoprequest):
+    """
+    performs custom logging to a shared queue, or to a log, or both
+    """
+    def __init__(self, queue=None, stoprequest=None, log_results=None):
         super(CustomLogging, self).__init__()
         self.queue = queue
         self.stoprequest = stoprequest
+        self.log_results = log_results
 
     def on_batch_end(self, batch, logs=None):
-        if self.stoprequest.isSet():
-            self.model.stop_training = True
+        if self.stoprequest:
+            if self.stoprequest.isSet():
+                self.model.stop_training = True
 
     def on_epoch_end(self, epoch, logs=None):
-        if self.stoprequest.isSet():
-            self.model.stop_training = True
+        if self.stoprequest:
+            if self.stoprequest.isSet():
+                self.model.stop_training = True
         loss = logs.get("val_loss")
-        self.queue.put(["finetune_data", epoch, loss])
+        lr = logs.get("lr")
+        if self.log_results:
+            logging.info("epoch: {}, validation_loss: {}, lr: {}".format(epoch, loss, lr))
+        if self.queue:
+            self.queue.put(["finetune_data", epoch, loss])
 
     def on_train_end(self, logs=None):
-        self.queue.put(["finetune_done"])
+        if self.log_results:
+            logging.info("Training finished.")
+        if self.queue:
+            self.queue.put(["finetune_done"])
 
 
-def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, queue=None, event=None):
+def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, output_path, queue=None, event=None):
     import keras
     keras.backend.clear_session()
     from tensorflow.python.keras.callbacks import TensorBoard
-    model_dir = Path("models")
+    model_dir = output_path
     data_dir = data_path
     cache_dir = Path("cache")
     cache_dir.mkdir(exist_ok=True, parents=True)
@@ -43,10 +56,12 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
     # hyper parameters #
     hp = {"batch_size": 16,
           "learning_rate": 1e-4,
-          "early_stopping_patience": 5,
-          "reduce_lr_patience": 3,
-          "epochs": 1000,
-          "verbosity": verbosity}
+          "early_stopping_patience": 20,
+          "reduce_lr_patience": 100,
+          "epochs": 2000,
+          "verbosity": verbosity,
+          "pre_trained_model": pretrained_model_name,
+          "shuffle_frames_pairwise": True}
     logging.info(hp.items())
     # load data
     if not pickle_file_path.is_file():
@@ -72,9 +87,10 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
     # keras.utils.plot_model(model, to_file=str(model_graph_path)+"_graph.png", show_shapes=True)
 
     # set model callbacks
+
     checkpoint = keras.callbacks.ModelCheckpoint(str(best_weight_location),
                                                  monitor='val_loss',
-                                                 verbose=hp["verbosity"],
+                                                 verbose=0,
                                                  save_best_only=True,
                                                  mode='min',
                                                  period=1)
@@ -82,27 +98,36 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
                                                min_delta=0.001,
                                                patience=hp["early_stopping_patience"],
                                                mode='min',
-                                               verbose=hp["verbosity"])
+                                               verbose=0)
     # trains well even without rducing lr...
-    # reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
-    #                                               factor=0.2,
-    #                                               patience=hp["reduce_lr_patience"],
-    #                                               verbose=1,
-    #                                               mode='min',
-    #                                               min_delta=0.001,
-    #                                               cooldown=0,
-    #                                               min_lr=1e-6)
-    callbacks = [checkpoint, early_stop]
+    reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
+                                                  factor=0.5,
+                                                  patience=hp["reduce_lr_patience"],
+                                                  verbose=0,
+                                                  mode='min',
+                                                  min_delta=0.001,
+                                                  cooldown=0,
+                                                  min_lr=1e-6)
+    callbacks = [checkpoint, reduce_lr]
+    if queue and event:
+        callbacks.append(CustomLogging(queue, event))
+    else:
+        callbacks.append(CustomLogging(queue, event, True))
     if tensorboard:
         tensor_board = TensorBoard(log_dir=Path(tensorboard),
                                    write_graph=True,
                                    write_images=True)
         callbacks.append(tensor_board)
-    if queue and event:
-        callbacks.append(CustomLogging(queue, event))
     dim = x_train.shape[1:]
-    training_generator = utils.DataGenerator(x_train, y_train, batch_size=hp["batch_size"], dim=dim)
-    validation_generator = utils.DataGenerator(x_val, y_val, batch_size=hp["batch_size"], dim=dim, mask_stickers=False)
+    training_generator = utils.DataGenerator(x_train, y_train,
+                                             batch_size=hp["batch_size"],
+                                             dim=dim,
+                                             shuffle_timestamps=hp["shuffle_frames_pairwise"])
+    validation_generator = utils.DataGenerator(x_val, y_val,
+                                               batch_size=hp["batch_size"],
+                                               dim=dim,
+                                               mask_stickers=False,
+                                               shuffle_timestamps=hp["shuffle_frames_pairwise"])
 
     # start training
     _ = model.fit_generator(generator=training_generator,
@@ -132,17 +157,23 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='This script fine-tunes STORM-Net')
     parser.add_argument("model_name", help="The name to give the newly trained model (without extension).")
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
-    parser.add_argument("--pretrained_model_path", default="models/telaviv_model_b16.h5", help="The path to the pretrained model file")
+    parser.add_argument("--output_path", default="models", help="The trained model will be saved to this folder")
+    parser.add_argument("--pretrained_model_path", help="The path to the pretrained model file")
     parser.add_argument("--gpu_id", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
-    parser.add_argument("--tensorboard", help="If present, writes training stats to this path (readable with tensorboard)")
-    parser.add_argument("--verbosity", type=int, default=1, choices=[0, 1, 2], help="If present, stdout will be redirected to this log file path.")
+    parser.add_argument("--tensorboard",
+                        help="If present, writes training stats to this path (readable with tensorboard)")
+    parser.add_argument("--log",
+                        help="If present, writes training log to this path")
+    parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    # cmd_line = 'telaviv_model_b17 models/telaviv_model_b16.h5 data/telaviv_model'.split()
     args = parser.parse_args()
     if args.pretrained_model_path:
         args.pretrained_model_path = Path(args.pretrained_model_path)
+    else:
+        args.pretrained_model_path = None
+    args.output_path = Path(args.output_path)
     if args.log:
         args.log = Path(args.log)
     if args.tensorboard:
@@ -153,6 +184,11 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
+    if args.log:
+        args.log.parent.mkdir(parents=True, exist_ok=True)
+        logging.basicConfig(filename=args.log, filemode='w', level=args.verbosity.upper())
+    else:
+        logging.basicConfig(level=args.verbosity.upper())
     configure_environment(args.gpu_id)
-    train(args.model_name, args.data_path, args.pretrained_model_path, args.tensorboard, args.verbosity)
+    train(args.model_name, args.data_path, args.pretrained_model_path, args.tensorboard, args.verbosity, args.output_path)
     logging.info("Done!")

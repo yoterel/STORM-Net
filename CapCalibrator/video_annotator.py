@@ -353,7 +353,7 @@ class GUI(tk.Tk):
                 else:
                     return Path(file)
             else:
-                file = filedialog.askopenfile(initialdir=initial_dir, title=title, mode='w+')
+                file = filedialog.asksaveasfile(initialdir=initial_dir, title=title)
                 if not file:
                     return None
                 else:
@@ -888,7 +888,7 @@ class ThreadedPeriodicTask(threading.Thread):
 
     def handle_finetune(self):
         model_name, pretrained_stormnet_path, synth_output_dir, finetune_log_file = self.msg[1:]
-        train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, self.queue,
+        train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
                     self.stoprequest)
 
     def handle_render(self):
@@ -1303,7 +1303,7 @@ class FinetunePage(tk.Frame):
         self.update_labels()
 
     def render_set_defaults(self):
-        self.set_entry_text(self.iterations_number, "30000")
+        self.set_entry_text(self.iterations_number, "100000")
         self.render_monitor_progress_checkbox.select()
 
     def finetune_set_defaults(self):

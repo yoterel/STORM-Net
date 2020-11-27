@@ -5,6 +5,7 @@ from file_io import read_template_file
 import re
 import logging
 import MNI
+from scipy.stats import pearsonr, ttest_rel
 
 
 def align_centroids(a, b):
@@ -414,6 +415,15 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
             vid_rot_sessions2.pop(index)
             vid_rot_sessions3.pop(index)
 
+        # calc t-test statistics
+        a_vid = np.array(vid_intra_method_rmse)
+        a_dig = np.array(digi_intra_method_rmse)
+        a_intra = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]), axis=0)
+        t1, p1 = ttest_rel(a_vid, a_dig)
+        logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
+        t2, p2 = ttest_rel(a_dig, a_intra)
+        logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
+
         #  calc shifts in every direction for each method
         digi2digi_shift = np.array(
             [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
@@ -421,11 +431,20 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
             [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
 
         #  correlate the shifts
-        x_corr = np.corrcoef(digi2digi_shift[:, 0], vid2vid_shift[:, 0], rowvar=False)
-        y_corr = np.corrcoef(digi2digi_shift[:, 1], vid2vid_shift[:, 1], rowvar=False)
-        z_corr = np.corrcoef(digi2digi_shift[:, 2], vid2vid_shift[:, 2], rowvar=False)
+        x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
+        y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
+        z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
 
-        logging.info("Shift correlation (x, y, z): {:.3f}, {:.3f}, {:.3f}".format(x_corr[0, 1], y_corr[0, 1], z_corr[0, 1]))
+        logging.info(
+            "Shift correlation (x, px, y, py, z, pz):"
+            "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
+
+        #  correlate the shifts
+        # x_corr = np.corrcoef(digi2digi_shift[:, 0], vid2vid_shift[:, 0], rowvar=False)
+        # y_corr = np.corrcoef(digi2digi_shift[:, 1], vid2vid_shift[:, 1], rowvar=False)
+        # z_corr = np.corrcoef(digi2digi_shift[:, 2], vid2vid_shift[:, 2], rowvar=False)
+        # logging.info("Shift correlation (x, y, z): {:.3f}, {:.3f}, {:.3f}".format(x_corr[0, 1], y_corr[0, 1], z_corr[0, 1]))
+
         return None
     else:
         vid_est = []
