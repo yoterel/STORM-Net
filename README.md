@@ -85,34 +85,13 @@ The following optodes must exist in the template model file (and their locations
 - "fpz" : used to find standard coordinate system.
 - "fp2" : used to find standard coordinate system.
 
-**Four** of the following optodes must exist in the template model file if MNI projection is required (either if using our implementation of the projection, **or not**):
-- "cz"
-- "nosebridge"
-- "inion"
-- "rightear"
-- "leftear"
-- "fp1"
-- "fp2"
-- "fpz"
-- "f7"
-- "f8"
-- "f3"
-- "f4"
-- "c3"
-- "c4"
-- "t3"
-- "t4"
-- "pz"
-- "p3"
-- "p4"
-- "t5"
-- "t6"
-- "o1"
-- "o2"
+At least **Four** (the more the better) of the following optodes must exist in the template model file if MNI projection is required (whether using our implementation of the MNI projection, **or not**):
+["cz", "nosebridge", "inion", "rightear", "leftear", "fp1", "fp2", "fpz", "f7", "f8", "f3", "f4", "c3", "c4", "t3", "t4", "pz", "p3", "p4", "t5", "t6", "o1", "o2"]
 
-Use these names (exactly, without double quoutes) as the first field for them to be parsed correctly.
-The stickers can be placed anywhere **on the cap** as long as the three frontal ones are not colinear, but we recommend using fp1, fpz + 1cm, fp2, cz as their location.
-"fpz + 1cm": we actually used a location 1 cm above fpz in our experiments (can be seen marked by a green sticker in the example video) - eliminating the risk of coliniearity (but it is not mandatory).
+Notes:
+- Use these names (exactly, without double quoutes) as the first field for them to be parsed correctly.
+- The stickers can be placed anywhere **on the cap** as long as the three frontal ones are not colinear, but we recommend using fp1, fpz + 1cm, fp2, cz as their location.
+- middle_triangle: we actually used a location 1 cm above fpz in our experiments (can be seen marked by a green sticker in the example video) - this eliminated the risk of coliniearity (but it is not mandatory).
 
 
 ## The standard coordiante system
