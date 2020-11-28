@@ -66,7 +66,6 @@ class GUI(tk.Tk):
         self.storm_model = None
         self.unet_graph = None
         self.storm_graph = None
-        self.pretrained_stormnet_path = None
         self.finetunning = False
         self.renderer_executable = None
         self.synth_output_dir = None
@@ -78,6 +77,7 @@ class GUI(tk.Tk):
         self.template_format = None
         self.projected_data = None
         self.cur_active_panel = None
+        self.pretrained_stormnet_path = Path(self.args.storm_net)
         self.render_thread_alive = False
         # if self.args.mode == "gui" or self.args.mode == "experimental":
         #     unet_model_full_path = Path(args.u_net)

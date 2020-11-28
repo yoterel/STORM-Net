@@ -24,12 +24,11 @@ def parse_arguments():
                         help="A path to a trained segmentation network model")
     parser.add_argument("-s", "--session_file",
                         help="A file containing processed results for previous videos.")
-    parser.add_argument("-out", "--output_file", help="The output csv file with calibrated results (given in MNI coordinates)")
+    parser.add_argument("-out", "--output_file", help="The output csv file with calibrated results")
     parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     parser.add_argument("-log", "--log", help="If specified, log will be output to this file")
     parser.add_argument("-gt", "--ground_truth", help="Use this in experimental mode only")
     parser.add_argument("--gpu_id", type=str, default='-1', help="Which GPU to use (or -1 for cpu)")
-
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -43,14 +42,22 @@ def parse_arguments():
     else:
         if args.video:
             args.video = Path(args.video)
+        else:
+            logging.error("Missing video file parameter")
+            exit(1)
         if args.template:
             args.template = Path(args.template)
+            if Path.is_dir(args.template):
+                args.template = args.template.glob("*.txt").__next__()
+        else:
+            logging.error("Missing template file parameter")
+            exit(1)
         if args.session_file:
             args.session_file = Path(args.session_file)
-        if Path.is_dir(args.template):
-            args.template = args.template.glob("*.txt").__next__()
         if args.ground_truth:
             args.ground_truth = Path(args.ground_truth)
+        if args.output_file:
+            args.output_file = Path(args.output_file)
     return args
 
 

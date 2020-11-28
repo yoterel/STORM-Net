@@ -7,7 +7,7 @@ import logging
 import shutil
 from pathlib import Path
 import tensorflow as tf
-
+import models
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
 
 
@@ -268,7 +268,7 @@ def load_semantic_seg_model(weights_loc):
     g = tf.Graph()
     with g.as_default():
         old_model = tf.keras.models.load_model(weights_loc,
-                                               custom_objects={'iou': utils.iou, 'iou_thresholded': utils.iou_thresholded})
+                                               custom_objects={'iou': models.iou, 'iou_thresholded': models.iou_thresholded})
         old_model.layers.pop(0)
         input_shape = (512, 1024, 3)  # replace input layer with this shape so unet forward will work
         new_input = tf.keras.layers.Input(input_shape)

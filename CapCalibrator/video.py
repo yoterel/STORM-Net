@@ -160,8 +160,8 @@ def auto_annotate_videos(args):
         force_annotate = False
         dump_to_db = True
     my_db = file_io.load_full_db(args.session_file)
-    unet_model_full_path = Path(args.u_net)
-    unet_model, graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
+    # unet_model_full_path = Path(args.u_net)
+    # unet_model, graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
     paths = []
     if Path.is_file(vid_path):
         paths.append(vid_path)
@@ -174,9 +174,7 @@ def auto_annotate_videos(args):
         if my_hash not in my_db.keys() or force_annotate:
             data = predict.predict_keypoints_locations(frames, args, my_hash,
                                                        is_puppet=False,
-                                                       save_intermed=False,
-                                                       preloaded_model=unet_model,
-                                                       graph=graph)
+                                                       save_intermed=False)
             my_db[my_hash] = [{"data": data,
                                "label": np.array([0, 0, 0]),
                                "frame_indices": indices}]
