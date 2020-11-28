@@ -1,12 +1,10 @@
 import numpy as np
-from utils import pairwise
+import utils
 import subprocess
 import pickle
 import json
 import logging
 import shutil
-import keras
-from keras_unet.metrics import iou, iou_thresholded
 from pathlib import Path
 import tensorflow as tf
 
@@ -52,7 +50,7 @@ def read_template_file(template_path):
         for j, session in enumerate(sessions):
             sensor1_data = []
             sensor2_data = []
-            for i, (sens1, sens2) in enumerate(pairwise(session)):
+            for i, (sens1, sens2) in enumerate(utils.pairwise(session)):
                 if i < len(labeled_names):
                     name = labeled_names[i]
                 else:
@@ -267,21 +265,23 @@ def deserialize_data(file_path, with_test_set=True):
 
 def load_semantic_seg_model(weights_loc):
     logging.info("Loading unet model from: " + str(weights_loc))
-    old_model = keras.models.load_model(weights_loc,
-                                        custom_objects={'iou': iou, 'iou_thresholded': iou_thresholded})
-    old_model.layers.pop(0)
-    input_shape = (512, 1024, 3)  # replace input layer with this shape so unet forward will work
-    new_input = keras.layers.Input(input_shape)
-    new_outputs = old_model(new_input)
-    new_model = keras.engine.Model(new_input, new_outputs)
-    # if verbosity:
-    #     new_model.summary()
-    return new_model, tf.get_default_graph()
+    g = tf.Graph()
+    with g.as_default():
+        old_model = tf.keras.models.load_model(weights_loc,
+                                               custom_objects={'iou': utils.iou, 'iou_thresholded': utils.iou_thresholded})
+        old_model.layers.pop(0)
+        input_shape = (512, 1024, 3)  # replace input layer with this shape so unet forward will work
+        new_input = tf.keras.layers.Input(input_shape)
+        new_outputs = old_model(new_input)
+        new_model = tf.keras.Model(new_input, new_outputs)
+        # if verbosity:
+        #     new_model.summary()
+    return new_model, g
 
 
 def load_keras_model(pretrained_model_path, learning_rate):
-    model = keras.models.load_model(str(pretrained_model_path))
-    opt = keras.optimizers.Adam(lr=learning_rate)
+    model = tf.keras.models.load_model(str(pretrained_model_path))
+    opt = tf.keras.optimizers.Adam(lr=learning_rate)
     model.compile(loss='mean_squared_error', optimizer=opt)
     # model.summary()
     return model
@@ -289,11 +289,12 @@ def load_keras_model(pretrained_model_path, learning_rate):
 
 def load_clean_keras_model(path):
     logging.info("Loading STORM model from: " + str(path))
-    model = keras.models.load_model(str(path))
-    # if v:
-    #     model.summary()
-    graph = tf.get_default_graph()
-    return model, graph
+    g = tf.Graph()
+    with g.as_default():
+        model = tf.keras.models.load_model(str(path))
+        # if v:
+        #     model.summary()
+    return model, g
 
 
 def load_from_pickle(pickle_file_path):

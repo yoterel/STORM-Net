@@ -64,7 +64,8 @@ class GUI(tk.Tk):
         self.finetune_thread = None
         self.unet_model = None
         self.storm_model = None
-        self.graph = None
+        self.unet_graph = None
+        self.storm_graph = None
         self.pretrained_stormnet_path = None
         self.finetunning = False
         self.renderer_executable = None
@@ -78,12 +79,12 @@ class GUI(tk.Tk):
         self.projected_data = None
         self.cur_active_panel = None
         self.render_thread_alive = False
-        if self.args.mode == "gui" or self.args.mode == "experimental":
-            unet_model_full_path = Path(args.u_net)
-            self.unet_model, self.graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
-            storm_model_full_path = Path(args.storm_net)
-            self.pretrained_stormnet_path = storm_model_full_path
-            self.storm_model, _ = file_io.load_clean_keras_model(storm_model_full_path)
+        # if self.args.mode == "gui" or self.args.mode == "experimental":
+        #     unet_model_full_path = Path(args.u_net)
+        #     self.unet_model, self.unet_graph = file_io.load_semantic_seg_model(str(unet_model_full_path))
+        #     storm_model_full_path = Path(args.storm_net)
+        #     self.pretrained_stormnet_path = storm_model_full_path
+        #     self.storm_model, self.storm_graph = file_io.load_clean_keras_model(storm_model_full_path)
         self.wm_title("STORM - a fNIRS Calibration Tool")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
@@ -372,7 +373,7 @@ class GUI(tk.Tk):
         return ["annotate_frames",
                 path,
                 self.unet_model,
-                self.graph,
+                self.unet_graph,
                 self.args]
 
     def prep_calibrate_packet(self):
@@ -381,7 +382,7 @@ class GUI(tk.Tk):
                 self.template_data,
                 self.db[self.get_cur_video_hash()][self.shift]["data"].copy(),
                 self.storm_model,
-                self.graph,
+                self.storm_graph,
                 self.args]
 
     def get_frame_size(self):

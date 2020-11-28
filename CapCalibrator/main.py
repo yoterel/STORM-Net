@@ -1,3 +1,5 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import argparse
 from pathlib import Path
 import video
@@ -26,7 +28,8 @@ def parse_arguments():
     parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     parser.add_argument("-log", "--log", help="If specified, log will be output to this file")
     parser.add_argument("-gt", "--ground_truth", help="Use this in experimental mode only")
-    parser.add_argument("--gpu_id", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
+    parser.add_argument("--gpu_id", type=str, default='-1', help="Which GPU to use (or -1 for cpu)")
+
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -52,20 +55,21 @@ def parse_arguments():
 
 
 def configure_compute_environment(gpu_id):
-    import os
-    if gpu_id == -1:
-        gpu_id = ""
-    else:
-        gpu_id = str(gpu_id)
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id  # set gpu visibility prior to importing tf and keras
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # suppress warnings & info from tf
-    from keras.backend.tensorflow_backend import set_session
+    global tf
     import tensorflow as tf
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-    sess = tf.Session(config=config)
-    set_session(sess)  # set this TensorFlow session as the default session for Keras
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            logging.info("Physical GPUs: {}, Logical GPUs: {}".format(len(gpus), len(logical_gpus)))
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            logging.info(e)
 
 
 if __name__ == "__main__":

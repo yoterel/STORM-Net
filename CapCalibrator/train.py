@@ -4,7 +4,9 @@ from pathlib import Path
 import utils
 import file_io
 import logging
-import keras.callbacks as cb
+import tensorflow.keras.callbacks as cb
+import models
+import data_generators
 
 
 class CustomLogging(cb.Callback):
@@ -41,8 +43,8 @@ class CustomLogging(cb.Callback):
 
 
 def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, output_path, queue=None, event=None):
-    import keras
-    keras.backend.clear_session()
+    import tensorflow as tf
+    tf.keras.backend.clear_session()
     from tensorflow.python.keras.callbacks import TensorBoard
     model_dir = output_path
     data_dir = data_path
@@ -83,31 +85,31 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
     if pretrained_model_name:
         model = file_io.load_keras_model(pretrained_model_name, hp["learning_rate"])
     else:
-        model = utils.create_fc2_model(input_shape, output_shape, hp["learning_rate"])
+        model = models.create_fc2_model(input_shape, output_shape, hp["learning_rate"])
     # keras.utils.plot_model(model, to_file=str(model_graph_path)+"_graph.png", show_shapes=True)
 
     # set model callbacks
 
-    checkpoint = keras.callbacks.ModelCheckpoint(str(best_weight_location),
-                                                 monitor='val_loss',
-                                                 verbose=0,
-                                                 save_best_only=True,
-                                                 mode='min',
-                                                 period=1)
-    early_stop = keras.callbacks.EarlyStopping(monitor='val_loss',
-                                               min_delta=0.001,
-                                               patience=hp["early_stopping_patience"],
-                                               mode='min',
-                                               verbose=0)
-    # trains well even without rducing lr...
-    reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
-                                                  factor=0.5,
-                                                  patience=hp["reduce_lr_patience"],
-                                                  verbose=0,
-                                                  mode='min',
+    checkpoint = tf.keras.callbacks.ModelCheckpoint(str(best_weight_location),
+                                                    monitor='val_loss',
+                                                    verbose=0,
+                                                    save_best_only=True,
+                                                    mode='min',
+                                                    period=1)
+    early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                   min_delta=0.001,
-                                                  cooldown=0,
-                                                  min_lr=1e-6)
+                                                  patience=hp["early_stopping_patience"],
+                                                  mode='min',
+                                                  verbose=0)
+    # trains well even without rducing lr...
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
+                                                     factor=0.5,
+                                                     patience=hp["reduce_lr_patience"],
+                                                     verbose=0,
+                                                     mode='min',
+                                                     min_delta=0.001,
+                                                     cooldown=0,
+                                                     min_lr=1e-6)
     callbacks = [checkpoint, reduce_lr]
     if queue and event:
         callbacks.append(CustomLogging(queue, event))
@@ -119,11 +121,11 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
                                    write_images=True)
         callbacks.append(tensor_board)
     dim = x_train.shape[1:]
-    training_generator = utils.DataGenerator(x_train, y_train,
+    training_generator = data_generators.DataGenerator(x_train, y_train,
                                              batch_size=hp["batch_size"],
                                              dim=dim,
                                              shuffle_timestamps=hp["shuffle_frames_pairwise"])
-    validation_generator = utils.DataGenerator(x_val, y_val,
+    validation_generator = data_generators.DataGenerator(x_val, y_val,
                                                batch_size=hp["batch_size"],
                                                dim=dim,
                                                mask_stickers=False,
@@ -139,18 +141,21 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
 
 def configure_environment(gpu_id):
     import os
-    if gpu_id == -1:
-        gpu_id = ""
-    else:
-        gpu_id = str(gpu_id)
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id  # set gpu visibility prior to importing tf and keras
-    from keras.backend.tensorflow_backend import set_session
+    global tf
     import tensorflow as tf
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-    sess = tf.Session(config=config)
-    set_session(sess)  # set this TensorFlow session as the default session for Keras
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            logging.info("Physical GPUs: {}, Logical GPUs: {}".format(len(gpus), len(logical_gpus)))
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            logging.info(e)
 
 
 def parse_arguments():

@@ -2,12 +2,9 @@ import sys
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "7"
-import keras.backend as K
-config = K.tf.ConfigProto()
-config.gpu_options.allow_growth = True
-session = K.tf.Session(config=config)
-import keras
-from keras_unet.utils import get_augmented
+import tensorflow as tf
+from data_generators import get_augmented
+import models
 from tensorflow.python.keras.callbacks import TensorBoard
 import utils
 import file_io
@@ -77,8 +74,8 @@ else:
     x_train, x_val, y_train, y_val = file_io.deserialize_data(pickle_file_path, with_test_set=False)
 
 input_shape = (None, None, 3)
-model = utils.create_semantic_seg_model(input_shape, learning_rate)
-keras.utils.plot_model(model, to_file=str(model_graph_path)+"_graph.png", show_shapes=True)
+model = models.create_semantic_seg_model(input_shape, learning_rate)
+# tf.keras.utils.plot_model(model, to_file=str(model_graph_path)+"_graph.png", show_shapes=True)
 
 train_gen = get_augmented(
     x_train, y_train, batch_size=batch_size,
@@ -97,12 +94,12 @@ steps_per_epoch = np.math.ceil(x_train.shape[0] / batch_size)
 # xx, yy = sample_batch
 # print(xx.shape, yy.shape)
 # plot_imgs(org_imgs=xx, mask_imgs=yy, nm_img_to_plot=2, figsize=6)
-checkpoint = keras.callbacks.ModelCheckpoint(str(best_weight_location),
-                                             monitor='val_loss',
-                                             verbose=1,
-                                             save_best_only=True,
-                                             mode='min',
-                                             period=1)
+checkpoint = tf.keras.callbacks.ModelCheckpoint(str(best_weight_location),
+                                                monitor='val_loss',
+                                                verbose=1,
+                                                save_best_only=True,
+                                                mode='min',
+                                                period=1)
 tensor_board = TensorBoard(log_dir=my_log_dir,
                            write_graph=True,
                            write_images=True)

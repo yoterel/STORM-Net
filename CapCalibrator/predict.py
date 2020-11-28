@@ -1,4 +1,4 @@
-import keras
+import tensorflow as tf
 import utils
 import file_io
 from pathlib import Path
@@ -7,15 +7,15 @@ import scipy.io as sio
 import cv2
 import pickle
 import dlib
-from imutils import face_utils
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 import logging
+import data_generators
 
 
 def is_using_gpu():
-    gpu_list = keras.backend.tensorflow_backend._get_available_gpus()
-    if gpu_list:
+    num_of_gpu_availble = len(tf.config.experimental.list_physical_devices('GPU'))
+    if num_of_gpu_availble:
         return True
     else:
         return False
@@ -34,15 +34,12 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
-    utils.center_data(sticker_locations)
-    # utils.shuffle_timeseries(sticker_locations)
-    # utils.shuffle_data(sticker_locations)
-    # utils.mask_data(sticker_locations)
-    if preloaded_model:
-        model = preloaded_model
-    else:
-        model_full_path = Path(args.storm_net)
-        model, graph = file_io.load_clean_keras_model(model_full_path)
+    data_generators.center_data(sticker_locations)
+    # if preloaded_model:
+    #     model = preloaded_model
+    # else:
+    model_full_path = Path(args.storm_net)
+    model, graph = file_io.load_clean_keras_model(model_full_path)
     with graph.as_default():
         y_predict = model.predict(sticker_locations)
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
@@ -88,7 +85,7 @@ def get_facial_landmarks(frames):
             # Make the prediction and transform it to numpy array
             # plt.imshow(img_data)
             landmarks = predictor(img_data, rect)
-            landmarks = face_utils.shape_to_np(landmarks)
+            landmarks = utils.shape_to_np(landmarks)
             # plt.scatter([landmarks[0:68, 0]], [landmarks[0:68, 1]], c='r', s=1)
             # plt.scatter([landmarks[30, 0]], [landmarks[30, 1]], c='g', s=1)
             # plt.scatter([np.mean(landmarks[42:47, 0])], [np.mean(landmarks[42:47, 1])], c='g', s=5)
@@ -150,11 +147,11 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     :param args: cmd line arguments
     :return: locations of stickers in all frames as a 2d numpy array
     """
-    if not preloaded_model:
-        model_full_path = Path(args.u_net)
-        my_model, graph = file_io.load_semantic_seg_model(str(model_full_path))
-    else:
-        my_model = preloaded_model
+    # if preloaded_model:
+    #     my_model = preloaded_model
+    # else:
+    model_full_path = Path(args.u_net)
+    my_model, graph = file_io.load_semantic_seg_model(str(model_full_path))
     imgs_list = []
     for image in frames:
         img_data = np.array(image.resize((1024, 512)))  # our unet only accepts powers of 2 image sizes
@@ -223,38 +220,6 @@ def predict_keypoints_locations(frames, args, vid_hash="", is_puppet=False, save
             pickle.dump(key_points, f)
             f.close()
     return key_points
-
-#####################################################################################
-
-
-def predict(model_name, root_dir):
-    data_dir = Path.joinpath(root_dir, "scene3_100k")
-    model_dir = Path.joinpath(root_dir, "models")
-    best_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
-    model = keras.models.load_model(str(best_weight_location))
-    pickle_file_path = Path.joinpath(data_dir, "data.pickle")
-    x_train, x_val, y_train, y_val, x_test, y_test = file_io.deserialize_data(pickle_file_path)
-    utils.center_data(x_test)
-    y_predict = model.predict(x_test)
-    total_error = mean_squared_error(y_test, y_predict, squared=False)
-    angel_error = mean_squared_error(y_test[:, :-2], y_predict[:, :-2], squared=False)
-    logging.info(str(total_error) +" "+ str(angel_error))
-    # y_predict = np.random.uniform(-4, 4, y_test.shape)
-    # testScore = mean_squared_error(y_test, y_predict, multioutput='raw_values')
-    # print(testScore)
-
-
-def predict_from_mat(model_name, root_dir):
-    mat_path = Path.joinpath(root_dir, "my_db1.mat")
-    model_dir = Path.joinpath(root_dir, "models")
-    best_weight_location = Path.joinpath(model_dir, "{}_best_weights.h5".format(model_name))
-    model = keras.models.load_model(str(best_weight_location))
-    mat_contents = sio.loadmat(mat_path)
-    x = np.expand_dims(mat_contents["db"][0], axis=0)
-    y_predict = model.predict(x)
-    rot = R.from_euler('xyz', [y_predict[0][0], y_predict[0][1], y_predict[0][2]], degrees=True)
-    logging.info(rot.as_matrix())
-    logging.info(y_predict)
 
 
 def get_puppet_landmarks(frames):
