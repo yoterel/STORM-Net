@@ -47,7 +47,9 @@ def to_standard_coordinate_system(names, data):
     x_axis = np.argmax(np.abs(data[right_eye_index] - data[left_eye_index]))
     data[:, [0, x_axis]] = data[:, [x_axis, 0]]
     # swap z axis with the best candidate (but not x)
-    z_axis = np.argmax(np.abs(data[fpz_index] - ((data[fp1_index] + data[fp2_index]) / 2)))
+    eyes_midpoint = ((data[left_eye_index] + data[right_eye_index]) / 2)
+    fp1fp2_midpoint = ((data[fp1_index] + data[fp2_index]) / 2)
+    z_axis = np.argmax(np.abs(eyes_midpoint - fp1fp2_midpoint))
     if z_axis != 0:
         data[:, [2, z_axis]] = data[:, [z_axis, 2]]
 
@@ -61,8 +63,8 @@ def to_standard_coordinate_system(names, data):
     data[:, 2] *= k
 
     # translate to standard origin
-    eye_midpoint = (data[right_eye_index] + data[left_eye_index]) / 2
-    origin = np.array([eye_midpoint[0], data[cz_index, 1], eye_midpoint[2]])
+    eyes_midpoint = (data[right_eye_index] + data[left_eye_index]) / 2
+    origin = np.array([eyes_midpoint[0], data[cz_index, 1], eyes_midpoint[2]])
     data = data - origin
 
     # possibly convert from inch to cm

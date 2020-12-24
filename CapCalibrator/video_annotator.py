@@ -275,7 +275,7 @@ class GUI(tk.Tk):
             filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
             menubar.add_cascade(label="File", menu=filemenu)
             optionsmenu = tk.Menu(menubar, tearoff=0)
-            optionsmenu.add_command(label="Toggle Un-Named Optodes", command=self.toggle_optodes, accelerator="Space")
+            optionsmenu.add_command(label="Toggle Named Optodes", command=self.toggle_optodes, accelerator="Space")
             optionsmenu.add_command(label="Next Optode", command=self.next_optode, accelerator="Right")
             optionsmenu.add_command(label="Prev Optode", command=self.prev_optode, accelerator="Left")
             menubar.add_cascade(label="Options", menu=optionsmenu)
@@ -819,7 +819,7 @@ class GUI(tk.Tk):
         return ["finetune_start", model_name, self.pretrained_stormnet_path, self.synth_output_dir, self.finetune_log_file]
 
     ### ExperimentViewerPage ###
-    def toggle_optodes(self):
+    def toggle_optodes(self, event=None):
         self.selected_optode = 0
         self.view_fiducials_only = not self.view_fiducials_only
         self.panels[ExperimentViewerPage].update_labels()
@@ -1131,6 +1131,7 @@ class ExperimentViewerPage(tk.Frame):
         self.controller = controller
         self.bind("<Left>", self.controller.prev_optode)
         self.bind("<Right>", self.controller.next_optode)
+        self.bind("<space>", self.controller.toggle_optodes)
         self.bind("<w>", self.controller.increase_elev)
         self.bind("<a>", self.controller.decrease_azim)
         self.bind("<s>", self.controller.decrease_elev)
