@@ -24,16 +24,25 @@ The repository also contains:
 
 Note: tested on Windows 10 and Ubuntu 18.04. Mac testing will be finished soon.
 
-## The template model file
+## Quick installation guide
+0. Have [python 3.6](https://www.python.org/downloads/) or higher installed and ready to use.
 
-The application uses a pre-measured template model file as an input. An example of such file is located under the [example_models](example_models) directory.
-This template model was obtained using a 3D digitizer, but can similarly be obtained in any way as long as the measurements are accurate to a satisfactory degree.
-It is strongly recommended to create your own template model file **per physical cap model you are using in your lab**, this will lead to best accuracies.
-The exact format of this file is now specified.
-The file is a csv space delimited file, where each row contains 4 values:
-1. An index of the optode (an integer numerical value representing the index of this optode. Starts from 0. any other value (strings, etc) will not be calibrated but still appear in the output file in the same standard coordiante system as the rest of the optodes).
-2. 3 numerical values: X, Y, Z representing the location of this optode (note: values must be supplied in cm or inch).
-The coordinate system these values are supplied in are not improtant, as they are transformed internally to a standard right-handed system, and output coordinates are in this new cooridnate system (described below).
+1. Clone the repository by downloading it [directly](https://github.com/yoterel/STORM-Net/archive/master.zip) or by using the git command line tool:\
+`git clone https://github.com/yoterel/STORM-Net.git`
+
+2. Download all neural network models from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip), and place them under the [models](CapCalibrator/models) folder (after extracting).
+
+3. Download all precompiled binaries for the renderer from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip).
+
+4. Setup a virtual environment
+
+5. Activate your new environment
+
+6. install requirements
+
+7. navigate to [main.py](CapCalibrator/main.py), and run:\
+`python main.py --mode gui`\
+Note: in Linux you might need to unset PYTHONPATH before the application can be run succesfully ("unset PYTHONPATH" in terminal)
 
 ## How to use the different modes
 
@@ -53,6 +62,16 @@ For all command line options, see:
 
 `python main.py --help`
 
+## The template model file
+
+The application uses a pre-measured template model file as an input. An example of such file is located under the [example_models](example_models) directory.
+This template model was obtained using a 3D digitizer, but can similarly be obtained in any way as long as the measurements are accurate to a satisfactory degree.
+It is strongly recommended to create your own template model file **per physical cap model you are using in your lab**, this will lead to best accuracies.
+The exact format of this file is now specified.
+The file is a csv space delimited file, where each row contains 4 values:
+1. An index of the optode (an integer numerical value representing the index of this optode. Starts from 0. any other value (strings, etc) will not be calibrated but still appear in the output file in the same standard coordiante system as the rest of the optodes).
+2. 3 numerical values: X, Y, Z representing the location of this optode (note: values must be supplied in cm or inch).
+The coordinate system these values are supplied in are not improtant, as they are transformed internally to a standard right-handed system, and output coordinates are in this new cooridnate system (described below).
 
 ## Using a new cap - how to improve accuracy
 
