@@ -142,7 +142,7 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
 def configure_environment(gpu_id):
     import os
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id  # set gpu visibility prior to importing tf and keras
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)  # set gpu visibility prior to importing tf and keras
     global tf
     import tensorflow as tf
     gpus = tf.config.experimental.list_physical_devices('GPU')

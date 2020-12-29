@@ -1104,7 +1104,7 @@ class AboutPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.title = tk.Label(self,
-                                 text="STORM: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS).\n"
+                                 text="STORM-Net: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS).\n"
                                       "Research: Yotam Erel, Sagi Jaffe-Dax, Yaara Yeshurun-Dishon, Amit H. Bermano\n"
                                       "Implementation: Yotam Erel\n"
                                       "This program is free for personal, non-profit or academic use.",

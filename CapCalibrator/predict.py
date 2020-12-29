@@ -92,12 +92,12 @@ def get_facial_landmarks(frames):
             # plt.scatter([np.mean(landmarks[36:41, 0])], [np.mean(landmarks[36:41, 1])], c='g', s=5)
             # plt.show()
             # left eye, nose, right eye
-            my_landmarks = np.array([np.mean(landmarks[42:47, 0]),
-                                    np.mean(landmarks[42:47, 1]),
+            my_landmarks = np.array([np.mean(landmarks[42:48, 0]),
+                                    np.mean(landmarks[42:48, 1]),
                                     np.mean(landmarks[30, 0]),
                                     np.mean(landmarks[30, 1]),
-                                    np.mean(landmarks[36:41, 0]),
-                                    np.mean(landmarks[36:41, 1])])
+                                    np.mean(landmarks[36:42, 0]),
+                                    np.mean(landmarks[36:42, 1])])
         landmarks_list.append(my_landmarks)
     np_kp = np.array(landmarks_list)
     np_kp[:, 1::2] = 540 - np_kp[:, 1::2]
