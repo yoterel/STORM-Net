@@ -14,7 +14,7 @@ The repository also contains:
 
 ### Application dependencies:
 - Python 3.6 or higher
-- Use the [requirments.txt](requirements.txt) file to obtain all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
+- [requirments.txt](requirements.txt) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `pip install -r requirements.txt`
       
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
@@ -34,15 +34,23 @@ Note: tested on Windows 10 and Ubuntu 18.04. Mac testing will be finished soon.
 
 3. Download all precompiled binaries for the renderer from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip).
 
-4. Setup a virtual environment
+4. Setup a virtual environment:\
+`python -m venv my_venv_folder`
 
-5. Activate your new environment
+5. Activate your new environment:\
+`source my_venv_folder/bin/activate`
 
-6. install requirements
+6. upgrade pip to latest version:\
+`pip install --upgrade pip`
 
-7. navigate to [main.py](CapCalibrator/main.py), and run:\
+7. install requirements:\
+`pip install -r requirements.txt`
+
+8. navigate to [main.py](CapCalibrator/main.py), and run:\
 `python main.py --mode gui`\
-Note: in Linux you might need to unset PYTHONPATH before the application can be run succesfully ("unset PYTHONPATH" in terminal)
+
+Note: in Linux you might need to unset pythonpath (after step 7) before the application can be run succesfully (step 8):\
+`unset PYTHONPATH`
 
 ## How to use the different modes
 
