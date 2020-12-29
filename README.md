@@ -6,7 +6,7 @@ This application is designed to provide an accurate estimation of the position o
 There are 3 modes of operation:
 1. A GUI that allows manual annotation of the data / supervising the automatic method - this is recommended for first time users.
 2. A command-line interface which is a ready-to-use end-to-end script that performs calibration given a video file - use this when you are comfortable with the GUI and its results.
-3. An experimental mode that allows reproducing all results from the original manuscript.
+3. An experimental mode that allows reproducing all results from the original paper.
 
 The repository also contains:
 - Python scripts for finetunning (or training from scratch) the neural networks discussed in the paper. Description of how to do this is down below. 
