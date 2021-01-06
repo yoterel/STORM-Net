@@ -47,7 +47,7 @@ Note: tested on Windows 10 and Ubuntu 18.04. Mac testing will be finished soon.
 `pip install -r requirements.txt`
 
 8. navigate to [main.py](CapCalibrator/main.py), and run:\
-`python main.py --mode gui`\
+`python main.py --mode gui`
 
 Note: in Linux you might need to unset pythonpath (after step 7) before the application can be run successfully (step 8):\
 `unset PYTHONPATH`
