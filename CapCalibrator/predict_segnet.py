@@ -2,14 +2,12 @@ import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 from pathlib import Path
-import keras
 import numpy as np
 from PIL import Image
 import draw
 import file_io
 import pickle
 import logging
-import cv2
 
 root_dir = Path("/disk1/yotam/capnet")
 db_dir = Path.joinpath(root_dir, "db_segmentation")

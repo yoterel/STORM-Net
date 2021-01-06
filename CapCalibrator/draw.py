@@ -2,33 +2,9 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import numpy as np
-import cv2
 from pathlib import Path
 import utils
 import file_io
-import logging
-
-image_hsv = None
-pixel = (0, 0, 0) #RANDOM DEFAULT VALUE
-ftypes = [
-    ('JPG', '*.jpg;*.JPG;*.JPEG'),
-    ('PNG', '*.png;*.PNG'),
-    ('GIF', '*.gif;*.GIF'),
-]
-
-
-def pick_color(event, x, y, flags, param):
-    if event == cv2.EVENT_LBUTTONDOWN:
-        pixel = image_hsv[y, x]
-
-        #HUE, SATURATION, AND VALUE (BRIGHTNESS) RANGES. TOLERANCE COULD BE ADJUSTED.
-        upper = np.array([pixel[0] + 10, pixel[1] + 10, pixel[2] + 40])
-        lower = np.array([pixel[0] - 10, pixel[1] - 10, pixel[2] - 40])
-        logging.info(str(lower) + str(upper))
-
-        #A MONOCHROME MASK FOR GETTING A BETTER VISION OVER THE COLORS
-        image_mask = cv2.inRange(image_hsv, lower, upper)
-        cv2.imshow("Mask", image_mask)
 
 
 class Arrow3D(FancyArrowPatch):
@@ -42,7 +18,7 @@ class Arrow3D(FancyArrowPatch):
     def draw(self, renderer):
         xs3d, ys3d, zs3d = self._verts3d
         xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
-        self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
         FancyArrowPatch.draw(self, renderer)
 
 

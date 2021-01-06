@@ -85,7 +85,7 @@ class GUI(tk.Tk):
         #     storm_model_full_path = Path(args.storm_net)
         #     self.pretrained_stormnet_path = storm_model_full_path
         #     self.storm_model, self.storm_graph = file_io.load_clean_keras_model(storm_model_full_path)
-        self.wm_title("STORM - a fNIRS Calibration Tool")
+        self.wm_title("STORM-Net - Simple and Timely Optode Registration Method for fNIRS")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
         photo = ImageTk.PhotoImage(master=self, file="resource/icon.png")
@@ -1071,7 +1071,7 @@ class CalibrationPage(tk.Frame):
 class MainMenu(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-        self.label = tk.Label(self, text="STORM - a fNIRS Calibration Tool", font=("Verdana", 12))
+        self.label = tk.Label(self, text="STORM-Net Calibration Toolbox", font=("Verdana", 12))
         self.canvas = tk.Canvas(self, height=400, width=400, bg="#263D42")
         img = ImageTk.PhotoImage(master=self, file="resource/render.png")
         self.canvas.img = img  # or else image gets garbage collected

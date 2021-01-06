@@ -2,8 +2,6 @@ import tensorflow as tf
 import utils
 import file_io
 from pathlib import Path
-from sklearn.metrics import mean_squared_error
-import scipy.io as sio
 import cv2
 import pickle
 import dlib
@@ -86,14 +84,8 @@ def get_facial_landmarks(frames):
                 rects = []
         for (i, rect) in enumerate(rects):
             # Make the prediction and transform it to numpy array
-            # plt.imshow(img_data)
             landmarks = predictor(img_data, rect)
             landmarks = utils.shape_to_np(landmarks)
-            # plt.scatter([landmarks[0:68, 0]], [landmarks[0:68, 1]], c='r', s=1)
-            # plt.scatter([landmarks[30, 0]], [landmarks[30, 1]], c='g', s=1)
-            # plt.scatter([np.mean(landmarks[42:47, 0])], [np.mean(landmarks[42:47, 1])], c='g', s=5)
-            # plt.scatter([np.mean(landmarks[36:41, 0])], [np.mean(landmarks[36:41, 1])], c='g', s=5)
-            # plt.show()
             # left eye, nose, right eye
             my_landmarks = np.array([np.mean(landmarks[42:48, 0]),
                                     np.mean(landmarks[42:48, 1]),
@@ -195,7 +187,7 @@ def predict_keypoints_locations(frames, args, vid_hash="", is_puppet=False, save
     :param frames: the frames to process
     :param args: cmd line arguments
     :param vid_hash: a pickle file will be loaded if exists to save time (from previous runs)
-    :param is_puppet: if true a different landmark estimator will be used (color thresholding)
+    :param is_puppet: legacy landmark detector, to be removed.
     :param save_intermed: if true intermediate products will be saved to disk
     :param preloaded_model: a preloaded keras model to be used for prediction
     :param graph: tf graph
@@ -208,10 +200,7 @@ def predict_keypoints_locations(frames, args, vid_hash="", is_puppet=False, save
         key_points = pickle.load(f)
     else:
         logging.info("Detecting facial key points.")
-        if is_puppet:
-            facial_keypoints = get_puppet_landmarks(frames)
-        else:
-            facial_keypoints = get_facial_landmarks(frames)
+        facial_keypoints = get_facial_landmarks(frames)
         logging.info("Detecting sticker key points.")
         sticker_keypoints = get_sticker_locations(frames, preloaded_model, graph, args)
         key_points = np.concatenate((facial_keypoints, sticker_keypoints), axis=1)
@@ -223,47 +212,3 @@ def predict_keypoints_locations(frames, args, vid_hash="", is_puppet=False, save
             pickle.dump(key_points, f)
             f.close()
     return key_points
-
-
-def get_puppet_landmarks(frames):
-    """
-    predicts location of center of eyes and nose tip in a set of images of a puppet
-    :param frames: the images to predict the landmarks on
-    :return: a 2d numpy array containing x, y coordinates of required landmarks for each frame
-    """
-    # global image_hsv, pixel
-    #
-    # #OPEN DIALOG FOR READING THE IMAGE FILE
-    # root = tk.Tk()
-    # root.withdraw() #HIDE THE TKINTER GUI
-    # image_src = cv2.cvtColor(np.array(frames[0]), cv2.COLOR_RGB2BGR)
-    # cv2.imshow("BGR",image_src)
-    #
-    # #CREATE THE HSV FROM THE BGR IMAGE
-    # image_hsv = cv2.cvtColor(image_src,cv2.COLOR_BGR2HSV)
-    # cv2.imshow("HSV",image_hsv)
-    #
-    # #CALLBACK FUNCTION
-    # cv2.setMouseCallback("HSV", pick_color)
-    #
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    key_points_list = []
-    for i, frame in enumerate(frames):
-        frame_HSV = cv2.cvtColor(np.array(frame), cv2.COLOR_RGB2HSV)
-        purp1 = (140, 138, 84)
-        purp2 = (160, 158, 164)
-        mask = cv2.inRange(frame_HSV, purp1, purp2)
-        key_points = get_blob_keypoints(mask, 3, True, 1)
-        logging.info("Found {} blobs in frame {}.".format(len(key_points), i))
-        if key_points.tolist() != []:
-            key_points = key_points[np.argsort(key_points, axis=0)[:, 0]][::-1]  # sort key points according to x value
-            if len(key_points.flatten()) == 6 and i <= 5:  # last frames can't possibly contain facial landmarks.
-                key_points[:, 1] = 540 - key_points[:, 1]
-            else:
-                key_points = np.zeros(6)
-        else:
-            key_points = np.zeros(6)
-        key_points_list.append(key_points.flatten())
-    np_kp = np.array(key_points_list)
-    return np_kp

@@ -50,18 +50,18 @@ def pairwise(iterable):
     return zip(a, a)
 
 
-def preprocess_semantic_labels(orig_label_folder, train_label_dir):
-    train_label_dir.mkdir(parents=True, exist_ok=True)
-    for file in sorted(orig_label_folder.glob("*")):
-        img = cv2.imread(str(file), 0)
-        img[img == 1] = 0
-        img[img == 3] = 0
-        img[img == 2] = 1
-        dst_file = Path.joinpath(train_label_dir, file.name)
-        cv2.imwrite(str(dst_file), img)
-        # hist = cv2.calcHist([img], [0], None, [256], [0, 256])
-        # num_of_classes = np.count_nonzero(hist)
-        # print(file, num_of_classes)
+# def preprocess_semantic_labels(orig_label_folder, train_label_dir):
+#     train_label_dir.mkdir(parents=True, exist_ok=True)
+#     for file in sorted(orig_label_folder.glob("*")):
+#         img = cv2.imread(str(file), 0)
+#         img[img == 1] = 0
+#         img[img == 3] = 0
+#         img[img == 2] = 1
+#         dst_file = Path.joinpath(train_label_dir, file.name)
+#         cv2.imwrite(str(dst_file), img)
+#         hist = cv2.calcHist([img], [0], None, [256], [0, 256])
+#         num_of_classes = np.count_nonzero(hist)
+#         print(file, num_of_classes)
 
 
 def get_patches(img_arr, size=256, stride=256):
