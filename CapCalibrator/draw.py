@@ -457,3 +457,13 @@ def visualize_network_performance(model_name, root_dir):
     # plt.show()
     plt.savefig('plots/sticker_percent.png')
     print("done")
+
+
+def plot_skull_vs_error(skull, intra_digi, intra_vid, inter):
+    plt.scatter(skull, intra_digi, s=100)
+    plt.scatter(skull, intra_vid, s=100)
+    plt.scatter(skull, inter, s=100)
+    plt.legend(['Intra-Method Error Digiziter', 'Intra-Method Error Ours', 'Inter-Method Error'])
+    plt.ylabel('RMSE Error [cm]')
+    plt.xlabel('Skull Size [cm]')
+    plt.show()

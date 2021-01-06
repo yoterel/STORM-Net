@@ -234,9 +234,9 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     :param args: see caller
     :return: -
     """
-    digi2digi_est, digi2digi_rot = get_digi2digi_results(args.template, args.ground_truth)
+    digi2digi_est, digi2digi_rot, skulls = get_digi2digi_results(args.template, args.ground_truth)
     vid2vid_est = []
-    names, data, format = read_template_file(args.template)
+    names, data, format, _ = read_template_file(args.template)
     names = names[0]
     data = data[0]
     data = to_standard_coordinate_system(names, data)
@@ -308,11 +308,13 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     # calc t-test statistics
     a_vid = np.array(vid_intra_method_rmse)
     a_dig = np.array(digi_intra_method_rmse)
-    a_intra = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
+    a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
                       axis=0)
+    import draw
+    draw.plot_skull_vs_error(skulls, digi_intra_method_rmse, vid_intra_method_rmse, a_inter)
     t1, p1 = ttest_rel(a_vid, a_dig)
     logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
-    t2, p2 = ttest_rel(a_dig, a_intra)
+    t2, p2 = ttest_rel(a_dig, a_inter)
     logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
 
     #  calc shifts in every direction for each method
@@ -340,7 +342,7 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
         if template_names:
             names, data = template_names, template_data
         else:
-            names, data, format = read_template_file(args.template)
+            names, data, format, _ = read_template_file(args.template)
             names = names[0]
             data = data[0]
         data = to_standard_coordinate_system(names, data)
@@ -371,8 +373,8 @@ def get_rmse(A, B):
 
 
 def compare_data_from_files(file_path1, file_path2, use_second_sensor):
-    names1, data1, format1 = read_template_file(file_path1)
-    names2, data2, format2 = read_template_file(file_path2)
+    names1, data1, format1, _ = read_template_file(file_path1)
+    names2, data2, format2, _ = read_template_file(file_path2)
     assert(names1 == names2)
     assert(len(data1) == len(data2))
     index_of_spiral1 = names1.index(0)
@@ -443,7 +445,7 @@ def normalize_coordinates(names, data):
 
 
 def get_digi2digi_results(path_to_template, experiment_folder_path):
-    template_names, template_data, template_format = read_template_file(path_to_template)
+    template_names, template_data, template_format, _ = read_template_file(path_to_template)
     template_data = template_data[0]
     template_names = template_names[0]
     template_data = to_standard_coordinate_system(template_names, template_data)
@@ -466,6 +468,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
     template_spiral_data = template_data[template_names.index(0):, :]  # select spiral
 
     experiment_file_list = []
+    skulls = []
     optode_estimations = {}
     rot_estimations = {}
     if experiment_folder_path.is_dir():
@@ -476,7 +479,8 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
 
     for exp_file in experiment_file_list:
         logging.info(exp_file.name)
-        file_names, file_data, file_format = read_template_file(exp_file)
+        file_names, file_data, file_format, skull = read_template_file(exp_file)
+        skulls.append(skull)
         for session in zip(file_names, file_data):
             if not session[0]:
                 optode_estimations.setdefault(exp_file.stem, []).append(None)
@@ -534,7 +538,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
         # print("digi2digi rmse between session 1 and session 3:", rmse)
         # rmse = get_rmse(estimations[1], estimations[2])
         # print("digi2digi rmse between session 2 and session 3:", rmse)
-    return optode_estimations, rot_estimations
+    return optode_estimations, rot_estimations, skulls
 
 
 def project_sensors_to_MNI(sensor_locations):
@@ -566,7 +570,7 @@ def project_sensors_to_MNI(sensor_locations):
     selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
     origin_xyz = unsorted_origin_xyz[sorting_indices]
     otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
-    #todo: report head points to caller? report standard deviation to caller ?
+    # todo: report head points to caller? report standard deviation to caller ?
     sensor_locations[1][names.index(0):, :] = otherC
     return sensor_locations
 

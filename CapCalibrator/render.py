@@ -67,7 +67,7 @@ def render(template_names, template_data, output_folder, exe_path, log_path, ite
     
 if __name__ == "__main__":
     args = parse_arguments()
-    names, data, file_format = read_template_file(args.template)
+    names, data, file_format, _ = read_template_file(args.template)
     data = data[0]  # select first (and only) session
     if file_format == "telaviv":
         data = data[:, 0, :]  # select first sensor

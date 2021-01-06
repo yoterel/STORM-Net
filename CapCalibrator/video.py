@@ -33,6 +33,7 @@ def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, local_env_
     assert (local_env_size < stride)
     assert (local_env_size % 2 == 1)
     if frame_indices is not None:
+        assert (len(frame_indices) == steps_per_datapoint)
         indices = [frame_indices]
     else:
         base_sites = [i for i in range(0, frames_to_use, stride)]

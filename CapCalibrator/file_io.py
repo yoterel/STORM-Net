@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 import tensorflow as tf
 import models
+import re
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
 
 
@@ -15,7 +16,8 @@ def read_template_file(template_path):
     """
     reads a template file in telaviv format ("sensor x y z rx ry rz") or in princeton format ("name x y z")
     multiple sessions in same file are assumed to be delimited by a line "*" (and first session starts with it)
-    note: assumes certain order of capturing in telaviv format (since no names are given)
+    note1: assumes certain order of capturing in telaviv format (since no names are given)
+    note2: in tel-aviv format, two scalars in the beginning of the file are assumed to be skull sizes of subject.
     :param template_path: the path to template file
     :return: positions is a list of np array per session, names is a list of lists of names per session.
              note: if two sensors exists, they are stacked in a nx2x3 array, else nx3 for positions.
@@ -26,6 +28,7 @@ def read_template_file(template_path):
     non_empty_lines = [line for line in contents_split if line]
     delimiters = [i for i, x in enumerate(non_empty_lines) if x == "*"]
     names = [[]]
+    skulls = None
     if not delimiters:
         cond = len(non_empty_lines[0].split()) <= 4
         sessions = [non_empty_lines]
@@ -34,6 +37,16 @@ def read_template_file(template_path):
         sessions = [non_empty_lines[delimiters[0]+1:delimiters[1]],
                     non_empty_lines[delimiters[1]+1:delimiters[2]],
                     non_empty_lines[delimiters[2]+1:]]
+        skulls = []
+        for x in non_empty_lines[0:delimiters[0]]:
+            skull = re.findall(r"[-+]?\d*\.\d+|\d+", x)
+            if skull:
+                skull = float(skull[0])
+                skulls.append(skull)
+        skulls = np.array(skulls)
+        skulls = np.mean(skulls)
+        if np.isnan(skulls):
+            skulls = None
         names = [[], [], []]
     if cond:
         file_format = "princeton"
@@ -43,10 +56,8 @@ def read_template_file(template_path):
         file_format = "telaviv"
     data = []
     if file_format == "telaviv":
-        # labeled_names = ['rightear', 'nosebridge', 'nosetip', 'righteye', 'lefteye', 'leftear', 'cz', 'fp1', 'fp2', 'fpz']
         labeled_names = ['leftear', 'nosebridge', 'nosetip', 'lefteye', 'righteye', 'rightear',
                          'f8', 'fp2', 'fpz', 'fp1', 'f7', 'cz', 'o1', 'oz', 'o2']
-        # labeled_names = [item for item in labeled_names for i in range(2)]
         for j, session in enumerate(sessions):
             sensor1_data = []
             sensor2_data = []
@@ -81,7 +92,7 @@ def read_template_file(template_path):
             end = names[0][-1]
             names[0][names.index(1):] = [x for x in range(end)]
         data = [np.array(data)]
-    return names, data, file_format
+    return names, data, file_format, skulls
 
 
 def delete_content_of_folder(folder_path):
@@ -143,7 +154,7 @@ def extract_session_data(file, use_scale=True):
                 sticker_2d_locs[j] = [0, 0]
             else:
                 sticker_count += 1
-        # if one of face stickers is missing, mark all of them as missing
+        # mask facial landmarks if one is missing, also mask if frame is above 6 (no facial landmarks expected there)
         if sticker_2d_locs[0] == [0, 0] or sticker_2d_locs[1] == [0, 0] or sticker_2d_locs[2] == [0, 0] or i >= 7:
             sticker_2d_locs[0] = [0, 0]
             sticker_2d_locs[1] = [0, 0]
