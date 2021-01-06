@@ -34,6 +34,9 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
+    # mask facial landmarks for frames that have less than 3 of them
+    data_generators.mask_facial_landmarks(sticker_locations)
+    # center the data
     data_generators.center_data(sticker_locations)
     # if preloaded_model:
     #     model = preloaded_model

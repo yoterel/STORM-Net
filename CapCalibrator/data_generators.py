@@ -158,6 +158,22 @@ def perturb_data(x):
     # x_inverted_reshaped = np.reshape(x_inverted, (len(x_inverted)//timesteps_per_sample, timesteps_per_sample, number_of_features))
     # return x_scaled_reshaped, x_inverted_reshaped, scaler
 
+
+def mask_facial_landmarks(x):
+    """
+    masks facial landmarks in-place in every frame of x if less than 3 of them are present in it (per frame)
+    note: masking in this sense means to zeroify the data.
+    :param x: the np tensor representing the data (shaped batch_size x 10 x 14)
+    :return: None
+    """
+    for batch in range(x.shape[0]):
+        b = np.reshape(x[batch], (x.shape[1], x.shape[2] // 2, 2))  # reshape to 10 x 7 x 2
+        c = np.all(b == 0, axis=2)  # find stickers that are zeros
+        for frame in range(c.shape[0]):  # iterate over frames
+            if c[frame, 0] or c[frame, 1] or c[frame, 2]:  # if one of the first 3 stickers is 0, set all of them to 0
+                b[frame, :3] = 0
+
+
 def get_augmented(X_train,
                   Y_train,
                   X_val=None,
