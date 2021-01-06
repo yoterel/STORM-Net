@@ -22,9 +22,10 @@ The repository also contains:
 - Precompiled binaries for the renderer which can be downloaded from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip). Note these can also be compiled from source using [Unity](https://unity.com/) 2019.3 or higher.
 - Hardware: Although not necessary, the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We recommend using a GPU if fast calibration times are needed.
 
-Note: tested on Windows 10 and Ubuntu 18.04. Mac testing will be finished soon.
+Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
 
 ## Quick installation guide
+
 0. Have [python 3.6](https://www.python.org/downloads/) or higher installed and ready to use.
 
 1. Clone the repository by downloading it [directly](https://github.com/yoterel/STORM-Net/archive/master.zip) or by using the git command line tool:\
