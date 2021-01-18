@@ -53,6 +53,17 @@ Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
 Note: in Linux you might need to unset pythonpath (after step 7) before the application can be run successfully (step 8):\
 `unset PYTHONPATH`
 
+### For Windows 10 users only: full application executable available
+
+Instead of launching the application using python as described above, use these steps intead (python not required):
+
+1. Download & extract the full executable from [here](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/STORM-Net/STORM-Net.zip).
+
+2. Follow steps 2-3 in the section above to get the model files and precompiled renderer.
+
+3. run the application frrom the command line:\
+`main.exe --mode gui`
+
 ## How to use the different modes
 
 The file [main.py](CapCalibrator/main.py) is the entry point of the application. Some common use cases are shown below:
