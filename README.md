@@ -68,8 +68,10 @@ Instead of launching the application using python as described above, use these 
 
 The file [main.py](CapCalibrator/main.py) is the entry point of the application. Some common use cases are shown below:
 
-`python main.py --mode gui`\
+`python main.py --mode gui`
+
 `python main.py --mode auto --video path_to_video_file --template path_to_template_file`
+
 `python main.py --mode experimental --video path_to_video_folder --template path_to_template_file --gt path_to_ground_truth_measurements_folder`
 
 The mode "gui" indicates to the application that the user wants to use the GUI and supervise the process of annotation and calibration and to correct it if needed. This is recommended when possible. Note the GUI contains other useful functions such as viewing a template model and finetunning the neural networks.
