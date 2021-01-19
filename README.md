@@ -122,12 +122,12 @@ To do this, follow the steps below:
 
 ## List of mandatory optodes in template file
 
-The following optodes must exist in the template model file (and their locations should corropond with real 10-20 locations as much as possible):
+The following optodes must exist in the template model file (and their locations should corrospond with real 10-20 locations as much as possible):
 - "left_triangle" : the left most sticker location, use fp1 if possible. Used by the renderer.
 - "middle_triangle" : the middle sticker location, use fpz location + 1cm upwards if possible. Used by the renderer.
 - "right_triangle" : the right most sticker location, use fp2 if possible. Used by the renderer.
 - "top" : the sticker on the top of the head, use cz if possible.
-- "cz" : used to find standard coordinate system, and projecting to MNI after calibration is done (if user rquires).
+- "cz" : used to find standard coordinate system, and projecting to MNI after calibration is done (if user requires).
 - "righteye" : used to find standard coordinate system and by renderer.
 - "lefteye" : used to find standard coordinate system and by renderer.
 - "nosetip" : used to find standard coordinate system and by renderer.
