@@ -13,7 +13,7 @@ The repository also contains:
 - A synthetic data generator implemented in [Unity](https://unity.com/).
 
 ### Application dependencies:
-- Python version >= 3.6, but <= 3.8
+- Python version >= 3.6, but <= 3.8 (x64)
 - [requirments.txt](requirements.txt) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `pip install -r requirements.txt`
       
