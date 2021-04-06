@@ -13,7 +13,7 @@ The repository also contains:
 - A synthetic data generator implemented in [Unity](https://unity.com/).
 
 ### Application dependencies:
-- Python version >= 3.6, but <= 3.8
+- Python version >= 3.6, but <= 3.8 (x64)
 - [requirments.txt](requirements.txt) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `pip install -r requirements.txt`
       
@@ -39,7 +39,10 @@ Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
 `python -m venv my_venv_folder`
 
 5. Activate your new environment:\
-`source my_venv_folder/bin/activate`
+Linux:\
+`source my_venv_folder/bin/activate`\
+Windows:\
+`my_venv_folder/Scripts/activate.bat`
 
 6. upgrade pip to latest version:\
 `pip install --upgrade pip`
@@ -55,7 +58,7 @@ Note: in Linux you might need to unset pythonpath (after step 7) before the appl
 
 ### For Windows 10 users only: full application executable available
 
-Instead of launching the application using python as described above, use these steps intead (python not required):
+Instead of launching the application using python as described above, use these steps instead (python not required):
 
 1. Download & extract the full executable from [here](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/STORM-Net/STORM-Net.zip).
 
