@@ -234,7 +234,7 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     :param args: see caller
     :return: -
     """
-    digi2digi_est, digi2digi_rot, skulls = get_digi2digi_results(args.template, args.ground_truth)
+    digi2digi_est, digi2digi_rot, skull_radii = get_digi2digi_results(args.template, args.ground_truth, True)
     vid2vid_est = []
     names, data, format, _ = read_template_file(args.template)
     names = names[0]
@@ -253,6 +253,8 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     vid_rot_sessions2 = []
     vid_rot_sessions3 = []
 
+    digi_r_matrix = []
+
     for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
         subject_name, session_name = vid.split("_")
         session_number = int(re.findall(r'\d+', session_name)[0]) - 1
@@ -261,17 +263,24 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
         # transformed_data = from_sim_to_standard_space(names, transformed_data_sim.T)
         vid2vid_est.append(transformed_data_sim.T)
         rot = R.from_matrix(rot_mat)
+        try:
+            digi_rot = R.from_matrix(digi2digi_rot[subject_name][session_number])
+            digi_rot_euler = digi_rot.as_euler('xyz', degrees=True)
+        except Exception:
+            digi_rot_euler = None
 
         if session_number == 0:
             digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
-            digi_rot_sessions1.append(digi2digi_rot[subject_name][session_number])
+            digi_rot_sessions1.append(digi_rot_euler)
             vid_rot_sessions1.append(rot.as_euler('xyz', degrees=True))
+            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
         if session_number == 1:
             digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
-            digi_rot_sessions2.append(digi2digi_rot[subject_name][session_number])
+            digi_rot_sessions2.append(digi_rot_euler)
             vid_rot_sessions2.append(rot.as_euler('xyz', degrees=True))
+            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
         if session_number == 2:
-            digi_rot_sessions3.append(digi2digi_rot[subject_name][session_number])
+            digi_rot_sessions3.append(digi_rot_euler)
             vid_rot_sessions3.append(rot.as_euler('xyz', degrees=True))
 
     digi_intra_method_rmse = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
@@ -311,7 +320,11 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
                       axis=0)
     import draw
-    draw.plot_skull_vs_error(skulls, digi_intra_method_rmse, vid_intra_method_rmse, a_inter)
+    skull_radii = np.array(skull_radii)
+    circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
+    draw.plot_skull_vs_error(circumferences, digi_intra_method_rmse, vid_intra_method_rmse, a_inter)
+    logging.info("skull circumferences mean: {:.3f}".format(np.mean(circumferences)))
+    logging.info("skull circumferences std: {:.3f}".format(np.std(circumferences)))
     t1, p1 = ttest_rel(a_vid, a_dig)
     logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
     t2, p2 = ttest_rel(a_dig, a_inter)
@@ -332,31 +345,87 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
         "Shift correlation (x, px, y, py, z, pz):"
         "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
 
+    vid_est = []
+    dig_est = []
+    names, data, format, _ = read_template_file(args.template)
+    names = names[0]
+    data = data[0]
+    data = to_standard_coordinate_system(names, data)
+    if 0 in names:
+        data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
+        data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
+    else:
+        data_origin = data
+        data_optodes = np.zeros(3)
+    for rot_mat, scale_mat in zip(r_matrix, s_matrix):
+        transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+        vid_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
+    for rot_mat, scale_mat in zip(digi_r_matrix, s_matrix):
+        transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+        dig_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
+    from scipy import io
+
+    io.savemat('names.mat',
+               {'names': np.array([vid_est[0][0]], dtype=np.object)})
+
+    session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
+    io.savemat('session1_vid_no_MNI.mat',
+               {'session1_vid_no_MNI': session1_vid})
+    session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
+    io.savemat('session2_vid_no_MNI.mat',
+               {'session2_vid_no_MNI': session2_vid})
+    session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
+    io.savemat('session1_digi_no_MNI.mat',
+               {'session1_digi_no_MNI': session1_dig})
+    session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
+    io.savemat('session2_digi_no_MNI.mat',
+               {'session2_digi_no_MNI': session2_dig})
+
+    vid_projected_data_session1 = project_sensors_to_MNI(vid_est[0::3])
+    session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
+    np.save("session1_vid_MNI", session1_vid)
+    io.savemat('session1_vid.mat',
+               {'session1_vid': session1_vid})
+    vid_projected_data_session2 = project_sensors_to_MNI(vid_est[1::3])
+    session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
+    np.save("session2_vid_MNI", session2_vid)
+    io.savemat('session2_vid.mat',
+               {'session2_vid': session2_vid})
+    digi_projected_data_session1 = project_sensors_to_MNI(dig_est[0::2])
+    session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
+    np.save("session1_digi_MNI", session1_dig)
+    io.savemat('session1_digi.mat',
+               {'session1_digi': session1_dig})
+    digi_projected_data_session2 = project_sensors_to_MNI(dig_est[1::2])
+    session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
+    np.save("session2_digi_MNI", session2_dig)
+    io.savemat('session2_digi.mat',
+               {'session2_digi': session2_dig})
+
 
 def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
     if args.mode == "experimental":
         reproduce_experiments(r_matrix, s_matrix, video_names, args)
-        return None
-    else:  # mode = gui / cli
-        vid_est = []
-        if template_names:
-            names, data = template_names, template_data
-        else:
-            names, data, format, _ = read_template_file(args.template)
-            names = names[0]
-            data = data[0]
-        data = to_standard_coordinate_system(names, data)
-        if 0 in names:
-            data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-            data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
-        else:
-            data_origin = data
-            data_optodes = np.zeros(3)
-        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
-            data_optodes = transformed_data_sim.T
-            vid_est.append([names, np.vstack((data_origin, data_optodes))])
-    return vid_est[0]
+        exit()
+    vid_est = []
+    if template_names:
+        names, data = template_names, template_data
+    else:
+        names, data, format, _ = read_template_file(args.template)
+        names = names[0]
+        data = data[0]
+    data = to_standard_coordinate_system(names, data)
+    if 0 in names:
+        data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
+        data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
+    else:
+        data_origin = data
+        data_optodes = np.zeros(3)
+    for rot_mat, scale_mat in zip(r_matrix, s_matrix):
+        transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+        data_optodes = transformed_data_sim.T
+        vid_est.append([names, np.vstack((data_origin, data_optodes))])
+    return vid_est
 
 
 def get_rmse(A, B):
@@ -444,7 +513,7 @@ def normalize_coordinates(names, data):
     # zscale = new_data[names.index('cz'), 1] - np.min(data[:, 2])
 
 
-def get_digi2digi_results(path_to_template, experiment_folder_path):
+def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matrix=False):
     template_names, template_data, template_format, _ = read_template_file(path_to_template)
     template_data = template_data[0]
     template_names = template_names[0]
@@ -480,14 +549,15 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
     for exp_file in experiment_file_list:
         logging.info(exp_file.name)
         file_names, file_data, file_format, skull = read_template_file(exp_file)
-        skulls.append(skull)
+        # skulls.append(skull)
+        skull_sizes = []
         for session in zip(file_names, file_data):
             if not session[0]:
                 optode_estimations.setdefault(exp_file.stem, []).append(None)
                 rot_estimations.setdefault(exp_file.stem, []).append(None)
                 continue
             names = session[0]
-            data = session[1][:, 0, :]# - session[1][:, 1, :]  # subtract second sensor
+            data = session[1][:, 0, :] #- session[1][:, 1, :]  # subtract second sensor
             data = to_standard_coordinate_system(names, data)
             # file_data = normalize_coordinates(file_names, file_data)  # normalize data
             file_mask_data = data[(names.index('fp1'),
@@ -521,7 +591,14 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
             # facial alignment was an intermediate result
             estimation = (ret_R @ template_spiral_data.T).T
             optode_estimations.setdefault(exp_file.stem, []).append(estimation)
-            rot_estimations.setdefault(exp_file.stem, []).append(gt_rot_e)
+            if rot_as_matrix:
+                rot_estimations.setdefault(exp_file.stem, []).append(ret_R)
+            else:
+                rot_estimations.setdefault(exp_file.stem, []).append(gt_rot_e)
+            skull_sizes.append([np.linalg.norm(data[(names.index('leftear'))] - data[(names.index('rightear'))]),
+                                np.linalg.norm(data[(names.index('fpz'))] - data[(names.index('o1'))])])
+        skulls.append(np.mean(np.array(skull_sizes), axis=0) / 2)
+
         # rmse = get_rmse(estimation, file_spiral_data)
         # print("template-digitizer error (transform using fiducials):", rmse)
         # vis_estimation = (ret_R @ template_face_data.T).T + ret_t
@@ -541,36 +618,38 @@ def get_digi2digi_results(path_to_template, experiment_folder_path):
     return optode_estimations, rot_estimations, skulls
 
 
-def project_sensors_to_MNI(sensor_locations):
+def project_sensors_to_MNI(list_of_sensor_locations):
     """
     project new sensor locations to MNI
-    :param sensor_locations: a list of names, data of all sensor locations
+    :param list_of_sensor_locations: a list of lists of names, data of all sensor locations
     :return:
     """
-    names = sensor_locations[0]
-    data = sensor_locations[1]
-    if 0 in names:
-        unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
-        unsorted_origin_names = np.array(names[:names.index(0)])
-        others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
-    else:  # someone forgot to pass data for projection...
-        unsorted_origin_xyz = data
-        unsorted_origin_names = np.array(names)
-        others_xyz = np.zeros(3)
+    projected_locations = list_of_sensor_locations.copy()
+    for sensor_locations in projected_locations:
+        names = sensor_locations[0]
+        data = sensor_locations[1]
+        if 0 in names:
+            unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+            unsorted_origin_names = np.array(names[:names.index(0)])
+            others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
+        else:  # someone forgot to pass data for projection...
+            unsorted_origin_xyz = data
+            unsorted_origin_names = np.array(names)
+            others_xyz = np.zeros(3)
 
-    # these names are written in an order the algorithm expects (and MNI template data was written in)
-    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
-                                    "fp1", "fp2", "fz", "f3",
-                                    "f4", "f7", "f8", "cz",
-                                    "c3", "c4", "t3", "t4",
-                                    "pz", "p3", "p4", "t5",
-                                    "t6", "o1", "o2"])
+        # these names are written in an order the algorithm expects (and MNI template data was written in)
+        target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
+                                        "fp1", "fp2", "fz", "f3",
+                                        "f4", "f7", "f8", "cz",
+                                        "c3", "c4", "t3", "t4",
+                                        "pz", "p3", "p4", "t5",
+                                        "t6", "o1", "o2"])
 
-    # sort our anchors using the order above
-    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
-    origin_xyz = unsorted_origin_xyz[sorting_indices]
-    otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
-    # todo: report head points to caller? report standard deviation to caller ?
-    sensor_locations[1][names.index(0):, :] = otherC
-    return sensor_locations
+        # sort our anchors using the order above
+        selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
+        origin_xyz = unsorted_origin_xyz[sorting_indices]
+        otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
+        # todo: report head points to caller? report standard deviation to caller ?
+        sensor_locations[1][names.index(0):, :] = otherC
+    return projected_locations
 

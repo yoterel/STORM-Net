@@ -441,5 +441,5 @@ def plot_skull_vs_error(skull, intra_digi, intra_vid, inter):
     plt.scatter(skull, inter, s=100)
     plt.legend(['Intra-Method Error Digiziter', 'Intra-Method Error Ours', 'Inter-Method Error'])
     plt.ylabel('RMSE Error [cm]')
-    plt.xlabel('Skull Size [cm]')
+    plt.xlabel('Skull Circumference [cm]')
     plt.show()

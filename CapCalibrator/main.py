@@ -100,4 +100,4 @@ if __name__ == "__main__":
             projected_data = geometry.project_sensors_to_MNI(sensor_locations)
         else:
             projected_data = sensor_locations
-        save_results(projected_data, args.output_file)
+        save_results(projected_data[0], args.output_file)

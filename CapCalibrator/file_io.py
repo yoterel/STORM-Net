@@ -43,9 +43,10 @@ def read_template_file(template_path):
             if skull:
                 skull = float(skull[0])
                 skulls.append(skull)
-        skulls = np.array(skulls)
-        skulls = np.mean(skulls)
-        if np.isnan(skulls):
+        if skulls:
+            skulls = np.array(skulls)
+            skulls = np.mean(skulls)
+        else:
             skulls = None
         names = [[], [], []]
     if cond:

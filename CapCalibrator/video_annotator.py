@@ -945,7 +945,7 @@ class ThreadedTask(threading.Thread):
             projected_data = geometry.project_sensors_to_MNI(sensor_locations)
         else:
             projected_data = sensor_locations
-        self.queue.put(["calibrate", projected_data])
+        self.queue.put(["calibrate", projected_data[0]])
 
     def handle_load_template_model(self):
         path = self.msg[1]
