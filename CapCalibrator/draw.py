@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+from matplotlib import colors
+from matplotlib.ticker import PercentFormatter
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import numpy as np
@@ -442,4 +444,60 @@ def plot_skull_vs_error(skull, intra_digi, intra_vid, inter):
     plt.legend(['Intra-Method Error Digiziter', 'Intra-Method Error Ours', 'Inter-Method Error'])
     plt.ylabel('RMSE Error [cm]')
     plt.xlabel('Skull Circumference [cm]')
+    plt.show()
+
+
+def plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI):
+
+    n_bins = 40
+    cm = plt.cm.get_cmap('cool')
+
+    fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True)
+
+    n0, _, patches0 = axs[0].hist(dig2vid_after_MNI.flatten(),
+                                  bins=n_bins,
+                                  weights=np.ones(dig2dig_after_MNI.size) / dig2dig_after_MNI.size,
+                                  range=[0, 20],
+                                  align="left")
+    axs[0].yaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    axs[0].set_title("Digitizer to Video")
+
+    n1, _, patches1 = axs[1].hist(dig2dig_after_MNI.flatten(),
+                                  bins=n_bins,
+                                  weights=np.ones(dig2dig_after_MNI.size) / dig2dig_after_MNI.size,
+                                  range=[0, 20],
+                                  align="left")
+    axs[1].yaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    axs[1].set_title("Digitizer to Digitizer")
+
+    n2, _, patches2 = axs[2].hist(vid2vid_after_MNI.flatten(),
+                                  bins=n_bins,
+                                  weights=np.ones(dig2dig_after_MNI.size) / dig2dig_after_MNI.size,
+                                  range=[0, 20],
+                                  align="left")
+    axs[2].yaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    axs[2].set_title("Video to Video")
+
+    max_c = np.max(np.concatenate((n0, n1, n2)))
+    min_c0 = np.min(n0[n0 != 0])
+    min_c1 = np.min(n0[n1 != 0])
+    min_c2 = np.min(n0[n2 != 0])
+    min_c = np.min(np.array([min_c0, min_c1, min_c2]))
+
+    for c, p in zip(n0, patches0):
+        norm_color = (c - min_c) / (max_c - min_c)
+        plt.setp(p, 'facecolor', cm(norm_color))
+    for c, p in zip(n1, patches1):
+        norm_color = (c - min_c) / (max_c - min_c)
+        plt.setp(p, 'facecolor', cm(norm_color))
+    for c, p in zip(n2, patches2):
+        norm_color = (c - min_c) / (max_c - min_c)
+        plt.setp(p, 'facecolor', cm(norm_color))
+    fig.add_subplot(111, frameon=False)
+    # hide tick and tick label of the big axes
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+    plt.grid(False)
+    plt.xlabel("Channel Error [mm]")
+    plt.ylabel("Percent of Channels")
+    # fig.suptitle('This is a somewhat long figure title', fontsize=16)
     plt.show()

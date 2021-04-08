@@ -234,14 +234,15 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     :param args: see caller
     :return: -
     """
-    digi2digi_est, digi2digi_rot, skull_radii = get_digi2digi_results(args.template, args.ground_truth, True)
+    digi2digi_est, digi2digi_rot, skull_radii, ss_data = get_digi2digi_results(args.template,
+                                                                               args.ground_truth,
+                                                                               True)
     vid2vid_est = []
     names, data, format, _ = read_template_file(args.template)
     names = names[0]
     data = data[0]
     data = to_standard_coordinate_system(names, data)
     data_spiral = data[names.index(0):, :]  # select spiral
-    # data_sim = from_standard_to_sim_space(names, data)
 
     digi_intra_method_sessions1 = []
     digi_intra_method_sessions2 = []
@@ -255,12 +256,12 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
 
     digi_r_matrix = []
 
+    # calculate all errors for manuscript
     for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
         subject_name, session_name = vid.split("_")
         session_number = int(re.findall(r'\d+', session_name)[0]) - 1
 
         transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
-        # transformed_data = from_sim_to_standard_space(names, transformed_data_sim.T)
         vid2vid_est.append(transformed_data_sim.T)
         rot = R.from_matrix(rot_mat)
         try:
@@ -319,6 +320,8 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     a_dig = np.array(digi_intra_method_rmse)
     a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
                       axis=0)
+
+    # do skulls plot
     import draw
     skull_radii = np.array(skull_radii)
     circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
@@ -330,13 +333,13 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     t2, p2 = ttest_rel(a_dig, a_inter)
     logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
 
-    #  calc shifts in every direction for each method
+    # calc shifts in every direction for each method
     digi2digi_shift = np.array(
         [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
     vid2vid_shift = np.array(
         [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
 
-    #  correlate the shifts
+    # correlate the shifts
     x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
     y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
     z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
@@ -345,6 +348,30 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
         "Shift correlation (x, px, y, py, z, pz):"
         "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
 
+    # do histogram plot
+    try:
+        import scipy.io as sio
+        dig2dig_after_MNI = sio.loadmat("dig2dig.mat")["dig2digDist"]
+        dig2vid_after_MNI = sio.loadmat("dig2vid.mat")["dig2vidDist"]
+        vid2vid_after_MNI = sio.loadmat("vid2vid.mat")["vid2vidDist"]
+        draw.plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI)
+    except Exception:
+        logging.info("tried to reproduce figure but pkl data is missing")
+
+    # do MNI plots
+    # digi2digi session1: calc error using subject-specific MNI anchors
+    dig_est = []
+    data_others = [x[1] for x in ss_data]
+    data_origin = [x[0] for x in ss_data]
+    for i, (rot_mat, scale_mat) in enumerate(zip(digi_r_matrix[0::2], s_matrix[0::3])):
+        transformed_data_sim = rot_mat @ (scale_mat @ data_others[i].T)
+        dig_est.append([names, np.vstack((data_origin[i], transformed_data_sim.T))])
+
+    digi_projected_data = project_sensors_to_MNI(dig_est)
+    digi = np.array([x[1] for x in digi_projected_data], dtype=np.object)
+    np.save("session1_digi_MNI_ss", digi)
+
+    # everything else (digi2digi, vid2vid, digi2vid) all sessions: calc error using template MNI anchors
     vid_est = []
     dig_est = []
     names, data, format, _ = read_template_file(args.template)
@@ -401,6 +428,7 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     np.save("session2_digi_MNI", session2_dig)
     io.savemat('session2_digi.mat',
                {'session2_digi': session2_dig})
+
 
 
 def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
@@ -538,6 +566,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
 
     experiment_file_list = []
     skulls = []
+    template_spiral_in_measurement_space = []
     optode_estimations = {}
     rot_estimations = {}
     if experiment_folder_path.is_dir():
@@ -549,9 +578,8 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
     for exp_file in experiment_file_list:
         logging.info(exp_file.name)
         file_names, file_data, file_format, skull = read_template_file(exp_file)
-        # skulls.append(skull)
         skull_sizes = []
-        for session in zip(file_names, file_data):
+        for i, session in enumerate(zip(file_names, file_data)):
             if not session[0]:
                 optode_estimations.setdefault(exp_file.stem, []).append(None)
                 rot_estimations.setdefault(exp_file.stem, []).append(None)
@@ -578,6 +606,15 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
             # align faces as intermediate step
             ret_R, ret_t = rigid_transform_3d_nparray(template_face_data, file_face_data)
             aligned_template_mask = (ret_R @ template_mask_data.T).T + ret_t
+
+            if i == 0:
+                subject_secific_origin = data[(names.index('leftear'),
+                                               names.index('rightear'),
+                                               names.index('nosebridge'),
+                                               names.index('cz')), :]
+                subject_secific_spiral = (ret_R @ template_spiral_data.T).T + ret_t
+                template_spiral_in_measurement_space.append([subject_secific_origin, subject_secific_spiral])
+
             # find mask transform
             ret_R, ret_t = rigid_transform_3d_nparray(aligned_template_mask, file_mask_data)
             # vis_estimation = (ret_R @ template_mask_data.T).T + ret_t
@@ -615,7 +652,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
         # print("digi2digi rmse between session 1 and session 3:", rmse)
         # rmse = get_rmse(estimations[1], estimations[2])
         # print("digi2digi rmse between session 2 and session 3:", rmse)
-    return optode_estimations, rot_estimations, skulls
+    return optode_estimations, rot_estimations, skulls, template_spiral_in_measurement_space
 
 
 def project_sensors_to_MNI(list_of_sensor_locations):
