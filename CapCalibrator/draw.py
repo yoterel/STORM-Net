@@ -483,16 +483,16 @@ def plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI):
     min_c1 = np.min(n0[n1 != 0])
     min_c2 = np.min(n0[n2 != 0])
     min_c = np.min(np.array([min_c0, min_c1, min_c2]))
-
-    for c, p in zip(n0, patches0):
-        norm_color = (c - min_c) / (max_c - min_c)
-        plt.setp(p, 'facecolor', cm(norm_color))
-    for c, p in zip(n1, patches1):
-        norm_color = (c - min_c) / (max_c - min_c)
-        plt.setp(p, 'facecolor', cm(norm_color))
-    for c, p in zip(n2, patches2):
-        norm_color = (c - min_c) / (max_c - min_c)
-        plt.setp(p, 'facecolor', cm(norm_color))
+    # "fancy" colors
+    # for c, p in zip(n0, patches0):
+    #     norm_color = (c - min_c) / (max_c - min_c)
+    #     plt.setp(p, 'facecolor', cm(norm_color))
+    # for c, p in zip(n1, patches1):
+    #     norm_color = (c - min_c) / (max_c - min_c)
+    #     plt.setp(p, 'facecolor', cm(norm_color))
+    # for c, p in zip(n2, patches2):
+    #     norm_color = (c - min_c) / (max_c - min_c)
+    #     plt.setp(p, 'facecolor', cm(norm_color))
     fig.add_subplot(111, frameon=False)
     # hide tick and tick label of the big axes
     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)

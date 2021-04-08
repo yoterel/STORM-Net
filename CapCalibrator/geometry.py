@@ -6,7 +6,7 @@ import re
 import logging
 import MNI
 from scipy.stats import pearsonr, ttest_rel
-
+from pathlib import Path
 
 def align_centroids(a, b):
     """
@@ -359,76 +359,93 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
         logging.info("tried to reproduce figure but pkl data is missing")
 
     # do MNI plots
-    # digi2digi session1: calc error using subject-specific MNI anchors
-    dig_est = []
-    data_others = [x[1] for x in ss_data]
-    data_origin = [x[0] for x in ss_data]
-    for i, (rot_mat, scale_mat) in enumerate(zip(digi_r_matrix[0::2], s_matrix[0::3])):
-        transformed_data_sim = rot_mat @ (scale_mat @ data_others[i].T)
-        dig_est.append([names, np.vstack((data_origin[i], transformed_data_sim.T))])
+    digi_names = ["leftear", "rightear", "nosebridge", "cz"] + names[names.index(0):]
+    if not Path("session1_digi_MNI_ss.npy").is_file():
+        # digi2digi session1: calc error using subject-specific MNI anchors
+        dig_est = []
+        data_others = [x[1] for x in ss_data]
+        data_origin = [x[0] for x in ss_data]
+        # digi_names = ["leftear", "rightear", "nosebridge", "cz"] + names[names.index(0):]
+        for i, (rot_mat, scale_mat) in enumerate(zip(digi_r_matrix[0::2], s_matrix[0::3])):
+            transformed_data_sim = rot_mat @ (scale_mat @ data_others[i].T)
+            dig_est.append([digi_names, np.vstack((data_origin[i], transformed_data_sim.T))])
 
-    digi_projected_data = project_sensors_to_MNI(dig_est)
-    digi = np.array([x[1] for x in digi_projected_data], dtype=np.object)
-    np.save("session1_digi_MNI_ss", digi)
+        digi_projected_data = project_sensors_to_MNI(dig_est)
+        digi = np.array([x[1] for x in digi_projected_data], dtype=np.object)
+        np.save("session1_digi_MNI_ss", digi)
 
-    # everything else (digi2digi, vid2vid, digi2vid) all sessions: calc error using template MNI anchors
-    vid_est = []
-    dig_est = []
-    names, data, format, _ = read_template_file(args.template)
-    names = names[0]
-    data = data[0]
-    data = to_standard_coordinate_system(names, data)
-    if 0 in names:
-        data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-        data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
-    else:
-        data_origin = data
-        data_optodes = np.zeros(3)
-    for rot_mat, scale_mat in zip(r_matrix, s_matrix):
-        transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
-        vid_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
-    for rot_mat, scale_mat in zip(digi_r_matrix, s_matrix):
-        transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
-        dig_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
-    from scipy import io
+    do_MNI = False
+    if do_MNI:
+        # everything else (digi2digi, vid2vid, digi2vid) all sessions: calc error using template MNI anchors
+        vid_est = []
+        dig_est = []
+        names, data, format, _ = read_template_file(args.template)
+        names = names[0]
+        data = data[0]
+        data = to_standard_coordinate_system(names, data)
+        if 0 in names:
+            data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
+            data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
+        else:
+            data_origin = data
+            data_optodes = np.zeros(3)
+        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
+            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+            vid_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
+        for rot_mat, scale_mat in zip(digi_r_matrix, s_matrix):
+            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+            dig_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
+        from scipy import io
 
-    io.savemat('names.mat',
-               {'names': np.array([vid_est[0][0]], dtype=np.object)})
+        io.savemat('names.mat',
+                   {'names': np.array([vid_est[0][0]], dtype=np.object)})
 
-    session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
-    io.savemat('session1_vid_no_MNI.mat',
-               {'session1_vid_no_MNI': session1_vid})
-    session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
-    io.savemat('session2_vid_no_MNI.mat',
-               {'session2_vid_no_MNI': session2_vid})
-    session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
-    io.savemat('session1_digi_no_MNI.mat',
-               {'session1_digi_no_MNI': session1_dig})
-    session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
-    io.savemat('session2_digi_no_MNI.mat',
-               {'session2_digi_no_MNI': session2_dig})
+        session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
+        io.savemat('session1_vid_no_MNI.mat',
+                   {'session1_vid_no_MNI': session1_vid})
+        session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
+        io.savemat('session2_vid_no_MNI.mat',
+                   {'session2_vid_no_MNI': session2_vid})
+        session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
+        io.savemat('session1_digi_no_MNI.mat',
+                   {'session1_digi_no_MNI': session1_dig})
+        session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
+        io.savemat('session2_digi_no_MNI.mat',
+                   {'session2_digi_no_MNI': session2_dig})
 
-    vid_projected_data_session1 = project_sensors_to_MNI(vid_est[0::3])
-    session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
-    np.save("session1_vid_MNI", session1_vid)
-    io.savemat('session1_vid.mat',
-               {'session1_vid': session1_vid})
-    vid_projected_data_session2 = project_sensors_to_MNI(vid_est[1::3])
-    session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
-    np.save("session2_vid_MNI", session2_vid)
-    io.savemat('session2_vid.mat',
-               {'session2_vid': session2_vid})
-    digi_projected_data_session1 = project_sensors_to_MNI(dig_est[0::2])
-    session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
-    np.save("session1_digi_MNI", session1_dig)
-    io.savemat('session1_digi.mat',
-               {'session1_digi': session1_dig})
-    digi_projected_data_session2 = project_sensors_to_MNI(dig_est[1::2])
-    session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
-    np.save("session2_digi_MNI", session2_dig)
-    io.savemat('session2_digi.mat',
-               {'session2_digi': session2_dig})
+        vid_projected_data_session1 = project_sensors_to_MNI(vid_est[0::3])
+        session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
+        np.save("session1_vid_MNI", session1_vid)
+        io.savemat('session1_vid.mat',
+                   {'session1_vid': session1_vid})
+        vid_projected_data_session2 = project_sensors_to_MNI(vid_est[1::3])
+        session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
+        np.save("session2_vid_MNI", session2_vid)
+        io.savemat('session2_vid.mat',
+                   {'session2_vid': session2_vid})
+        digi_projected_data_session1 = project_sensors_to_MNI(dig_est[0::2])
+        session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
+        np.save("session1_digi_MNI", session1_dig)
+        io.savemat('session1_digi.mat',
+                   {'session1_digi': session1_dig})
+        digi_projected_data_session2 = project_sensors_to_MNI(dig_est[1::2])
+        session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
+        np.save("session2_digi_MNI", session2_dig)
+        io.savemat('session2_digi.mat',
+                   {'session2_digi': session2_dig})
 
+    digi_ss = np.load("session1_digi_MNI_ss.npy", allow_pickle=True)
+    digi_template = np.load("session1_digi_MNI.npy", allow_pickle=True)
+    digi_ss_spiral = digi_ss[:, digi_names.index(0):, :]
+    digi_template_spiral = digi_template[:, names.index(0):, :]
+    errors = []
+    for i in range(len(digi_ss_spiral)):
+        rmse_error = calc_rmse_error(digi_ss_spiral[i], digi_template_spiral[i])
+        errors.append(rmse_error)
+    rmse_error_f = np.mean(np.array(errors))
+    logging.info("with ss mni vs without: {:.3f}".format(rmse_error_f))
+    draw.visualize_2_pc(points_blue=digi_ss_spiral[0], points_red=digi_ss_spiral[1])
+    print("done!")
 
 
 def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
@@ -658,7 +675,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
 def project_sensors_to_MNI(list_of_sensor_locations):
     """
     project new sensor locations to MNI
-    :param list_of_sensor_locations: a list of lists of names, data of all sensor locations
+    :param list_of_sensor_locations: a list of lists of names (, data (nx3)of all sensor locations
     :return:
     """
     projected_locations = list_of_sensor_locations.copy()
