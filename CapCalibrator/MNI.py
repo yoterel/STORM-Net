@@ -18,15 +18,6 @@ def project(origin_xyz, others_xyz, selected_indices):
     # othersPath = "resource\\MNI_templates\\others_sample.csv"  # Provide others path
 
     # --------------------- Load and process the data ----------------------
-
-    dmnihavePath = Path("resource/MNI_templates/DMNIHAve.csv")
-    xallhemPath = Path("resource/MNI_templates/xallHEM.csv")
-    yallhemPath = Path("resource/MNI_templates/yallHEM.csv")
-    zallhemPath = Path("resource/MNI_templates/zallHEM.csv")
-    xallbemPath = Path("resource/MNI_templates/xallBEM.csv")
-    yallbemPath = Path("resource/MNI_templates/yallBEM.csv")
-    zallbemPath = Path("resource/MNI_templates/zallBEM.csv")
-
     # try:
     #     originXYZ = (pd.DataFrame(pd.read_csv(originPath), columns=['X', 'Y', 'Z'])).to_numpy()
     # except:
@@ -41,13 +32,14 @@ def project(origin_xyz, others_xyz, selected_indices):
     originXYZ = origin_xyz
     othersXYZ = others_xyz
 
-    DMNIHAve = np.genfromtxt(dmnihavePath, delimiter=',')
-    xallHEM = np.genfromtxt(xallhemPath, delimiter=',')
-    yallHEM = np.genfromtxt(yallhemPath, delimiter=',')
-    zallHEM = np.genfromtxt(zallhemPath, delimiter=',')
-    xallBEM = np.genfromtxt(xallbemPath, delimiter=',')
-    yallBEM = np.genfromtxt(yallbemPath, delimiter=',')
-    zallBEM = np.genfromtxt(zallbemPath, delimiter=',')
+    path_wo_ext = "resource/MNI_templates/DMNIHAve"
+    dmnihavePath = Path(path_wo_ext + ".csv")
+    if Path(path_wo_ext+".npy").is_file():
+        DMNIHAve = np.load(path_wo_ext+".npy", allow_pickle=True)
+    else:
+        DMNIHAve = np.genfromtxt(dmnihavePath, delimiter=',')
+        np.save(path_wo_ext, DMNIHAve)
+
 
 
     # othersXYZ = np.delete(othersXYZ, 0, 1)
@@ -82,10 +74,19 @@ def project(origin_xyz, others_xyz, selected_indices):
     refN = 17
     refBList = np.empty((refN, 2), dtype=object)
 
+    DMS = []
     for i in range(1, refN+1):
-        path = Path("resource/MNI_templates/DMNI{:0>4d}.csv".format(i))
-        DM = np.genfromtxt(path, delimiter=',')
-        DM = DM[selectedIndexes, :]
+        path_wo_ext = "resource/MNI_templates/DMNI{:0>4d}".format(i)
+        if Path(path_wo_ext+".npy").is_file():
+            DMS.append(np.load(path_wo_ext+".npy", allow_pickle=True))
+        else:
+            csv_path = Path(path_wo_ext+".csv")
+            DM = np.genfromtxt(csv_path, delimiter=',')
+            np.save(path_wo_ext, DM)
+            DMS.append(DM)
+
+    for i in range(1, refN+1):
+        DM = DMS[i-1][selectedIndexes, :]
         refDist = np.c_[DM, np.ones(size)]
         WW = np.linalg.lstsq(listOri, refDist, rcond=None)[0]
         refBListCur = np.matmul(listOri, WW)
@@ -123,7 +124,19 @@ def project(origin_xyz, others_xyz, selected_indices):
     otherHMean = np.ones((pointN, 3))
     otherHVar = np.ones((pointN, 4))
     otherHSD = np.ones((pointN, 4))
-    XYZ = np.column_stack((xallHEM, yallHEM, zallHEM))
+
+    path_wo_ext = "resource/MNI_templates/xyzallHEM"
+    if Path(path_wo_ext+".npy").is_file():
+        XYZ = np.load(path_wo_ext+".npy", allow_pickle=True)
+    else:
+        xallhemPath = Path("resource/MNI_templates/xallHEM.csv")
+        yallhemPath = Path("resource/MNI_templates/yallHEM.csv")
+        zallhemPath = Path("resource/MNI_templates/zallHEM.csv")
+        xallHEM = np.genfromtxt(xallhemPath, delimiter=',')
+        yallHEM = np.genfromtxt(yallhemPath, delimiter=',')
+        zallHEM = np.genfromtxt(zallhemPath, delimiter=',')
+        XYZ = np.column_stack((xallHEM, yallHEM, zallHEM))
+        np.save(path_wo_ext, XYZ)
     top = 3
 
     for i in range(pointN):
@@ -131,15 +144,15 @@ def project(origin_xyz, others_xyz, selected_indices):
         otherHMean[i, :] = AA
 
         # ----- Back projection ----- (l 707)
-        PP = np.ones(XYZ.shape)
-        PP[:, 0], PP[:, 1], PP[:, 2] = AA[0], AA[1], AA[2]
-        preD = XYZ - PP
-        preD2 = preD*preD
-        preD3 = np.sum(preD2, axis=1)
-        D = preD3 ** 0.5
-        ID = np.argsort(D)      # sort and show indices
-
-        IDtop = ID[0: top]
+        PP = np.broadcast_to(AA, XYZ.shape)
+        D = np.linalg.norm(XYZ - PP, axis=1)
+        # preD = XYZ - PP
+        # preD2 = preD*preD
+        # preD3 = np.sum(preD2, axis=1)
+        # D = preD3 ** 0.5
+        IDtop = np.argpartition(D, top)[:top] # sort by lowest norm
+        # ID = np.argsort(D)
+        # IDtop = ID[0: top]
         XYZtop = XYZ[IDtop, :]
         closest = np.mean(XYZtop, axis=0)
         # -------- End of back projection ----------
@@ -173,13 +186,18 @@ def project(origin_xyz, others_xyz, selected_indices):
     otherRefCList = np.empty((1, refN), dtype=object)
     for i in range(refN):
         projectionListC = np.ones((pointN, 3))
-        pathX = Path("resource/MNI_templates/xallM0" + str(i+1) + ".csv")
-        pathY = Path("resource/MNI_templates/yallM0" + str(i+1) + ".csv")
-        pathZ = Path("resource/MNI_templates/zallM0" + str(i+1) + ".csv")
-        xall = np.genfromtxt(pathX, delimiter=',')
-        yall = np.genfromtxt(pathY, delimiter=',')
-        zall = np.genfromtxt(pathZ, delimiter=',')
-        XYZ = np.column_stack((xall, yall, zall))
+        my_str = "resource/MNI_templates/xyzall{}.npy".format(str(i+1))
+        if Path(my_str).is_file():
+            XYZ = np.load(my_str, allow_pickle=True)
+        else:
+            pathX = Path("resource/MNI_templates/xallM0" + str(i+1) + ".csv")
+            pathY = Path("resource/MNI_templates/yallM0" + str(i+1) + ".csv")
+            pathZ = Path("resource/MNI_templates/zallM0" + str(i+1) + ".csv")
+            xall = np.genfromtxt(pathX, delimiter=',')
+            yall = np.genfromtxt(pathY, delimiter=',')
+            zall = np.genfromtxt(pathZ, delimiter=',')
+            XYZ = np.column_stack((xall, yall, zall))
+            np.save("resource/MNI_templates/xyzall{}".format(str(i+1)), XYZ)
         logging.info("Projection to MNI in progress [" + str(round(100/17*(i+1))) + "%]")
 
         for j in range(pointN):
@@ -201,15 +219,19 @@ def project(origin_xyz, others_xyz, selected_indices):
             PNear = np.mean(XYZclose, axis=0)
 
             # Line between P and PNear
-            NXYZtop = XYZtop.shape[0]
+            # NXYZtop = XYZtop.shape[0]
             PVec = P - PNear
             A, B, C = PVec[0], PVec[1], PVec[2]
-            H = np.ones(XYZtop.shape)
 
-            for k in range(NXYZtop):
-                xc, yc, zc = XYZtop[k,0], XYZtop[k, 1], XYZtop[k, 2]
-                t = (A * (xc - P[0]) + B * (yc - P[1]) + C * (zc - P[2])) / (A * A + B * B + C * C)
-                H[k, :] = np.column_stack((A * t + P[0], B * t + P[1], C *t + P[2]))
+            t = (A * (XYZtop[:, 0] - P[0]) + B * (XYZtop[:, 1] - P[1]) + C * (XYZtop[:, 2] - P[2])) / (
+                        A * A + B * B + C * C)
+            H = np.array([A * t + P[0], B * t + P[1], C * t + P[2]]).T
+
+            # H = np.ones(XYZtop.shape)
+            # for k in range(NXYZtop):
+            #     xc, yc, zc = XYZtop[k,0], XYZtop[k, 1], XYZtop[k, 2]
+            #     t = (A * (xc - P[0]) + B * (yc - P[1]) + C * (zc - P[2])) / (A * A + B * B + C * C)
+            #     H[k, :] = np.column_stack((A * t + P[0], B * t + P[1], C *t + P[2]))
 
             # Find deviation between points in XYZclose and H (l 841)
             PreDH = XYZtop - H
@@ -224,8 +246,7 @@ def project(origin_xyz, others_xyz, selected_indices):
                 rodR += 1
                 Iless2 = np.where(DH <= rodR)
                 rod = XYZtop[Iless2, :][0]
-                tmp = rod*rod
-                det = np.sum(sum(np.sum(tmp, axis=0)))
+                det = np.sum(rod**2)
 
             # Find brain surface points on the vicinity of P (l 862)
             PPB = np.ones(rod.shape)
@@ -263,7 +284,18 @@ def project(origin_xyz, others_xyz, selected_indices):
     otherC = np.ones(otherH.shape)
     otherCVar = np.ones((pointN, 4))
     otherCSD = np.ones((pointN, 4))
-    XYZ = np.column_stack((xallBEM, yallBEM, zallBEM))
+    my_str = "resource/MNI_templates/xyzallBEM.npy"
+    if Path(my_str).is_file():
+        XYZ = np.load(my_str, allow_pickle=True)
+    else:
+        xallbemPath = Path("resource/MNI_templates/xallBEM.csv")
+        yallbemPath = Path("resource/MNI_templates/yallBEM.csv")
+        zallbemPath = Path("resource/MNI_templates/zallBEM.csv")
+        xallBEM = np.genfromtxt(xallbemPath, delimiter=',')
+        yallBEM = np.genfromtxt(yallbemPath, delimiter=',')
+        zallBEM = np.genfromtxt(zallbemPath, delimiter=',')
+        XYZ = np.column_stack((xallBEM, yallBEM, zallBEM))
+        np.save("resource/MNI_templates/xyzallBEM", XYZ)
     top = 3
 
     for i in range(pointN):

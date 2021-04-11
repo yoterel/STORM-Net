@@ -6,7 +6,6 @@ import video
 from pathlib import Path
 import file_io
 
-
 def test_3d_rigid_transform():
     a1 = np.array([
         [1, 0, 0],
@@ -46,5 +45,6 @@ def test_MNI_projection():
     names = names[0]
     data = data[0]
     data = geometry.to_standard_coordinate_system(names, data)
-    projected_data = geometry.project_sensors_to_MNI([names, data])
-    assert (projected_data is not None)
+    projected_data = geometry.project_sensors_to_MNI([[names, data]])
+    saved_projected = np.load("resource/ex_model_MNI_proj.npy", allow_pickle=True)
+    assert np.all(np.isclose(saved_projected, projected_data[0][1]))
