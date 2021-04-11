@@ -6,32 +6,23 @@ import logging
 def project(origin_xyz, others_xyz, selected_indices):
     """
     projects others_xyz to MNI coordiantes given anchors in origin_xyz
-    :param origin_xyz: anchors
-    :param others_xyz: optodes to project
-    :return: otherH - given head surface points transformed to the MNI ideal head (within-subject hat)
-             otherC - given cortical surface points transformed to the MNI ideal brain (within-subject hat)
-             otherHSD, otherCSD -  transformation SD for given head surface points, point manner
+    :param origin_xyz: anchors given as nx3 np array (n >= 4)
+    :param others_xyz: optodes to project given as mx3 np array (m>=1)
+    :param selected_indices: which indices to select from origin_xyz as anchors given as np array (len must be at least 4)
+                             order matters! selection is based on this order:
+                             ["nosebridge", "inion", "rightear", "leftear",
+                              "fp1", "fp2", "fz", "f3",
+                              "f4", "f7", "f8", "cz",
+                              "c3", "c4", "t3", "t4",
+                              "pz", "p3", "p4", "t5",
+                              "t6", "o1", "o2"]
+    :return: otherH - others transformed to MNI of ideal head (head surface)
+             otherC - others transformed to MNI of ideal head  (cortical surface)
+             otherHSD - transformation standard deviation per axis, point manner (for otherH).
+                        Last channel is SD across all axes (root sum of squares).
+             otherCSD - transformation standard deviation per axis, point manner (for otherC).
+                        Last channel is SD across all axes (root sum of squares).
     """
-    # --------------------------- CONFIG ----------------------------------
-
-    # originPath = "resource\\MNI_templates\\origin_sample.csv"  # Provide origin path
-    # othersPath = "resource\\MNI_templates\\others_sample.csv"  # Provide others path
-
-    # --------------------- Load and process the data ----------------------
-    # try:
-    #     originXYZ = (pd.DataFrame(pd.read_csv(originPath), columns=['X', 'Y', 'Z'])).to_numpy()
-    # except:
-    #     print("Origin file not found!")
-    #     exit(1)
-    # try:
-    #     othersXYZ = (pd.DataFrame(pd.read_csv(othersPath, header=None))).to_numpy()
-    # except:
-    #     print("Others file not found!")
-    #     exit(1)
-
-    originXYZ = origin_xyz
-    othersXYZ = others_xyz
-
     path_wo_ext = "resource/MNI_templates/DMNIHAve"
     dmnihavePath = Path(path_wo_ext + ".csv")
     if Path(path_wo_ext+".npy").is_file():
@@ -40,40 +31,30 @@ def project(origin_xyz, others_xyz, selected_indices):
         DMNIHAve = np.genfromtxt(dmnihavePath, delimiter=',')
         np.save(path_wo_ext, DMNIHAve)
 
+    size = len(selected_indices)
 
+    assert size >= 4
 
-    # othersXYZ = np.delete(othersXYZ, 0, 1)
-    # selectedBoolean = np.invert(np.isnan(originXYZ).any(axis=1))
-
-    # for i in range(len(selectedBoolean)):
-    #     if selectedBoolean[i]:
-    #         selectedIndexes.append(i)
-
-    selectedIndexes = selected_indices
-    size = len(selectedIndexes)
-
-    # if size < 4:
-    #     print("Please provide at least 4 values in the origin file")
-    #     exit(1)
-
-    D = originXYZ
-    DD = DMNIHAve[selectedIndexes, :]
-    DDD = othersXYZ
+    D = origin_xyz  # our anchors
+    DD = DMNIHAve[selected_indices, :]  # contains locations of anchors in original experiment
+    DDD = others_xyz  # our sensors
 
 
     # ==================== AffineEstimation4 ====================== (l 225)
 
+    # find affine transformation with ideal brain (not used anywhere..)
     listOri = np.c_[D, np.ones(size)]
     DD[:, 3] = 1
     listDist = DD
-    W = np.linalg.lstsq(listOri, listDist, rcond=None)[0]  # transformation matrix
+    W = np.linalg.lstsq(listOri, listDist, rcond=None)[0]  # affine transformation matrix
     listCur = np.matmul(listOri, W)
 
     # ------------ Transformation to reference brains -------------- ( l 271)
-
+    # find affine transformation with every brain in the 17 templates
     refN = 17
     refBList = np.empty((refN, 2), dtype=object)
 
+    # load 17 brain templates from disk
     DMS = []
     for i in range(1, refN+1):
         path_wo_ext = "resource/MNI_templates/DMNI{:0>4d}".format(i)
@@ -84,9 +65,9 @@ def project(origin_xyz, others_xyz, selected_indices):
             DM = np.genfromtxt(csv_path, delimiter=',')
             np.save(path_wo_ext, DM)
             DMS.append(DM)
-
+    # find affine transformation between our anchors and all brains
     for i in range(1, refN+1):
-        DM = DMS[i-1][selectedIndexes, :]
+        DM = DMS[i-1][selected_indices, :]
         refDist = np.c_[DM, np.ones(size)]
         WW = np.linalg.lstsq(listOri, refDist, rcond=None)[0]
         refBListCur = np.matmul(listOri, WW)
@@ -202,14 +183,16 @@ def project(origin_xyz, others_xyz, selected_indices):
 
         for j in range(pointN):
             P = othersRefList[0, i][j, 0:3]
-            PP = np.ones(XYZ.shape)
-            PP[:, 0], PP[:, 1], PP[:, 2] = P[0], P[1], P[2]
-            PreD = XYZ - PP
-            PreD2 = PreD*PreD
-            PreD3 = np.sum(PreD2, axis=1)
-            D = PreD3 ** 0.5
-            ID = np.argsort(D)
+            PP = np.broadcast_to(P, XYZ.shape)
+            D = np.linalg.norm(XYZ - PP, axis=1)
+            # PP = np.ones(XYZ.shape)
+            # PP[:, 0], PP[:, 1], PP[:, 2] = P[0], P[1], P[2]
+            # PreD = XYZ - PP
+            # PreD2 = PreD*PreD
+            # PreD3 = np.sum(PreD2, axis=1)
+            # D = PreD3 ** 0.5
             top = round(XYZ.shape[0] * 0.05)
+            ID = np.argsort(D)
             IDtop = ID[0:top]
             XYZtop = XYZ[IDtop, :]
 
@@ -234,11 +217,11 @@ def project(origin_xyz, others_xyz, selected_indices):
             #     H[k, :] = np.column_stack((A * t + P[0], B * t + P[1], C *t + P[2]))
 
             # Find deviation between points in XYZclose and H (l 841)
-            PreDH = XYZtop - H
-            PreDH2 = PreDH * PreDH
-            PreDH3 = np.sum(PreDH2, axis=1)
-            DH = PreDH3 ** 0.5
-
+            # PreDH = XYZtop - H
+            # PreDH2 = PreDH * PreDH
+            # PreDH3 = np.sum(PreDH2, axis=1)
+            # DH = PreDH3 ** 0.5
+            DH = np.linalg.norm(XYZtop - H, axis=1)
             # Extend the line P-Pnear to a rod (l 851)
             det = 0
             rodR = 0
@@ -249,16 +232,18 @@ def project(origin_xyz, others_xyz, selected_indices):
                 det = np.sum(rod**2)
 
             # Find brain surface points on the vicinity of P (l 862)
-            PPB = np.ones(rod.shape)
-            PPB[:, 0], PPB[:, 1], PPB[:, 2] = P[0], P[1], P[2]
-            PreVicD = rod - PPB
-            PreVicD2 = PreVicD*PreVicD
-            PreVicD3 = np.sum(PreVicD2, axis=1)
-            VicD = PreVicD3**0.5
-            IVicD = np.argsort(VicD)
+            PPB = np.broadcast_to(P, rod.shape)
+            VicD = np.linalg.norm(rod - PPB, axis=1)
+            # PPB = np.ones(rod.shape)
+            # PPB[:, 0], PPB[:, 1], PPB[:, 2] = P[0], P[1], P[2]
+            # PreVicD = rod - PPB
+            # PreVicD2 = PreVicD*PreVicD
+            # PreVicD3 = np.sum(PreVicD2, axis=1)
+            # VicD = PreVicD3**0.5
             NVic = 3
             if rod.shape[0] < NVic:
                 NVic = rod.shape[0]
+            IVicD = np.argsort(VicD)
             NIVicD = IVicD[0:NVic]
             Vic = rod[NIVicD, :]
             CP = np.mean(Vic, axis=0)
