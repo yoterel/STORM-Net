@@ -5,6 +5,8 @@ import geometry
 import video
 from pathlib import Path
 import file_io
+import MNI
+
 
 def test_3d_rigid_transform():
     a1 = np.array([
@@ -45,6 +47,30 @@ def test_MNI_projection():
     names = names[0]
     data = data[0]
     data = geometry.to_standard_coordinate_system(names, data)
-    projected_data = geometry.project_sensors_to_MNI([[names, data]])
-    saved_projected = np.load("resource/ex_model_MNI_proj.npy", allow_pickle=True)
-    assert np.all(np.isclose(saved_projected, projected_data[0][1]))
+    assert 0 in names
+    unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+    unsorted_origin_names = np.array(names[:names.index(0)])
+    others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
+    # these names are written in an order the algorithm expects (and MNI template data was written in)
+    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
+                                    "fp1", "fp2", "fz", "f3",
+                                    "f4", "f7", "f8", "cz",
+                                    "c3", "c4", "t3", "t4",
+                                    "pz", "p3", "p4", "t5",
+                                    "t6", "o1", "o2"])
+
+    # sort our anchors using the order above
+    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
+    origin_xyz = unsorted_origin_xyz[sorting_indices]
+    otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
+    # np.savez('resource/mni_projection_test.npz', name1=otherH, name2=otherC, name3=otherHSD, name4=otherCSD)
+    data = np.load('resource/mni_projection_test.npz')
+    otherH_loaded, otherC_loaded, otherHSD_loaded, otherCSD_loaded = data["name1"], data["name2"], data["name3"], data["name4"]
+    assert np.all(np.isclose(otherH_loaded, otherH))
+    assert np.all(np.isclose(otherC_loaded, otherC))
+    assert np.all(np.isclose(otherHSD_loaded, otherHSD))
+    assert np.all(np.isclose(otherCSD_loaded, otherCSD))
+
+
+# if __name__ == "__main__":
+#     test_MNI_projection()

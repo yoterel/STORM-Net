@@ -351,9 +351,9 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     # do histogram plot
     try:
         import scipy.io as sio
-        dig2dig_after_MNI = sio.loadmat("dig2dig.mat")["dig2digDist"]
-        dig2vid_after_MNI = sio.loadmat("dig2vid.mat")["dig2vidDist"]
-        vid2vid_after_MNI = sio.loadmat("vid2vid.mat")["vid2vidDist"]
+        dig2dig_after_MNI = sio.loadmat("resource/dig2dig.mat")["dig2digDist"]
+        dig2vid_after_MNI = sio.loadmat("resource/dig2vid.mat")["dig2vidDist"]
+        vid2vid_after_MNI = sio.loadmat("resource/vid2vid.mat")["vid2vidDist"]
         draw.plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI)
     except Exception:
         logging.info("tried to reproduce figure but pkl data is missing")
