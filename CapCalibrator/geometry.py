@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import math
-from file_io import read_template_file
+from file_io import read_template_file, read_digitizer_multi_noptodes_experiment_file
 import re
 import logging
 import MNI
@@ -234,6 +234,8 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     :param args: see caller
     :return: -
     """
+    do_digi_error_experiment()
+
     digi2digi_est, digi2digi_rot, skull_radii, ss_data = get_digi2digi_results(args.template,
                                                                                args.ground_truth,
                                                                                True)
@@ -419,22 +421,22 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
 
         vid_projected_data_session1 = project_sensors_to_MNI(vid_est[0::3])
         session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
-        np.save("session1_vid_MNI", session1_vid)
+        np.save("cache/session1_vid_MNI", session1_vid)
         # io.savemat('session1_vid.mat',
         #            {'session1_vid': session1_vid})
         vid_projected_data_session2 = project_sensors_to_MNI(vid_est[1::3])
         session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
-        np.save("session2_vid_MNI", session2_vid)
+        np.save("cache/session2_vid_MNI", session2_vid)
         # io.savemat('session2_vid.mat',
         #            {'session2_vid': session2_vid})
         digi_projected_data_session1 = project_sensors_to_MNI(dig_est[0::2])
         session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
-        np.save("session1_digi_MNI", session1_dig)
+        np.save("cache/session1_digi_MNI", session1_dig)
         # io.savemat('session1_digi.mat',
         #            {'session1_digi': session1_dig})
         digi_projected_data_session2 = project_sensors_to_MNI(dig_est[1::2])
         session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
-        np.save("session2_digi_MNI", session2_dig)
+        np.save("cache/session2_digi_MNI", session2_dig)
         # io.savemat('session2_digi.mat',
         #            {'session2_digi': session2_dig})
 
@@ -727,3 +729,24 @@ def project_sensors_to_MNI(list_of_sensor_locations):
         sensor_locations[1][names.index(0):, :] = otherC
     return projected_locations
 
+
+def do_digi_error_experiment():
+    """
+    reproduces experiment where various number of optodes were measured with digitizer
+    tries to find relationship between number of optodes and error received
+    :return:
+    """
+    data = read_digitizer_multi_noptodes_experiment_file("resource/digi_error_exp.txt")
+    errors = {}
+    for datum in data:
+        number_of_optodes = len(datum) // 10
+        error = []
+        for exp in range(5):
+            real_exp = exp * number_of_optodes * 2
+            begin = datum[real_exp:real_exp + number_of_optodes]
+            end = datum[real_exp + number_of_optodes:real_exp + 2*number_of_optodes]
+            error.append(get_rmse(begin, end))
+        error = np.array(error)
+        error = np.mean(error)
+        errors.setdefault(number_of_optodes, []).append(error)
+    logging.info(errors)

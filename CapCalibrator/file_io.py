@@ -344,3 +344,27 @@ def load_full_db(db_path=None):
 
 def move(src, dst):
     shutil.move(src, dst)
+
+
+def read_digitizer_multi_noptodes_experiment_file(exp_file_loc):
+    path = Path(exp_file_loc)
+    file_handle = open(str(path))
+    file_contents = file_handle.read()
+    contents_split = file_contents.splitlines()
+    non_empty_lines = [line for line in contents_split if line]
+    delimiters = [i for i, x in enumerate(non_empty_lines) if x == "*"]
+    data = []
+    for i in range(len(delimiters)-1):
+        session = non_empty_lines[delimiters[i]+1:delimiters[i+1]]
+        sensor1_data = []
+        sensor2_data = []
+        for sens1, sens2 in utils.pairwise(session):
+            data1 = sens1.split()
+            x, y, z = float(data1[1]), float(data1[2]), float(data1[3])
+            sensor1_data.append(np.array([x, y, z]))
+            data2 = sens2.split()
+            x, y, z = float(data2[1]), float(data2[2]), float(data2[3])
+            sensor2_data.append(np.array([x, y, z]))
+        sensor_data = np.abs(np.array(sensor1_data) - np.array(sensor2_data))
+        data.append(sensor_data)
+    return data
