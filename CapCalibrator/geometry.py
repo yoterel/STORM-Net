@@ -359,20 +359,24 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
         logging.info("tried to reproduce figure but pkl data is missing")
 
     # do MNI plots
-    digi_names = ["leftear", "rightear", "nosebridge", "cz"] + names[names.index(0):]
-    if not Path("session1_digi_MNI_ss.npy").is_file():
+    dig_est_ses1 = []
+    dig_est_ses2 = []
+    data_others = [x[1] for x in ss_data]
+    data_origin = [x[0] for x in ss_data]
+    list_extension = [x for x in range(len(data_others))]
+    digi_names = ["leftear", "rightear", "nosebridge", "cz"] + list_extension
+    if not Path("cache/session1_digi_MNI_ss.npy").is_file():
         # digi2digi session1: calc error using subject-specific MNI anchors
-        dig_est = []
-        data_others = [x[1] for x in ss_data]
-        data_origin = [x[0] for x in ss_data]
-        # digi_names = ["leftear", "rightear", "nosebridge", "cz"] + names[names.index(0):]
-        for i, (rot_mat, scale_mat) in enumerate(zip(digi_r_matrix[0::2], s_matrix[0::3])):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_others[i].T)
-            dig_est.append([digi_names, np.vstack((data_origin[i], transformed_data_sim.T))])
+        for i in range(0, len(data_origin), 3):
+            dig_est_ses1.append([digi_names, np.vstack((data_origin[i], data_others[i]))])
+            dig_est_ses2.append([digi_names, np.vstack((data_origin[i + 1], data_others[i + 1]))])
 
-        digi_projected_data = project_sensors_to_MNI(dig_est)
-        digi = np.array([x[1] for x in digi_projected_data], dtype=np.object)
-        np.save("session1_digi_MNI_ss", digi)
+        digi_projected_data_ses1 = project_sensors_to_MNI(dig_est_ses1)
+        digi = np.array([x[1] for x in digi_projected_data_ses1], dtype=np.object)
+        np.save("cache/session1_digi_MNI_ss", digi)
+        digi_projected_data_ses2 = project_sensors_to_MNI(dig_est_ses2)
+        digi = np.array([x[1] for x in digi_projected_data_ses2], dtype=np.object)
+        np.save("cache/session2_digi_MNI_ss", digi)
 
     do_MNI = False
     if do_MNI:
@@ -397,47 +401,47 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
             dig_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
         from scipy import io
 
-        io.savemat('names.mat',
-                   {'names': np.array([vid_est[0][0]], dtype=np.object)})
+        # io.savemat('names.mat',
+        #            {'names': np.array([vid_est[0][0]], dtype=np.object)})
 
-        session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
-        io.savemat('session1_vid_no_MNI.mat',
-                   {'session1_vid_no_MNI': session1_vid})
-        session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
-        io.savemat('session2_vid_no_MNI.mat',
-                   {'session2_vid_no_MNI': session2_vid})
-        session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
-        io.savemat('session1_digi_no_MNI.mat',
-                   {'session1_digi_no_MNI': session1_dig})
-        session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
-        io.savemat('session2_digi_no_MNI.mat',
-                   {'session2_digi_no_MNI': session2_dig})
+        # session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
+        # io.savemat('session1_vid_no_MNI.mat',
+        #            {'session1_vid_no_MNI': session1_vid})
+        # session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
+        # io.savemat('session2_vid_no_MNI.mat',
+        #            {'session2_vid_no_MNI': session2_vid})
+        # session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
+        # io.savemat('session1_digi_no_MNI.mat',
+        #            {'session1_digi_no_MNI': session1_dig})
+        # session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
+        # io.savemat('session2_digi_no_MNI.mat',
+        #            {'session2_digi_no_MNI': session2_dig})
 
         vid_projected_data_session1 = project_sensors_to_MNI(vid_est[0::3])
         session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
         np.save("session1_vid_MNI", session1_vid)
-        io.savemat('session1_vid.mat',
-                   {'session1_vid': session1_vid})
+        # io.savemat('session1_vid.mat',
+        #            {'session1_vid': session1_vid})
         vid_projected_data_session2 = project_sensors_to_MNI(vid_est[1::3])
         session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
         np.save("session2_vid_MNI", session2_vid)
-        io.savemat('session2_vid.mat',
-                   {'session2_vid': session2_vid})
+        # io.savemat('session2_vid.mat',
+        #            {'session2_vid': session2_vid})
         digi_projected_data_session1 = project_sensors_to_MNI(dig_est[0::2])
         session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
         np.save("session1_digi_MNI", session1_dig)
-        io.savemat('session1_digi.mat',
-                   {'session1_digi': session1_dig})
+        # io.savemat('session1_digi.mat',
+        #            {'session1_digi': session1_dig})
         digi_projected_data_session2 = project_sensors_to_MNI(dig_est[1::2])
         session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
         np.save("session2_digi_MNI", session2_dig)
-        io.savemat('session2_digi.mat',
-                   {'session2_digi': session2_dig})
+        # io.savemat('session2_digi.mat',
+        #            {'session2_digi': session2_dig})
 
-    digi_ss = np.load("session1_digi_MNI_ss.npy", allow_pickle=True)
-    digi_template = np.load("session1_digi_MNI.npy", allow_pickle=True)
+    digi_ss = np.load("cache/session1_digi_MNI_ss.npy", allow_pickle=True)
+    digi_template = np.load("cache/session2_digi_MNI_ss.npy", allow_pickle=True)
     digi_ss_spiral = digi_ss[:, digi_names.index(0):, :]
-    digi_template_spiral = digi_template[:, names.index(0):, :]
+    digi_template_spiral = digi_template[:, digi_names.index(0):, :]
     errors = []
     for i in range(len(digi_ss_spiral)):
         rmse_error = calc_rmse_error(digi_ss_spiral[i], digi_template_spiral[i])
@@ -558,7 +562,15 @@ def normalize_coordinates(names, data):
     # zscale = new_data[names.index('cz'), 1] - np.min(data[:, 2])
 
 
-def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matrix=False):
+def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matrix=False, spiral_output_type="orig"):
+    """
+    returns digitizer results from experiements
+    :param path_to_template:
+    :param experiment_folder_path:
+    :param rot_as_matrix:
+    :param spiral_output_type:
+    :return:
+    """
     template_names, template_data, template_format, _ = read_template_file(path_to_template)
     template_data = template_data[0]
     template_names = template_names[0]
@@ -583,7 +595,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
 
     experiment_file_list = []
     skulls = []
-    template_spiral_in_measurement_space = []
+    spiral_output = []
     optode_estimations = {}
     rot_estimations = {}
     if experiment_folder_path.is_dir():
@@ -624,13 +636,21 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
             ret_R, ret_t = rigid_transform_3d_nparray(template_face_data, file_face_data)
             aligned_template_mask = (ret_R @ template_mask_data.T).T + ret_t
 
-            if i == 0:
+            if spiral_output_type == "orig":
                 subject_secific_origin = data[(names.index('leftear'),
                                                names.index('rightear'),
                                                names.index('nosebridge'),
                                                names.index('cz')), :]
-                subject_secific_spiral = (ret_R @ template_spiral_data.T).T + ret_t
-                template_spiral_in_measurement_space.append([subject_secific_origin, subject_secific_spiral])
+                subject_secific_spiral = file_mask_data
+                spiral_output.append([subject_secific_origin, subject_secific_spiral])
+            elif spiral_output_type == "spiral_transformed":
+                if i == 0:
+                    subject_secific_origin = data[(names.index('leftear'),
+                                                   names.index('rightear'),
+                                                   names.index('nosebridge'),
+                                                   names.index('cz')), :]
+                    subject_secific_spiral = (ret_R @ template_spiral_data.T).T + ret_t
+                    spiral_output.append([subject_secific_origin, subject_secific_spiral])
 
             # find mask transform
             ret_R, ret_t = rigid_transform_3d_nparray(aligned_template_mask, file_mask_data)
@@ -669,7 +689,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
         # print("digi2digi rmse between session 1 and session 3:", rmse)
         # rmse = get_rmse(estimations[1], estimations[2])
         # print("digi2digi rmse between session 2 and session 3:", rmse)
-    return optode_estimations, rot_estimations, skulls, template_spiral_in_measurement_space
+    return optode_estimations, rot_estimations, skulls, spiral_output
 
 
 def project_sensors_to_MNI(list_of_sensor_locations):
