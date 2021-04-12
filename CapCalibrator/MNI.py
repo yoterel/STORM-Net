@@ -1,6 +1,7 @@
 import numpy as np
 from pathlib import Path
 import logging
+# import time
 
 
 def project(origin_xyz, others_xyz, selected_indices):
@@ -163,7 +164,7 @@ def project(origin_xyz, others_xyz, selected_indices):
 
 
     # --------- Calculating errors on cortical surface -------------
-
+    # start = time.process_time()
     otherRefCList = np.empty((1, refN), dtype=object)
     for i in range(refN):
         projectionListC = np.ones((pointN, 3))
@@ -192,12 +193,14 @@ def project(origin_xyz, others_xyz, selected_indices):
             # PreD3 = np.sum(PreD2, axis=1)
             # D = PreD3 ** 0.5
             top = round(XYZ.shape[0] * 0.05)
-            ID = np.argsort(D)
-            IDtop = ID[0:top]
+            IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
+            # ID = np.argsort(D)
+            # IDtop = ID[0:top]
             XYZtop = XYZ[IDtop, :]
 
             Nclose = 200
-            IDclose = ID[0:Nclose]
+            IDclose = np.argpartition(D, Nclose)[:Nclose]  # sort by lowest norm
+            # IDclose = ID[0:Nclose]
             XYZclose = XYZ[IDclose, :]
             PNear = np.mean(XYZclose, axis=0)
 
@@ -251,7 +254,8 @@ def project(origin_xyz, others_xyz, selected_indices):
             projectionListC[j, :] = CP
 
         otherRefCList[0, i] = projectionListC
-
+    # # your code here
+    # print(time.process_time() - start)
     # ----- Restore data across reference brains -----
     CPListOverPoint = np.empty((1, pointN), dtype=object)
 
