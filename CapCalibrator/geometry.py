@@ -367,7 +367,7 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     data_origin = [x[0] for x in ss_data]
     list_extension = [x for x in range(len(data_others))]
     digi_names = ["leftear", "rightear", "nosebridge", "cz"] + list_extension
-    if not Path("cache/session1_digi_MNI_ss.npy").is_file():
+    if not Path("cache/session1_digi_MNI_ss.npy").is_file() or not Path("cache/session2_digi_MNI_ss.npy").is_file():
         # digi2digi session1: calc error using subject-specific MNI anchors
         for i in range(0, len(data_origin), 3):
             dig_est_ses1.append([digi_names, np.vstack((data_origin[i], data_others[i]))])
@@ -749,4 +749,5 @@ def do_digi_error_experiment():
         error = np.array(error)
         error = np.mean(error)
         errors.setdefault(number_of_optodes, []).append(error)
-    logging.info(errors)
+    for key, value in errors.items():
+        logging.info("{}->{:.3f}".format(key, value[0]))
