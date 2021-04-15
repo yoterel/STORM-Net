@@ -449,7 +449,7 @@ def plot_skull_vs_error(skull, intra_digi, intra_vid, inter):
 
 def plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI):
 
-    n_bins = 40
+    n_bins = 20
     cm = plt.cm.get_cmap('cool')
 
     fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True)

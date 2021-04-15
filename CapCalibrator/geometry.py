@@ -1,12 +1,11 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import math
-from file_io import read_template_file, read_digitizer_multi_noptodes_experiment_file
-import re
+from file_io import read_template_file
 import logging
 import MNI
-from scipy.stats import pearsonr, ttest_rel
-from pathlib import Path
+from experimental import reproduce_experiments
+
 
 def align_centroids(a, b):
     """
@@ -87,6 +86,21 @@ def get_euler_angles(gt_data, model_data):
     gt_rot_m = R.from_matrix(ret_R)
     gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
     return gt_rot_e
+
+
+def affine_transform_3d_nparray(A, B):
+    """
+        finds best affine transformation between pc a and pc b (in terms of rmse)
+        # Input: expects nx3 matrix of points
+        # Returns W = the transformation to apply to A such that it matches B.
+        """
+    new_A = np.c_[A, np.ones(len(A))]
+    new_B = np.c_[B, np.ones(len(B))]
+    W = np.linalg.lstsq(new_A, new_B, rcond=None)[0]  # affine transformation matrix
+    # A_transformed = np.matmul(new_A, W)
+    # get_rmse(A_transformed[:, :-1], B)
+    return W
+
 
 
 def rigid_transform_3d_nparray(A, B):
@@ -173,6 +187,19 @@ def calc_rmse_error(A1, A2):
     return math.sqrt(err/max(A1.shape))
 
 
+def get_rmse(A, B):
+    """
+    gets rmse between 2 point clouds nx3
+    :param A: nx3 point cloud
+    :param B: nx3 point cloud
+    :return: rmse
+    """
+    assert len(A.shape) == 2
+    assert len(B.shape) == 2
+    rmse = np.mean(np.linalg.norm((A - B).astype(np.float), axis=1))
+    return rmse
+
+
 def fix_yaw(names, data):
     """
     given sticker names and data (nx3),
@@ -225,235 +252,6 @@ def from_sim_to_standard_space(names, data):
     return from_standard_to_sim_space(names, data)
 
 
-def reproduce_experiments(r_matrix, s_matrix, video_names, args):
-    """
-    reproduces original experiments reported in paper, results are printed to log
-    :param r_matrix: see caller
-    :param s_matrix: see caller
-    :param video_names: see caller
-    :param args: see caller
-    :return: -
-    """
-    do_digi_error_experiment()
-
-    digi2digi_est, digi2digi_rot, skull_radii, ss_data = get_digi2digi_results(args.template,
-                                                                               args.ground_truth,
-                                                                               True)
-    vid2vid_est = []
-    names, data, format, _ = read_template_file(args.template)
-    names = names[0]
-    data = data[0]
-    data = to_standard_coordinate_system(names, data)
-    data_spiral = data[names.index(0):, :]  # select spiral
-
-    digi_intra_method_sessions1 = []
-    digi_intra_method_sessions2 = []
-    digi_rot_sessions1 = []
-    digi_rot_sessions2 = []
-    digi_rot_sessions3 = []
-
-    vid_rot_sessions1 = []
-    vid_rot_sessions2 = []
-    vid_rot_sessions3 = []
-
-    digi_r_matrix = []
-
-    # calculate all errors for manuscript
-    for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
-        subject_name, session_name = vid.split("_")
-        session_number = int(re.findall(r'\d+', session_name)[0]) - 1
-
-        transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
-        vid2vid_est.append(transformed_data_sim.T)
-        rot = R.from_matrix(rot_mat)
-        try:
-            digi_rot = R.from_matrix(digi2digi_rot[subject_name][session_number])
-            digi_rot_euler = digi_rot.as_euler('xyz', degrees=True)
-        except Exception:
-            digi_rot_euler = None
-
-        if session_number == 0:
-            digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
-            digi_rot_sessions1.append(digi_rot_euler)
-            vid_rot_sessions1.append(rot.as_euler('xyz', degrees=True))
-            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
-        if session_number == 1:
-            digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
-            digi_rot_sessions2.append(digi_rot_euler)
-            vid_rot_sessions2.append(rot.as_euler('xyz', degrees=True))
-            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
-        if session_number == 2:
-            digi_rot_sessions3.append(digi_rot_euler)
-            vid_rot_sessions3.append(rot.as_euler('xyz', degrees=True))
-
-    digi_intra_method_rmse = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
-    digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
-    digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
-    logging.info(
-        "digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
-
-    vid_intra_method_sessions1 = vid2vid_est[::3]
-    vid_intra_method_sessions2 = vid2vid_est[1::3]
-    vid_intra_method_rmse = [get_rmse(x, y) for x, y in zip(vid_intra_method_sessions1, vid_intra_method_sessions2)]
-    vid_intra_method_rmse_avg = np.mean(vid_intra_method_rmse)
-    vid_intra_method_rmse_std = np.std(vid_intra_method_rmse)
-    logging.info("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
-
-    inter_method_rmse1 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions1)]
-    inter_method_rmse2 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions2)]
-    inter_method_rmse3 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions1)]
-    inter_method_rmse4 = [get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions2)]
-    inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
-    inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
-    logging.info("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
-
-    # if we are missing a session, remove it from other experiments too
-    pop_indices = [i for i, x in enumerate(digi_rot_sessions3) if x is None]
-    for index in pop_indices:
-        digi_rot_sessions1.pop(index)
-        digi_rot_sessions2.pop(index)
-        digi_rot_sessions3.pop(index)
-        vid_rot_sessions1.pop(index)
-        vid_rot_sessions2.pop(index)
-        vid_rot_sessions3.pop(index)
-
-    # calc t-test statistics
-    a_vid = np.array(vid_intra_method_rmse)
-    a_dig = np.array(digi_intra_method_rmse)
-    a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
-                      axis=0)
-
-    # do skulls plot
-    import draw
-    skull_radii = np.array(skull_radii)
-    circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
-    draw.plot_skull_vs_error(circumferences, digi_intra_method_rmse, vid_intra_method_rmse, a_inter)
-    logging.info("skull circumferences mean: {:.3f}".format(np.mean(circumferences)))
-    logging.info("skull circumferences std: {:.3f}".format(np.std(circumferences)))
-    t1, p1 = ttest_rel(a_vid, a_dig)
-    logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
-    t2, p2 = ttest_rel(a_dig, a_inter)
-    logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
-
-    # calc shifts in every direction for each method
-    digi2digi_shift = np.array(
-        [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
-    vid2vid_shift = np.array(
-        [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
-
-    # correlate the shifts
-    x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
-    y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
-    z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
-
-    logging.info(
-        "Shift correlation (x, px, y, py, z, pz):"
-        "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
-
-    # do histogram plot
-    try:
-        import scipy.io as sio
-        dig2dig_after_MNI = sio.loadmat("resource/dig2dig.mat")["dig2digDist"]
-        dig2vid_after_MNI = sio.loadmat("resource/dig2vid.mat")["dig2vidDist"]
-        vid2vid_after_MNI = sio.loadmat("resource/vid2vid.mat")["vid2vidDist"]
-        draw.plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI)
-    except Exception:
-        logging.info("tried to reproduce figure but pkl data is missing")
-
-    # do MNI plots
-    dig_est_ses1 = []
-    dig_est_ses2 = []
-    data_others = [x[1] for x in ss_data]
-    data_origin = [x[0] for x in ss_data]
-    list_extension = [x for x in range(len(data_others))]
-    digi_names = ["leftear", "rightear", "nosebridge", "cz"] + list_extension
-    if not Path("cache/session1_digi_MNI_ss.npy").is_file() or not Path("cache/session2_digi_MNI_ss.npy").is_file():
-        # digi2digi session1: calc error using subject-specific MNI anchors
-        for i in range(0, len(data_origin), 3):
-            dig_est_ses1.append([digi_names, np.vstack((data_origin[i], data_others[i]))])
-            dig_est_ses2.append([digi_names, np.vstack((data_origin[i + 1], data_others[i + 1]))])
-
-        digi_projected_data_ses1 = project_sensors_to_MNI(dig_est_ses1)
-        digi = np.array([x[1] for x in digi_projected_data_ses1], dtype=np.object)
-        np.save("cache/session1_digi_MNI_ss", digi)
-        digi_projected_data_ses2 = project_sensors_to_MNI(dig_est_ses2)
-        digi = np.array([x[1] for x in digi_projected_data_ses2], dtype=np.object)
-        np.save("cache/session2_digi_MNI_ss", digi)
-
-    do_MNI = False
-    if do_MNI:
-        # everything else (digi2digi, vid2vid, digi2vid) all sessions: calc error using template MNI anchors
-        vid_est = []
-        dig_est = []
-        names, data, format, _ = read_template_file(args.template)
-        names = names[0]
-        data = data[0]
-        data = to_standard_coordinate_system(names, data)
-        if 0 in names:
-            data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-            data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
-        else:
-            data_origin = data
-            data_optodes = np.zeros(3)
-        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
-            vid_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
-        for rot_mat, scale_mat in zip(digi_r_matrix, s_matrix):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
-            dig_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
-        from scipy import io
-
-        # io.savemat('names.mat',
-        #            {'names': np.array([vid_est[0][0]], dtype=np.object)})
-
-        # session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
-        # io.savemat('session1_vid_no_MNI.mat',
-        #            {'session1_vid_no_MNI': session1_vid})
-        # session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
-        # io.savemat('session2_vid_no_MNI.mat',
-        #            {'session2_vid_no_MNI': session2_vid})
-        # session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
-        # io.savemat('session1_digi_no_MNI.mat',
-        #            {'session1_digi_no_MNI': session1_dig})
-        # session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
-        # io.savemat('session2_digi_no_MNI.mat',
-        #            {'session2_digi_no_MNI': session2_dig})
-
-        vid_projected_data_session1 = project_sensors_to_MNI(vid_est[0::3])
-        session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
-        np.save("cache/session1_vid_MNI", session1_vid)
-        # io.savemat('session1_vid.mat',
-        #            {'session1_vid': session1_vid})
-        vid_projected_data_session2 = project_sensors_to_MNI(vid_est[1::3])
-        session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
-        np.save("cache/session2_vid_MNI", session2_vid)
-        # io.savemat('session2_vid.mat',
-        #            {'session2_vid': session2_vid})
-        digi_projected_data_session1 = project_sensors_to_MNI(dig_est[0::2])
-        session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
-        np.save("cache/session1_digi_MNI", session1_dig)
-        # io.savemat('session1_digi.mat',
-        #            {'session1_digi': session1_dig})
-        digi_projected_data_session2 = project_sensors_to_MNI(dig_est[1::2])
-        session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
-        np.save("cache/session2_digi_MNI", session2_dig)
-        # io.savemat('session2_digi.mat',
-        #            {'session2_digi': session2_dig})
-
-    digi_ss = np.load("cache/session1_digi_MNI_ss.npy", allow_pickle=True)
-    digi_template = np.load("cache/session2_digi_MNI_ss.npy", allow_pickle=True)
-    digi_ss_spiral = digi_ss[:, digi_names.index(0):, :]
-    digi_template_spiral = digi_template[:, digi_names.index(0):, :]
-    errors = []
-    for i in range(len(digi_ss_spiral)):
-        rmse_error = calc_rmse_error(digi_ss_spiral[i], digi_template_spiral[i])
-        errors.append(rmse_error)
-    rmse_error_f = np.mean(np.array(errors))
-    logging.info("with ss mni vs without: {:.3f}".format(rmse_error_f))
-    draw.visualize_2_pc(points_blue=digi_ss_spiral[0], points_red=digi_ss_spiral[1])
-    print("done!")
-
-
 def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
     if args.mode == "experimental":
         reproduce_experiments(r_matrix, s_matrix, video_names, args)
@@ -477,19 +275,6 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
         data_optodes = transformed_data_sim.T
         vid_est.append([names, np.vstack((data_origin, data_optodes))])
     return vid_est
-
-
-def get_rmse(A, B):
-    """
-    gets rmse between 2 point clouds nx3
-    :param A: nx3 point cloud
-    :param B: nx3 point cloud
-    :return: rmse
-    """
-    diff = np.abs(A - B)
-    mse = np.mean(diff*diff)
-    rmse = np.sqrt(mse)
-    return rmse
 
 
 def compare_data_from_files(file_path1, file_path2, use_second_sensor):
@@ -564,155 +349,28 @@ def normalize_coordinates(names, data):
     # zscale = new_data[names.index('cz'), 1] - np.min(data[:, 2])
 
 
-def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matrix=False, spiral_output_type="orig"):
-    """
-    returns digitizer results from experiements
-    :param path_to_template:
-    :param experiment_folder_path:
-    :param rot_as_matrix:
-    :param spiral_output_type:
-    :return:
-    """
-    template_names, template_data, template_format, _ = read_template_file(path_to_template)
-    template_data = template_data[0]
-    template_names = template_names[0]
-    template_data = to_standard_coordinate_system(template_names, template_data)
-    # template_data = normalize_coordinates(template_names, template_data)  # normalize data
-    template_mask_data = template_data[(template_names.index('fp1'),
-                                        template_names.index('fp2'),
-                                        template_names.index('fpz'),
-                                        template_names.index('cz'),
-                                        template_names.index('o1'),
-                                        template_names.index('o2'),
-                                        template_names.index('oz'),
-                                        template_names.index('f7'),
-                                        template_names.index('f8')), :]
-    template_face_data = template_data[(template_names.index('leftear'),
-                                        template_names.index('rightear'),
-                                        template_names.index('lefteye'),
-                                        template_names.index('righteye'),
-                                        template_names.index('nosebridge'),
-                                        template_names.index('nosetip')), :]
-    template_spiral_data = template_data[template_names.index(0):, :]  # select spiral
-
-    experiment_file_list = []
-    skulls = []
-    spiral_output = []
-    optode_estimations = {}
-    rot_estimations = {}
-    if experiment_folder_path.is_dir():
-        for exp_file in sorted(experiment_folder_path.glob("*.txt")):
-            experiment_file_list.append(exp_file)
-    else:
-        experiment_file_list.append(experiment_folder_path)
-
-    for exp_file in experiment_file_list:
-        logging.info(exp_file.name)
-        file_names, file_data, file_format, skull = read_template_file(exp_file)
-        skull_sizes = []
-        for i, session in enumerate(zip(file_names, file_data)):
-            if not session[0]:
-                optode_estimations.setdefault(exp_file.stem, []).append(None)
-                rot_estimations.setdefault(exp_file.stem, []).append(None)
-                continue
-            names = session[0]
-            data = session[1][:, 0, :] #- session[1][:, 1, :]  # subtract second sensor
-            data = to_standard_coordinate_system(names, data)
-            # file_data = normalize_coordinates(file_names, file_data)  # normalize data
-            file_mask_data = data[(names.index('fp1'),
-                                   names.index('fp2'),
-                                   names.index('fpz'),
-                                   names.index('cz'),
-                                   names.index('o1'),
-                                   names.index('o2'),
-                                   names.index('oz'),
-                                   names.index('f7'),
-                                   names.index('f8')), :]
-            file_face_data = data[(names.index('leftear'),
-                                   names.index('rightear'),
-                                   names.index('lefteye'),
-                                   names.index('righteye'),
-                                   names.index('nosebridge'),
-                                   names.index('nosetip')), :]
-            # align faces as intermediate step
-            ret_R, ret_t = rigid_transform_3d_nparray(template_face_data, file_face_data)
-            aligned_template_mask = (ret_R @ template_mask_data.T).T + ret_t
-
-            if spiral_output_type == "orig":
-                subject_secific_origin = data[(names.index('leftear'),
-                                               names.index('rightear'),
-                                               names.index('nosebridge'),
-                                               names.index('cz')), :]
-                subject_secific_spiral = file_mask_data
-                spiral_output.append([subject_secific_origin, subject_secific_spiral])
-            elif spiral_output_type == "spiral_transformed":
-                if i == 0:
-                    subject_secific_origin = data[(names.index('leftear'),
-                                                   names.index('rightear'),
-                                                   names.index('nosebridge'),
-                                                   names.index('cz')), :]
-                    subject_secific_spiral = (ret_R @ template_spiral_data.T).T + ret_t
-                    spiral_output.append([subject_secific_origin, subject_secific_spiral])
-
-            # find mask transform
-            ret_R, ret_t = rigid_transform_3d_nparray(aligned_template_mask, file_mask_data)
-            # vis_estimation = (ret_R @ template_mask_data.T).T + ret_t
-            # draw.visualize_2_pc(points_blue=vis_estimation,
-            #                     points_red=file_mask_data,
-            #                     title="test")
-            gt_rot_m = R.from_matrix(ret_R)
-            gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
-            logging.info("Digitizer Euler angels: " + str(gt_rot_e))
-            # note: we apply only the mask transformation and report that to downstream.
-            # facial alignment was an intermediate result
-            estimation = (ret_R @ template_spiral_data.T).T
-            optode_estimations.setdefault(exp_file.stem, []).append(estimation)
-            if rot_as_matrix:
-                rot_estimations.setdefault(exp_file.stem, []).append(ret_R)
-            else:
-                rot_estimations.setdefault(exp_file.stem, []).append(gt_rot_e)
-            skull_sizes.append([np.linalg.norm(data[(names.index('leftear'))] - data[(names.index('rightear'))]),
-                                np.linalg.norm(data[(names.index('fpz'))] - data[(names.index('o1'))])])
-        skulls.append(np.mean(np.array(skull_sizes), axis=0) / 2)
-
-        # rmse = get_rmse(estimation, file_spiral_data)
-        # print("template-digitizer error (transform using fiducials):", rmse)
-        # vis_estimation = (ret_R @ template_face_data.T).T + ret_t
-        # visualize.visualize_pc(points_blue=vis_estimation,
-        #                        points_red=file_face_data,
-        #                        title="test")
-        # ret_R, ret_t = rigid_transform_3d_nparray(template_spiral_data.T, file_spiral_data.T)
-        # estimation = (ret_R @ template_spiral_data.T).T + ret_t
-        # rmse = get_rmse(estimation, file_spiral_data)
-        # print("template-digitizer (transform using all-sensors):", rmse)
-        # rmse = get_rmse(estimations[0], estimations[1])
-        # print("digi2digi rmse between session 1 and session 2:", rmse)
-        # rmse = get_rmse(estimations[0], estimations[2])
-        # print("digi2digi rmse between session 1 and session 3:", rmse)
-        # rmse = get_rmse(estimations[1], estimations[2])
-        # print("digi2digi rmse between session 2 and session 3:", rmse)
-    return optode_estimations, rot_estimations, skulls, spiral_output
-
-
-def project_sensors_to_MNI(list_of_sensor_locations):
+def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
     """
     project new sensor locations to MNI
-    :param list_of_sensor_locations: a list of lists of names (, data (nx3)of all sensor locations
+    :param list_of_sensor_locations: a list of lists of [names ,data (nx3)] of all sensor locations
     :return:
     """
     projected_locations = list_of_sensor_locations.copy()
     for sensor_locations in projected_locations:
         names = sensor_locations[0]
         data = sensor_locations[1]
-        if 0 in names:
+        if origin_optodes_names:
+            origin_selector = tuple([names.index(x) for x in origin_optodes_names])
+            unsorted_origin_xyz = data[origin_selector, :]  # treated as anchors for projection (they are not changed)
+            unsorted_origin_names = np.array(origin_optodes_names)
+            others_selector = tuple([names.index(x) for x in names if x not in origin_optodes_names])
+            others_xyz = data[others_selector, :]  # will be transformed to MNI
+        elif 0 in names: # fallback if someone didn't pass origin_optodes_names
             unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
             unsorted_origin_names = np.array(names[:names.index(0)])
             others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
         else:  # someone forgot to pass data for projection...
-            unsorted_origin_xyz = data
-            unsorted_origin_names = np.array(names)
-            others_xyz = np.zeros(3)
-
+            assert False, "can't resolve origin & others from sensors."
         # these names are written in an order the algorithm expects (and MNI template data was written in)
         target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
                                         "fp1", "fp2", "fz", "f3",
@@ -725,29 +383,9 @@ def project_sensors_to_MNI(list_of_sensor_locations):
         selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
         origin_xyz = unsorted_origin_xyz[sorting_indices]
         otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
-        # todo: report head points to caller? report standard deviation to caller ?
-        sensor_locations[1][names.index(0):, :] = otherC
+        # todo: should we report anything but cortex locations to caller?
+        if origin_optodes_names:
+            sensor_locations[1][others_selector, :] = otherC
+        else:
+            sensor_locations[1][names.index(0):, :] = otherC
     return projected_locations
-
-
-def do_digi_error_experiment():
-    """
-    reproduces experiment where various number of optodes were measured with digitizer
-    tries to find relationship between number of optodes and error received
-    :return:
-    """
-    data = read_digitizer_multi_noptodes_experiment_file("resource/digi_error_exp.txt")
-    errors = {}
-    for datum in data:
-        number_of_optodes = len(datum) // 10
-        error = []
-        for exp in range(5):
-            real_exp = exp * number_of_optodes * 2
-            begin = datum[real_exp:real_exp + number_of_optodes]
-            end = datum[real_exp + number_of_optodes:real_exp + 2*number_of_optodes]
-            error.append(get_rmse(begin, end))
-        error = np.array(error)
-        error = np.mean(error)
-        errors.setdefault(number_of_optodes, []).append(error)
-    for key, value in errors.items():
-        logging.info("{}->{:.3f}".format(key, value[0]))
