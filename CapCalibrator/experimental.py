@@ -28,214 +28,7 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
 
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
 
-
-    digi2digi_est, digi2digi_rot, skull_radii, ss_data = get_digi2digi_results(args.template,
-                                                                               args.ground_truth,
-                                                                               True)
-    vid2vid_est = []
-    names, data, format, _ = read_template_file(args.template)
-    names = names[0]
-    data = data[0]
-    data = geometry.to_standard_coordinate_system(names, data)
-    data_spiral = data[names.index(0):, :]  # select spiral
-
-    digi_intra_method_sessions1 = []
-    digi_intra_method_sessions2 = []
-    digi_rot_sessions1 = []
-    digi_rot_sessions2 = []
-    digi_rot_sessions3 = []
-
-    vid_rot_sessions1 = []
-    vid_rot_sessions2 = []
-    vid_rot_sessions3 = []
-
-    digi_r_matrix = []
-
-    # calculate all errors for manuscript
-    for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
-        subject_name, session_name = vid.split("_")
-        session_number = int(re.findall(r'\d+', session_name)[0]) - 1
-
-        transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
-        vid2vid_est.append(transformed_data_sim.T)
-        rot = R.from_matrix(rot_mat)
-        try:
-            digi_rot = R.from_matrix(digi2digi_rot[subject_name][session_number])
-            digi_rot_euler = digi_rot.as_euler('xyz', degrees=True)
-        except Exception:
-            digi_rot_euler = None
-
-        if session_number == 0:
-            digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
-            digi_rot_sessions1.append(digi_rot_euler)
-            vid_rot_sessions1.append(rot.as_euler('xyz', degrees=True))
-            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
-        if session_number == 1:
-            digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
-            digi_rot_sessions2.append(digi_rot_euler)
-            vid_rot_sessions2.append(rot.as_euler('xyz', degrees=True))
-            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
-        if session_number == 2:
-            digi_rot_sessions3.append(digi_rot_euler)
-            vid_rot_sessions3.append(rot.as_euler('xyz', degrees=True))
-
-    digi_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
-    digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
-    digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
-    logging.info(
-        "digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
-
-    vid_intra_method_sessions1 = vid2vid_est[::3]
-    vid_intra_method_sessions2 = vid2vid_est[1::3]
-    vid_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in zip(vid_intra_method_sessions1, vid_intra_method_sessions2)]
-    vid_intra_method_rmse_avg = np.mean(vid_intra_method_rmse)
-    vid_intra_method_rmse_std = np.std(vid_intra_method_rmse)
-    logging.info("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
-
-    inter_method_rmse1 = [geometry.get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions1)]
-    inter_method_rmse2 = [geometry.get_rmse(x, y) for x, y in zip(digi_intra_method_sessions1, vid_intra_method_sessions2)]
-    inter_method_rmse3 = [geometry.get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions1)]
-    inter_method_rmse4 = [geometry.get_rmse(x, y) for x, y in zip(digi_intra_method_sessions2, vid_intra_method_sessions2)]
-    inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
-    inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
-    logging.info("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
-
-    # if we are missing a session, remove it from other experiments too
-    pop_indices = [i for i, x in enumerate(digi_rot_sessions3) if x is None]
-    for index in pop_indices:
-        digi_rot_sessions1.pop(index)
-        digi_rot_sessions2.pop(index)
-        digi_rot_sessions3.pop(index)
-        vid_rot_sessions1.pop(index)
-        vid_rot_sessions2.pop(index)
-        vid_rot_sessions3.pop(index)
-
-    # calc t-test statistics
-    a_vid = np.array(vid_intra_method_rmse)
-    a_dig = np.array(digi_intra_method_rmse)
-    a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
-                      axis=0)
-
-    # do skulls plot
-    import draw
-    skull_radii = np.array(skull_radii)
-    circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
-    draw.plot_skull_vs_error(circumferences, digi_intra_method_rmse, vid_intra_method_rmse, a_inter)
-    logging.info("skull circumferences mean: {:.3f}".format(np.mean(circumferences)))
-    logging.info("skull circumferences std: {:.3f}".format(np.std(circumferences)))
-    t1, p1 = ttest_rel(a_vid, a_dig)
-    logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
-    t2, p2 = ttest_rel(a_dig, a_inter)
-    logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
-
-    # calc shifts in every direction for each method
-    digi2digi_shift = np.array(
-        [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
-    vid2vid_shift = np.array(
-        [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
-
-    # correlate the shifts
-    x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
-    y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
-    z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
-
-    logging.info(
-        "Shift correlation (x, px, y, py, z, pz):"
-        "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
-
-
-    # do MNI plots
-    dig_est_ses1 = []
-    dig_est_ses2 = []
-    data_others = [x[1] for x in ss_data]
-    data_origin = [x[0] for x in ss_data]
-    list_extension = [x for x in range(len(data_others))]
-    digi_names = ["leftear", "rightear", "nosebridge", "cz"] + list_extension
-    if not Path("cache/session1_digi_MNI_ss.npy").is_file() or not Path("cache/session2_digi_MNI_ss.npy").is_file():
-        # digi2digi session1: calc error using subject-specific MNI anchors
-        for i in range(0, len(data_origin), 3):
-            dig_est_ses1.append([digi_names, np.vstack((data_origin[i], data_others[i]))])
-            dig_est_ses2.append([digi_names, np.vstack((data_origin[i + 1], data_others[i + 1]))])
-
-        digi_projected_data_ses1 = geometry.project_sensors_to_MNI(dig_est_ses1)
-        digi = np.array([x[1] for x in digi_projected_data_ses1], dtype=np.object)
-        np.save("cache/session1_digi_MNI_ss", digi)
-        digi_projected_data_ses2 = geometry.project_sensors_to_MNI(dig_est_ses2)
-        digi = np.array([x[1] for x in digi_projected_data_ses2], dtype=np.object)
-        np.save("cache/session2_digi_MNI_ss", digi)
-
-    do_MNI = False
-    if do_MNI:
-        # everything else (digi2digi, vid2vid, digi2vid) all sessions: calc error using template MNI anchors
-        vid_est = []
-        dig_est = []
-        names, data, format, _ = read_template_file(args.template)
-        names = names[0]
-        data = data[0]
-        data = geometry.to_standard_coordinate_system(names, data)
-        if 0 in names:
-            data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-            data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
-        else:
-            data_origin = data
-            data_optodes = np.zeros(3)
-        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
-            vid_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
-        for rot_mat, scale_mat in zip(digi_r_matrix, s_matrix):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
-            dig_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
-        from scipy import io
-
-        # io.savemat('names.mat',
-        #            {'names': np.array([vid_est[0][0]], dtype=np.object)})
-
-        # session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
-        # io.savemat('session1_vid_no_MNI.mat',
-        #            {'session1_vid_no_MNI': session1_vid})
-        # session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
-        # io.savemat('session2_vid_no_MNI.mat',
-        #            {'session2_vid_no_MNI': session2_vid})
-        # session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
-        # io.savemat('session1_digi_no_MNI.mat',
-        #            {'session1_digi_no_MNI': session1_dig})
-        # session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
-        # io.savemat('session2_digi_no_MNI.mat',
-        #            {'session2_digi_no_MNI': session2_dig})
-
-        vid_projected_data_session1 = geometry.project_sensors_to_MNI(vid_est[0::3])
-        session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
-        np.save("cache/session1_vid_MNI", session1_vid)
-        # io.savemat('session1_vid.mat',
-        #            {'session1_vid': session1_vid})
-        vid_projected_data_session2 = geometry.project_sensors_to_MNI(vid_est[1::3])
-        session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
-        np.save("cache/session2_vid_MNI", session2_vid)
-        # io.savemat('session2_vid.mat',
-        #            {'session2_vid': session2_vid})
-        digi_projected_data_session1 = geometry.project_sensors_to_MNI(dig_est[0::2])
-        session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
-        np.save("cache/session1_digi_MNI", session1_dig)
-        # io.savemat('session1_digi.mat',
-        #            {'session1_digi': session1_dig})
-        digi_projected_data_session2 = geometry.project_sensors_to_MNI(dig_est[1::2])
-        session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
-        np.save("cache/session2_digi_MNI", session2_dig)
-        # io.savemat('session2_digi.mat',
-        #            {'session2_digi': session2_dig})
-
-    digi_ss = np.load("cache/session1_digi_MNI_ss.npy", allow_pickle=True)
-    digi_template = np.load("cache/session2_digi_MNI_ss.npy", allow_pickle=True)
-    digi_ss_spiral = digi_ss[:, digi_names.index(0):, :]
-    digi_template_spiral = digi_template[:, digi_names.index(0):, :]
-    errors = []
-    for i in range(len(digi_ss_spiral)):
-        rmse_error = geometry.get_rmse(digi_ss_spiral[i], digi_template_spiral[i])
-        errors.append(rmse_error)
-    rmse_error_f = np.mean(np.array(errors))
-    logging.info("with ss mni vs without: {:.3f}".format(rmse_error_f))
-    draw.visualize_2_pc(points_blue=digi_ss_spiral[0], points_red=digi_ss_spiral[1])
-    print("done!")
+    do_old_experiment(r_matrix, s_matrix, video_names, args)
 
 
 def do_digi_error_experiment():
@@ -422,6 +215,7 @@ def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matric
     :param video_names:
     :param r_matrices:
     :param s_matrices:
+    :param digi_sessions: pass this to use anchors from digitizer
     :return:
     """
     names, data, format, _ = read_template_file(template_path)
@@ -643,3 +437,218 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
         # rmse = geometry.get_rmse(estimations[1], estimations[2])
         # print("digi2digi rmse between session 2 and session 3:", rmse)
     return optode_estimations, rot_estimations, skulls, spiral_output
+
+
+def do_old_experiment(r_matrix, s_matrix, video_names, args):
+    digi2digi_est, digi2digi_rot, skull_radii, ss_data = get_digi2digi_results(args.template,
+                                                                               args.ground_truth,
+                                                                               True)
+    vid2vid_est = []
+    names, data, format, _ = read_template_file(args.template)
+    names = names[0]
+    data = data[0]
+    data = geometry.to_standard_coordinate_system(names, data)
+    data_spiral = data[names.index(0):, :]  # select spiral
+
+    digi_intra_method_sessions1 = []
+    digi_intra_method_sessions2 = []
+    digi_rot_sessions1 = []
+    digi_rot_sessions2 = []
+    digi_rot_sessions3 = []
+
+    vid_rot_sessions1 = []
+    vid_rot_sessions2 = []
+    vid_rot_sessions3 = []
+
+    digi_r_matrix = []
+
+    # calculate all errors for manuscript
+    for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrix, s_matrix, video_names)):
+        subject_name, session_name = vid.split("_")
+        session_number = int(re.findall(r'\d+', session_name)[0]) - 1
+
+        transformed_data_sim = rot_mat @ (scale_mat @ data_spiral.T)
+        vid2vid_est.append(transformed_data_sim.T)
+        rot = R.from_matrix(rot_mat)
+        try:
+            digi_rot = R.from_matrix(digi2digi_rot[subject_name][session_number])
+            digi_rot_euler = digi_rot.as_euler('xyz', degrees=True)
+        except Exception:
+            digi_rot_euler = None
+
+        if session_number == 0:
+            digi_intra_method_sessions1.append(digi2digi_est[subject_name][session_number])
+            digi_rot_sessions1.append(digi_rot_euler)
+            vid_rot_sessions1.append(rot.as_euler('xyz', degrees=True))
+            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
+        if session_number == 1:
+            digi_intra_method_sessions2.append(digi2digi_est[subject_name][session_number])
+            digi_rot_sessions2.append(digi_rot_euler)
+            vid_rot_sessions2.append(rot.as_euler('xyz', degrees=True))
+            digi_r_matrix.append(digi2digi_rot[subject_name][session_number])
+        if session_number == 2:
+            digi_rot_sessions3.append(digi_rot_euler)
+            vid_rot_sessions3.append(rot.as_euler('xyz', degrees=True))
+
+    digi_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in
+                              zip(digi_intra_method_sessions1, digi_intra_method_sessions2)]
+    digi_intra_method_rmse_avg = np.mean(digi_intra_method_rmse)
+    digi_intra_method_rmse_std = np.std(digi_intra_method_rmse)
+    logging.info(
+        "digi2digi rmse avg, std: {:.3f}, {:.3f}".format(digi_intra_method_rmse_avg, digi_intra_method_rmse_std))
+
+    vid_intra_method_sessions1 = vid2vid_est[::3]
+    vid_intra_method_sessions2 = vid2vid_est[1::3]
+    vid_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in
+                             zip(vid_intra_method_sessions1, vid_intra_method_sessions2)]
+    vid_intra_method_rmse_avg = np.mean(vid_intra_method_rmse)
+    vid_intra_method_rmse_std = np.std(vid_intra_method_rmse)
+    logging.info("vid2vid rmse avg, std: {:.3f}, {:.3f}".format(vid_intra_method_rmse_avg, vid_intra_method_rmse_std))
+
+    inter_method_rmse1 = [geometry.get_rmse(x, y) for x, y in
+                          zip(digi_intra_method_sessions1, vid_intra_method_sessions1)]
+    inter_method_rmse2 = [geometry.get_rmse(x, y) for x, y in
+                          zip(digi_intra_method_sessions1, vid_intra_method_sessions2)]
+    inter_method_rmse3 = [geometry.get_rmse(x, y) for x, y in
+                          zip(digi_intra_method_sessions2, vid_intra_method_sessions1)]
+    inter_method_rmse4 = [geometry.get_rmse(x, y) for x, y in
+                          zip(digi_intra_method_sessions2, vid_intra_method_sessions2)]
+    inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+    inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+    logging.info("digi2vid rmse avg, std: {:.3f}, {:.3f}".format(inter_method_rmse_avg, inter_method_rmse_std))
+
+    # if we are missing a session, remove it from other experiments too
+    pop_indices = [i for i, x in enumerate(digi_rot_sessions3) if x is None]
+    for index in pop_indices:
+        digi_rot_sessions1.pop(index)
+        digi_rot_sessions2.pop(index)
+        digi_rot_sessions3.pop(index)
+        vid_rot_sessions1.pop(index)
+        vid_rot_sessions2.pop(index)
+        vid_rot_sessions3.pop(index)
+
+    # calc t-test statistics
+    a_vid = np.array(vid_intra_method_rmse)
+    a_dig = np.array(digi_intra_method_rmse)
+    a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
+                      axis=0)
+
+    # do skulls plot
+    import draw
+    skull_radii = np.array(skull_radii)
+    circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
+    draw.plot_skull_vs_error(circumferences, digi_intra_method_rmse, vid_intra_method_rmse, a_inter)
+    logging.info("skull circumferences mean: {:.3f}".format(np.mean(circumferences)))
+    logging.info("skull circumferences std: {:.3f}".format(np.std(circumferences)))
+    t1, p1 = ttest_rel(a_vid, a_dig)
+    logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
+    t2, p2 = ttest_rel(a_dig, a_inter)
+    logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
+
+    # calc shifts in every direction for each method
+    digi2digi_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(digi_rot_sessions1, digi_rot_sessions2, digi_rot_sessions3)])
+    vid2vid_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(vid_rot_sessions1, vid_rot_sessions2, vid_rot_sessions3)])
+
+    # correlate the shifts
+    x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
+    y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
+    z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
+
+    logging.info(
+        "Shift correlation (x, px, y, py, z, pz):"
+        "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
+
+    # do MNI plots
+    dig_est_ses1 = []
+    dig_est_ses2 = []
+    data_others = [x[1] for x in ss_data]
+    data_origin = [x[0] for x in ss_data]
+    list_extension = [x for x in range(len(data_others))]
+    digi_names = ["leftear", "rightear", "nosebridge", "cz"] + list_extension
+    if not Path("cache/session1_digi_MNI_ss.npy").is_file() or not Path("cache/session2_digi_MNI_ss.npy").is_file():
+        # digi2digi session1: calc error using subject-specific MNI anchors
+        for i in range(0, len(data_origin), 3):
+            dig_est_ses1.append([digi_names, np.vstack((data_origin[i], data_others[i]))])
+            dig_est_ses2.append([digi_names, np.vstack((data_origin[i + 1], data_others[i + 1]))])
+
+        digi_projected_data_ses1 = geometry.project_sensors_to_MNI(dig_est_ses1)
+        digi = np.array([x[1] for x in digi_projected_data_ses1], dtype=np.object)
+        np.save("cache/session1_digi_MNI_ss", digi)
+        digi_projected_data_ses2 = geometry.project_sensors_to_MNI(dig_est_ses2)
+        digi = np.array([x[1] for x in digi_projected_data_ses2], dtype=np.object)
+        np.save("cache/session2_digi_MNI_ss", digi)
+
+    do_MNI = False
+    if do_MNI:
+        # everything else (digi2digi, vid2vid, digi2vid) all sessions: calc error using template MNI anchors
+        vid_est = []
+        dig_est = []
+        names, data, format, _ = read_template_file(args.template)
+        names = names[0]
+        data = data[0]
+        data = geometry.to_standard_coordinate_system(names, data)
+        if 0 in names:
+            data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
+            data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
+        else:
+            data_origin = data
+            data_optodes = np.zeros(3)
+        for rot_mat, scale_mat in zip(r_matrix, s_matrix):
+            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+            vid_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
+        for rot_mat, scale_mat in zip(digi_r_matrix, s_matrix):
+            transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
+            dig_est.append([names, np.vstack((data_origin, transformed_data_sim.T))])
+        from scipy import io
+
+        # io.savemat('names.mat',
+        #            {'names': np.array([vid_est[0][0]], dtype=np.object)})
+
+        # session1_vid = np.array([x[1] for x in vid_est[0::3]], dtype=np.object)
+        # io.savemat('session1_vid_no_MNI.mat',
+        #            {'session1_vid_no_MNI': session1_vid})
+        # session2_vid = np.array([x[1] for x in vid_est[1::3]], dtype=np.object)
+        # io.savemat('session2_vid_no_MNI.mat',
+        #            {'session2_vid_no_MNI': session2_vid})
+        # session1_dig = np.array([x[1] for x in dig_est[0::2]], dtype=np.object)
+        # io.savemat('session1_digi_no_MNI.mat',
+        #            {'session1_digi_no_MNI': session1_dig})
+        # session2_dig = np.array([x[1] for x in dig_est[1::2]], dtype=np.object)
+        # io.savemat('session2_digi_no_MNI.mat',
+        #            {'session2_digi_no_MNI': session2_dig})
+
+        vid_projected_data_session1 = geometry.project_sensors_to_MNI(vid_est[0::3])
+        session1_vid = np.array([x[1] for x in vid_projected_data_session1], dtype=np.object)
+        np.save("cache/session1_vid_MNI", session1_vid)
+        # io.savemat('session1_vid.mat',
+        #            {'session1_vid': session1_vid})
+        vid_projected_data_session2 = geometry.project_sensors_to_MNI(vid_est[1::3])
+        session2_vid = np.array([x[1] for x in vid_projected_data_session2], dtype=np.object)
+        np.save("cache/session2_vid_MNI", session2_vid)
+        # io.savemat('session2_vid.mat',
+        #            {'session2_vid': session2_vid})
+        digi_projected_data_session1 = geometry.project_sensors_to_MNI(dig_est[0::2])
+        session1_dig = np.array([x[1] for x in digi_projected_data_session1], dtype=np.object)
+        np.save("cache/session1_digi_MNI", session1_dig)
+        # io.savemat('session1_digi.mat',
+        #            {'session1_digi': session1_dig})
+        digi_projected_data_session2 = geometry.project_sensors_to_MNI(dig_est[1::2])
+        session2_dig = np.array([x[1] for x in digi_projected_data_session2], dtype=np.object)
+        np.save("cache/session2_digi_MNI", session2_dig)
+        # io.savemat('session2_digi.mat',
+        #            {'session2_digi': session2_dig})
+
+    digi_ss = np.load("cache/session1_digi_MNI_ss.npy", allow_pickle=True)
+    digi_template = np.load("cache/session2_digi_MNI_ss.npy", allow_pickle=True)
+    digi_ss_spiral = digi_ss[:, digi_names.index(0):, :]
+    digi_template_spiral = digi_template[:, digi_names.index(0):, :]
+    errors = []
+    for i in range(len(digi_ss_spiral)):
+        rmse_error = geometry.get_rmse(digi_ss_spiral[i], digi_template_spiral[i])
+        errors.append(rmse_error)
+    rmse_error_f = np.mean(np.array(errors))
+    logging.info("with ss mni vs without: {:.3f}".format(rmse_error_f))
+    draw.visualize_2_pc(points_blue=digi_ss_spiral[0], points_red=digi_ss_spiral[1])
+    print("done!")
