@@ -79,7 +79,10 @@ def read_template_file(template_path):
             data.append(np.stack((sensor1_data, sensor2_data), axis=1))
     else:  # princeton
         for line in non_empty_lines:
-            name, x, y, z = line.split()
+            try:
+                name, x, y, z = line.split()
+            except ValueError:
+                name, x, y, z = line.split(",")
             x = float(x)
             y = float(y)
             z = float(z)

@@ -53,8 +53,13 @@ def launch_renderer(exe_path, log_path, iterations, template, output, images):
           " -batchmode"
     if images:
         cmd += " -save_image True"
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    logging.info("Renderer launched as daemon.")
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        logging.info("Renderer launched as daemon.")
+        return True
+    except FileNotFoundError:
+        logging.error("Failed to run renderer. Does it really exist in this path? " + str(exe_path))
+        return False
 
 
 def render(template_names, template_data, output_folder, exe_path, log_path, iterations, images):
@@ -62,8 +67,8 @@ def render(template_names, template_data, output_folder, exe_path, log_path, ite
     data = fix_yaw(template_names, data)
     template_file_path = Path("cache", "template_transformed.txt")
     create_temporary_template(template_names, data, template_file_path)
-    launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder, images)
-    
+    success = launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder, images)
+    return success
     
 if __name__ == "__main__":
     args = parse_arguments()
@@ -73,7 +78,7 @@ if __name__ == "__main__":
         data = data[:, 0, :]  # select first sensor
     names = names[0]  # select first (and only) session
     if not args.no_transform:
-        render(names, data, args.output, args.exe, args.log, args.iterations, args.save_images)
+        _ = render(names, data, args.output, args.exe, args.log, args.iterations, args.save_images)
     else:
         launch_renderer(args.exe, args.log, args.iterations, args.template, args.output, args.images)
     logging.info("See", args.log.resolve(), "for detailed renderer log.")

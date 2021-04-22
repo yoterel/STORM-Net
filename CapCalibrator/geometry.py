@@ -365,7 +365,7 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
             unsorted_origin_names = np.array(origin_optodes_names)
             others_selector = tuple([names.index(x) for x in names if x not in origin_optodes_names])
             others_xyz = data[others_selector, :]  # will be transformed to MNI
-        elif 0 in names: # fallback if someone didn't pass origin_optodes_names
+        elif 0 in names:  # fallback if someone didn't pass origin_optodes_names
             unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
             unsorted_origin_names = np.array(names[:names.index(0)])
             others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
