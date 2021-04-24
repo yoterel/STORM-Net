@@ -8,12 +8,26 @@ from scipy.stats import pearsonr, ttest_rel
 from scipy.spatial.transform import Rotation as R
 
 
-def do_opt2dig_experiment(digi_ses1, digi_ses2, opt_ses1, opt_ses2, rots, video_names):
+def do_opt2dig_experiment(digi_ses1, digi_ses2, opt_ses1, opt_ses2, rots, scales, video_names):
+    """
+    reports results given optimal sessions and digitizer sessions
+    (and rots / scales usedto achieve optimum)
+    :param digi_ses1:
+    :param digi_ses2:
+    :param opt_ses1:
+    :param opt_ses2:
+    :param rots:
+    :param scales:
+    :param video_names:
+    :return:
+    """
     subject_names = [x.split("_")[0] for x in video_names[::3]]
     errors_ses1 = []
     errors_ses2 = []
     real_errors_ses1 = []
     real_errors_ses2 = []
+    ses1 = opt_ses1.copy()
+    ses2 = opt_ses2.copy()
     for i in range(len(digi_ses1[1])):
         inter_method_rmse1 = [geometry.get_rmse(x, digi_ses1[1][i]) for x in opt_ses1[1]]
         inter_method_rmse2 = [geometry.get_rmse(x, digi_ses2[1][i]) for x in opt_ses2[1]]
@@ -22,22 +36,37 @@ def do_opt2dig_experiment(digi_ses1, digi_ses2, opt_ses1, opt_ses2, rots, video_
     for i, error in enumerate(errors_ses1):
         min_error_index = np.argmin(error)
         min_error = error[min_error_index.astype(np.int)]
-        logging.info("session: {}, subject: {}, min error: {}, rot: {}".format(1, subject_names[i], min_error, rots[min_error_index]))
+        logging.info("session: {}, subject: {}, min error: {}, rot: {}, scale: {}".format(1,
+                                                                                          subject_names[i],
+                                                                                          min_error,
+                                                                                          rots[min_error_index],
+                                                                                          scales[min_error_index]
+                                                                                          ))
         real_errors_ses1.append(min_error)
+        ses1[1][i] = opt_ses1[1][min_error_index]
     for i, error in enumerate(errors_ses2):
         min_error_index = np.argmin(error)
         min_error = error[min_error_index.astype(np.int)]
-        logging.info("session: {}, subject: {}, min error: {}, rot: {}".format(2, subject_names[i], min_error, rots[min_error_index]))
+        logging.info("session: {}, subject: {}, min error: {}, rot: {}, scale: {}".format(2,
+                                                                                          subject_names[i],
+                                                                                          min_error,
+                                                                                          rots[min_error_index],
+                                                                                          scales[min_error_index]
+                                                                                          ))
         real_errors_ses2.append(min_error)
-    logging.info("ses1 as good as you are gonna get: {}".format(np.mean(real_errors_ses1)))
-    logging.info("ses2 as good as you are gonna get: {}".format(np.mean(real_errors_ses2)))
-
+        ses2[1][i] = opt_ses2[1][min_error_index]
+    ses1[1] = ses1[1][:10]
+    ses2[1] = ses2[1][:10]
+    logging.info("ses1 optimal inter-validation error: {}".format(np.mean(real_errors_ses1)))
+    logging.info("ses2 optimal inter-validation error: {}".format(np.mean(real_errors_ses2)))
+    # return sessions incase caller wants to plot / visualize
+    return ses1, ses2
 
 
 def do_find_optimal_rotation_experiment(template_path):
     """
-    experiement to compare intra-method error between video sessions
-    applies transform from network before MNI projection
+    experiement to use an exhaustive search of paramter space to find optimal rotation and scale of template model
+    applies transform from before MNI projection.
     :param template_path:
     :param video_names:
     :param r_matrices:
@@ -45,7 +74,7 @@ def do_find_optimal_rotation_experiment(template_path):
     :param digi_sessions: pass this to use anchors from digitizer
     :return:
     """
-    random_grid_space_size = 1000
+    random_grid_space_size = 10000
     names, data, format, _ = read_template_file(template_path)
     names = names[0]
     data = data[0]
@@ -55,18 +84,24 @@ def do_find_optimal_rotation_experiment(template_path):
     origin_names = ["leftear", "rightear", "nosebridge", "cz"]
     full_names = origin_names + others_names
     sessions = [[], []]
+    np.random.seed(42)
     rx = np.random.rand(random_grid_space_size)*10 - 5
     ry = np.random.rand(random_grid_space_size)*10 - 5
     rz = np.random.rand(random_grid_space_size)*10 - 5
+    sx = np.random.rand(random_grid_space_size)*0.6 + 0.7
+    sy = np.random.rand(random_grid_space_size)*0.6 + 0.7
+    sz = np.random.rand(random_grid_space_size)*0.6 + 0.7
+    scales = np.array([sx, sy, sz]).T
     rots = np.array([rx, ry, rz]).T
     from scipy.spatial.transform import Rotation as R
     rot_grid_search = [R.from_euler('xyz', rots[i], degrees=True).as_matrix() for i in range(len(rots))]
-    for rot in rot_grid_search:
+    scale_grid_search = [np.diag(scales[i]) for i in range(len(scales))]
+    for rot, scale in zip(rot_grid_search, scale_grid_search):
         origin_selector = tuple([names.index(x) for x in origin_names])
         origin = data[origin_selector, :]
         others_selector = tuple([names.index(x) for x in others_names])
         others = data[others_selector, :]
-        others = (rot @ others.T).T  # apply transform before MNI projection
+        others = (rot @ (scale @ others.T)).T  # apply transform before MNI projection
         sessions[0].append([full_names, np.vstack((origin, others))])
     sessions[1] = sessions[0]
     cached_result_ses1 = "cache/session1_opt_MNI"
@@ -78,23 +113,17 @@ def do_find_optimal_rotation_experiment(template_path):
         # vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
         vid_ss_data_ses2 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
         np.save(cached_result_ses2, vid_ss_data_ses2)
+        np.save("cache/rots", rots)
+        np.save("cache/scales", scales)
     else:
         vid_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
         vid_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
-    vid_projected_ses1_others = vid_ss_data_ses1[:, full_names.index(output_others_names[0]):, :]
-    vid_projected_ses2_others = vid_ss_data_ses2[:, full_names.index(output_others_names[0]):, :]
-    errors = []
-    for i in range(len(sessions[0])):
-        rmse_error = geometry.get_rmse(vid_projected_ses1_others[i], vid_projected_ses2_others[i])
-        errors.append(rmse_error)
-    rmse_error_mean = np.mean(np.array(errors))
-    rmse_error_std = np.std(np.array(errors))
-    logging.info("vid2vid mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(rmse_error_mean,
-                                                                                        rmse_error_std))
+        rots = np.load("cache/rots.npy", allow_pickle=True)
+        scales = np.load("cache/scales.npy", allow_pickle=True)
     output_selector = tuple([full_names.index(x) for x in output_others_names])
     return [output_others_names, vid_ss_data_ses1[:, output_selector, :]],\
            [output_others_names, vid_ss_data_ses2[:, output_selector, :]], \
-           rots
+           rots, scales
 
 
 def reproduce_experiments(r_matrix, s_matrix, video_names, args):
@@ -106,7 +135,7 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     :param args: see caller
     :return: -
     """
-    opt_ses1, opt_ses2, rots = do_find_optimal_rotation_experiment(args.template)
+    opt_ses1, opt_ses2, rots, scales = do_find_optimal_rotation_experiment(args.template)
 
     do_MNI_sensitivity_experiment(args.template)
 
@@ -114,7 +143,7 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
 
     dig_ses1, dig_ses2, sessions = do_dig2dig_experiment(args.template, args.ground_truth)
 
-    do_opt2dig_experiment(dig_ses1, dig_ses2, opt_ses1, opt_ses2, rots, video_names)
+    true_opt1, true_opt2 = do_opt2dig_experiment(dig_ses1, dig_ses2, opt_ses1, opt_ses2, rots, scales, video_names)
 
     vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args.template, video_names, r_matrix, s_matrix)
     # vid_ses1, vid_ses2 = do_vid2vid_project_afterMNI_experiment(args.template, video_names, r_matrix, s_matrix)

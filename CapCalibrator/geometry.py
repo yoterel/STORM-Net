@@ -356,7 +356,8 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
     :return:
     """
     projected_locations = list_of_sensor_locations.copy()
-    for sensor_locations in projected_locations:
+    for i, sensor_locations in enumerate(projected_locations):
+        logging.info("Projecting: {} / {} point clouds to MNI".format(i+1, len(projected_locations)))
         names = sensor_locations[0]
         data = sensor_locations[1]
         if origin_optodes_names:

@@ -180,7 +180,7 @@ def project(origin_xyz, others_xyz, selected_indices):
             zall = np.genfromtxt(pathZ, delimiter=',')
             XYZ = np.column_stack((xall, yall, zall))
             np.save("resource/MNI_templates/xyzall{}".format(str(i+1)), XYZ)
-        logging.info("Projection to MNI in progress [" + str(round(100/17*(i+1))) + "%]")
+        # logging.info("Projection to MNI in progress [" + str(round(100/17*(i+1))) + "%]")
 
         for j in range(pointN):
             P = othersRefList[0, i][j, 0:3]
