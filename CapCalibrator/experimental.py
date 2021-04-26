@@ -84,6 +84,7 @@ def do_find_optimal_rotation_experiment(template_path):
     :return:
     """
     random_grid_space_size = 50000
+    splits = 5
     names, data, format, _ = read_template_file(template_path)
     names = names[0]
     data = data[0]
@@ -116,14 +117,17 @@ def do_find_optimal_rotation_experiment(template_path):
     cached_result_ses1 = "cache/session1_opt_MNI"
     cached_result_ses2 = "cache/session2_opt_MNI"
     if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
-        vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
-        vid_ss_data_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
-        np.save(cached_result_ses1, vid_ss_data_ses1)
-        # vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
-        vid_ss_data_ses2 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
-        np.save(cached_result_ses2, vid_ss_data_ses2)
         np.save("cache/rots", rots)
         np.save("cache/scales", scales)
+        for split in range(splits):
+            min_range = (random_grid_space_size // splits)*(split)
+            max_range = (random_grid_space_size // splits)*(split+1)
+            vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0][min_range:max_range], origin_names)
+            vid_ss_data_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
+            np.save(cached_result_ses1+str(split), vid_ss_data_ses1)
+            # vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
+            vid_ss_data_ses2 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
+            np.save(cached_result_ses2+str(split), vid_ss_data_ses2)
     else:
         vid_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
         vid_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
