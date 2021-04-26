@@ -93,46 +93,66 @@ def do_find_optimal_rotation_experiment(template_path):
     others_names = output_others_names #+ names[names.index(0):]
     origin_names = ["leftear", "rightear", "nosebridge", "cz"]
     full_names = origin_names + others_names
-    sessions = [[], []]
-    np.random.seed(42)
-    rx = np.random.rand(random_grid_space_size)*14 - 7
-    ry = np.random.rand(random_grid_space_size)*14 - 7
-    rz = np.random.rand(random_grid_space_size)*14 - 7
-    sx = np.random.rand(random_grid_space_size)*0.6 + 0.7
-    sy = np.random.rand(random_grid_space_size)*0.6 + 0.7
-    sz = np.random.rand(random_grid_space_size)*0.6 + 0.7
-    scales = np.array([sx, sy, sz]).T
-    rots = np.array([rx, ry, rz]).T
-    from scipy.spatial.transform import Rotation as R
-    rot_grid_search = [R.from_euler('xyz', rots[i], degrees=True).as_matrix() for i in range(len(rots))]
-    scale_grid_search = [np.diag(scales[i]) for i in range(len(scales))]
-    for rot, scale in zip(rot_grid_search, scale_grid_search):
-        origin_selector = tuple([names.index(x) for x in origin_names])
-        origin = data[origin_selector, :]
-        others_selector = tuple([names.index(x) for x in others_names])
-        others = data[others_selector, :]
-        others = (rot @ (scale @ others.T)).T  # apply transform before MNI projection
-        sessions[0].append([full_names, np.vstack((origin, others))])
-    sessions[1] = sessions[0]
     cached_result_ses1 = "cache/session1_opt_MNI"
     cached_result_ses2 = "cache/session2_opt_MNI"
-    if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
+    recreate_files = False
+    for i in range(splits):
+        name1 = cached_result_ses1 + str(i)
+        name2 = cached_result_ses1 + str(i)
+        if not Path(name1 + ".npy").is_file() or not Path(name2 + ".npy").is_file():
+            recreate_files = True
+    ses1_list = []
+    ses2_list = []
+    if recreate_files:
+        # perform random grid search
+        sessions = [[], []]
+        np.random.seed(42)
+        rx = np.random.rand(random_grid_space_size) * 14 - 7
+        ry = np.random.rand(random_grid_space_size) * 14 - 7
+        rz = np.random.rand(random_grid_space_size) * 14 - 7
+        sx = np.random.rand(random_grid_space_size) * 0.6 + 0.7
+        sy = np.random.rand(random_grid_space_size) * 0.6 + 0.7
+        sz = np.random.rand(random_grid_space_size) * 0.6 + 0.7
+        scales = np.array([sx, sy, sz]).T
+        rots = np.array([rx, ry, rz]).T
+        from scipy.spatial.transform import Rotation as R
+        rot_grid_search = [R.from_euler('xyz', rots[i], degrees=True).as_matrix() for i in range(len(rots))]
+        scale_grid_search = [np.diag(scales[i]) for i in range(len(scales))]
+        for rot, scale in zip(rot_grid_search, scale_grid_search):
+            origin_selector = tuple([names.index(x) for x in origin_names])
+            origin = data[origin_selector, :]
+            others_selector = tuple([names.index(x) for x in others_names])
+            others = data[others_selector, :]
+            others = (rot @ (scale @ others.T)).T  # apply transform before MNI projection
+            sessions[0].append([full_names, np.vstack((origin, others))])
+        sessions[1] = sessions[0]
+        # save grid search parameters
         np.save("cache/rots", rots)
         np.save("cache/scales", scales)
         for split in range(splits):
             min_range = (random_grid_space_size // splits)*(split)
             max_range = (random_grid_space_size // splits)*(split+1)
+            # project to MNI every split
             vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0][min_range:max_range], origin_names)
             vid_ss_data_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
             np.save(cached_result_ses1+str(split), vid_ss_data_ses1)
-            # vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
+            ses1_list.append(vid_ss_data_ses1)
+            # session2 is just a copy of session1 in this case
             vid_ss_data_ses2 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
             np.save(cached_result_ses2+str(split), vid_ss_data_ses2)
+            ses2_list.append(vid_ss_data_ses2)
     else:
-        vid_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
-        vid_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
         rots = np.load("cache/rots.npy", allow_pickle=True)
         scales = np.load("cache/scales.npy", allow_pickle=True)
+        for i in range(splits):
+            name1 = cached_result_ses1 + str(i)
+            name2 = cached_result_ses1 + str(i)
+            ses1_list.append(np.load(name1 + ".npy", allow_pickle=True))
+            ses2_list.append(np.load(name2 + ".npy", allow_pickle=True))
+    vid_ss_data_ses1 = np.vstack(ses1_list).astype(np.float)
+    vid_ss_data_ses2 = np.vstack(ses2_list).astype(np.float)
+
+
     output_selector = tuple([full_names.index(x) for x in output_others_names])
     return [output_others_names, vid_ss_data_ses1[:, output_selector, :]],\
            [output_others_names, vid_ss_data_ses2[:, output_selector, :]], \

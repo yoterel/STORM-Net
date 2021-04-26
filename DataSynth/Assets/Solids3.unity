@@ -371,10 +371,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 122123595}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6b7e9fcb795b84664bfc1ac40799a68f, type: 3}
+  m_Script: {fileID: 11500000, guid: dcb2180ae78e75a4aa90e16a3d18be7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  uberReplacementShader: {fileID: 4800000, guid: 171e6e515a12e4a298dce708924e98ba,
+  uberReplacementShader: {fileID: 4800000, guid: c68b9083bcb813647bbc3843a8d3be14,
     type: 3}
 --- !u!20 &122123597
 Camera:
@@ -442,7 +442,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 171872821}
-  - component: {fileID: 171872822}
+  - component: {fileID: 171872823}
   m_Layer: 0
   m_Name: SceneController
   m_TagString: Untagged
@@ -465,7 +465,7 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &171872822
+--- !u!114 &171872823
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -474,7 +474,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 171872820}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4909eacc3993104799fca541537da0b, type: 3}
+  m_Script: {fileID: 11500000, guid: 0df20518c2425324781cda65b668a8b9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   synth: {fileID: 122123596}
@@ -1948,20 +1948,21 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'AL: 519.9 270.0
+  m_text: 'lefteye: 519.9 270.0
 
-    NZ: 480.2 247.9
+    nosetip: 480.2 247.9
 
-    AR: 439.5 270.3
+    righteye: 439.5 270.3
 
-    FP1: 539.6
-    356.3
+    left_triangle:
+    539.6 356.3
 
-    FPZ: 468.3 395.3
+    middle_triangle: 468.3 395.3
 
-    FP2: 405.0 360.2
+    right_triangle: 405.0 360.2
 
-    CZ: 469.2 416.7
+    top:
+    469.2 416.7
 
 '
   m_isRightToLeft: 0
@@ -2005,10 +2006,10 @@ MonoBehaviour:
   m_lineSpacingMax: 0
   m_paragraphSpacing: 0
   m_charWidthMaxAdj: 0
-  m_enableWordWrapping: 1
+  m_enableWordWrapping: 0
   m_wordWrappingRatios: 0.4
   m_overflowMode: 0
-  m_firstOverflowCharacterIndex: 16
+  m_firstOverflowCharacterIndex: 21
   m_linkedTextComponent: {fileID: 0}
   m_isLinkedTextComponent: 0
   m_isTextTruncated: 0
@@ -2032,10 +2033,10 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_textInfo:
     textComponent: {fileID: 573758881}
-    characterCount: 115
+    characterCount: 165
     spriteCount: 0
     spaceCount: 21
-    wordCount: 35
+    wordCount: 38
     linkCount: 0
     lineCount: 7
     pageCount: 1
@@ -2062,9 +2063,9 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 573758879}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 45d18a12dc373464396975a190c8f959, type: 3}
+  m_Script: {fileID: 11500000, guid: 15ee6b22dd421ae47a6ae1b08da81dc6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!222 &573758883

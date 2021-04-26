@@ -782,13 +782,14 @@ class GUI(tk.Tk):
                 return
             else:
                 _ = open(self.renderer_log_file.absolute(), "w+")
-        status = render.render(self.template_names,
-                               self.template_data,
-                               self.synth_output_dir,
-                               self.renderer_executable,
-                               self.renderer_log_file,
-                               iterations,
-                               False)
+        status, _ = render.render(self.template_names,
+                                  self.template_data,
+                                  self.synth_output_dir,
+                                  self.renderer_executable,
+                                  self.renderer_log_file,
+                                  iterations,
+                                  False,
+                                  False)
         if status:
             if self.panels[self.cur_active_panel].render_monitor_progress.get():
                 self.take_async_action(["render_start", self.renderer_log_file.absolute()], periodic=True)

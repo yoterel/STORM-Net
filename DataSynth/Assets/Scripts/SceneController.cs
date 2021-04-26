@@ -11,6 +11,7 @@ public class SceneController : MonoBehaviour
     private bool saveData;
     private bool shiftCamera;
     private bool rotateCamera;
+    private bool scaleFace;
     private string inputFile;
     private string outputFolder;
     //private parameters
@@ -111,6 +112,11 @@ public class SceneController : MonoBehaviour
         {
             rotateCamera = true;
         }
+        iterationsString = GetArg("-scale");
+        if (!bool.TryParse(iterationsString, out scaleFace))
+        {
+            scaleFace = false;
+        }
         iterationsString = GetArg("-input_file");
         if (string.IsNullOrEmpty(iterationsString))
         {
@@ -134,6 +140,7 @@ public class SceneController : MonoBehaviour
         System.Console.WriteLine("Saving data to disk == {0}", saveData);
         System.Console.WriteLine("Camera shift enabled == {0}", shiftCamera);
         System.Console.WriteLine("Camera rotation enabled == {0}", rotateCamera);
+        System.Console.WriteLine("Scaling face enabled== {0}", scaleFace);
         System.Console.WriteLine("Input file: " + inputFile);
         System.Console.WriteLine("Output folder: " + outputFolder);
     }
@@ -317,10 +324,13 @@ public class SceneController : MonoBehaviour
         //initialize mask location (rotation is determined randomly)
         mask.transform.position = maskInitialPosition;
         //set mask scale (not in use)
-        //float randxscale = Random.Range(1f, 1.5f);
-        //float randyscale = Random.Range(0.8f, 1f);
-        //float randzscale = Random.Range(1f, 1.2f);
-        //mask.transform.localScale = new Vector3(randxscale, randyscale, randzscale);
+        if (scaleFace)
+        {
+            float randxscale = Random.Range(0.7f, 1.3f);
+            float randyscale = Random.Range(0.7f, 1.3f);
+            float randzscale = Random.Range(0.7f, 1.3f);
+            mask.transform.localScale = new Vector3(randxscale, randyscale, randzscale);
+        }
         //set random mask rotation (ranges were hueristicly defined by observing real data)
         float randx = Random.Range(-10f, 10f);
         float randy = Random.Range(-15f, 15f);

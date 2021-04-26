@@ -17,6 +17,8 @@ def parse_arguments():
     parser.add_argument("--log", default="log.txt", help="The path to the output log file from renderer.")
     parser.add_argument("--no_transform", default=False, action='store_true', help="If specified, the data from the input template model will *NOT* be transformed to standard coordinate system before rendering. This is not recommended.")
     parser.add_argument("--save_images", default=False, action='store_true', help="Renderer will output images (in addition to formatted data)")
+    parser.add_argument("--scale_faces", default=False, action='store_true',
+                        help="Renderer will also apply different scales to the virtual head & mask")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -44,32 +46,35 @@ def create_temporary_template(names, data, template_file):
     f.close()
 
 
-def launch_renderer(exe_path, log_path, iterations, template, output, images):
+def launch_renderer(exe_path, log_path, iterations, template, output, images, scale_faces):
     cmd = str(exe_path) + \
           " -logFile {}".format(str(log_path.resolve())) +\
           " -iterations {}".format(iterations) +\
           " -input_file {}".format(str(template.resolve())) +\
           " -output_folder {}".format(str(output.resolve())) +\
           " -batchmode"
+    if scale_faces:
+        cmd += " -scale True"
     if images:
         cmd += " -save_image True"
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         logging.info("Renderer launched as daemon.")
-        return True
+        return True, process
     except FileNotFoundError:
         logging.error("Failed to run renderer. Does it really exist in this path? " + str(exe_path))
-        return False
+        return False, None
 
 
-def render(template_names, template_data, output_folder, exe_path, log_path, iterations, images):
+def render(template_names, template_data, output_folder, exe_path, log_path, iterations, images, scale_faces):
     data = to_standard_coordinate_system(template_names, template_data)
     data = fix_yaw(template_names, data)
     template_file_path = Path("cache", "template_transformed.txt")
     create_temporary_template(template_names, data, template_file_path)
-    success = launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder, images)
-    return success
-    
+    success, process = launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder, images, scale_faces)
+    return success, process
+
+
 if __name__ == "__main__":
     args = parse_arguments()
     names, data, file_format, _ = read_template_file(args.template)
@@ -78,7 +83,7 @@ if __name__ == "__main__":
         data = data[:, 0, :]  # select first sensor
     names = names[0]  # select first (and only) session
     if not args.no_transform:
-        _ = render(names, data, args.output, args.exe, args.log, args.iterations, args.save_images)
+        render(names, data, args.output, args.exe, args.log, args.iterations, args.save_images, args.scale_faces)
     else:
-        launch_renderer(args.exe, args.log, args.iterations, args.template, args.output, args.images)
+        launch_renderer(args.exe, args.log, args.iterations, args.template, args.output, args.images, args.scale_faces)
     logging.info("See", args.log.resolve(), "for detailed renderer log.")

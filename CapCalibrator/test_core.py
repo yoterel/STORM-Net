@@ -6,6 +6,7 @@ import video
 from pathlib import Path
 import file_io
 import MNI
+import render
 
 
 def test_3d_rigid_transform():
@@ -72,5 +73,25 @@ def test_MNI_projection():
     assert np.all(np.isclose(otherCSD_loaded, otherCSD))
 
 
-# if __name__ == "__main__":
-#     test_MNI_projection()
+def test_render():
+    names, data, file_format, _ = file_io.read_template_file(Path("../example_models/example_model.txt"))
+    data = data[0]  # select first (and only) session
+    if file_format == "telaviv":
+        data = data[:, 0, :]  # select first sensor
+    names = names[0]  # select first (and only) session
+    render_dir = Path("cache/renders")
+    render_dir.mkdir(parents=True, exist_ok=True)
+    file_io.delete_content_of_folder(render_dir)
+    status, process = render.render(names,
+                                    data,
+                                    render_dir,
+                                    Path("../DataSynth/build/DataSynth.exe"),
+                                    Path("cache/log"),
+                                    1,
+                                    False,
+                                    False)
+    assert status
+    exit_code = process.wait()
+    X, Y = file_io.load_raw_json_db(render_dir)
+    assert X.shape == (1, 10, 14)
+    assert Y.shape == (1, 3)
