@@ -5,6 +5,7 @@ attrs==20.3.0
 cachetools==4.1.1
 certifi==2020.11.8
 chardet==3.0.4
+cmake==3.18.4.post1
 colorama==0.4.4
 cycler==0.10.0
 dlib==19.21.0
