@@ -699,7 +699,7 @@ class GUI(tk.Tk):
             self.show_panel(self.cur_active_panel)
 
     def load_pretrained_model(self):
-        obj = filedialog.asksaveasfile(initialdir="./..", title="Select Pretrained Model Location", mode='w+')
+        obj = self.select_from_filesystem(False, True, "./..", "Select Pretrained Model Location")
         if obj:
             self.pretrained_stormnet_path = Path(obj)
             self.show_panel(self.cur_active_panel)
