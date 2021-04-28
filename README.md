@@ -49,6 +49,7 @@ Windows:\
 
 7. install requirements:\
 `pip install -r requirements.txt`
+Note: For dlib (part of the requirements), you must have some modern C++ able compiler like [visual studio](https://visualstudio.microsoft.com/) or gcc installed on your computer.
 
 8. navigate to [main.py](CapCalibrator/main.py), and run:\
 `python main.py --mode gui`
