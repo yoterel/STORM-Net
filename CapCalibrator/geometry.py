@@ -390,3 +390,25 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
         else:
             sensor_locations[1][names.index(0):, :] = otherC
     return projected_locations
+
+
+def clean_model(names, data, threshold=0.3):
+    """
+    cleans a point cloud from points too close to each other ("almost" duplicates)
+    :param names: names of the points
+    :param data: the points themselves nx3
+    :return: the cleaned point cloud and its names
+    Note: assumes almsot duplictes only exist in unnamed points (numbers and not strings in the input names)
+    """
+    indices = []
+    anchors = data[:names.index(0)]
+    unfiltered_pc = data[names.index(0):]
+    for i in range(len(unfiltered_pc)):
+        for j in range(i+1, len(unfiltered_pc)):
+            dist = np.linalg.norm(unfiltered_pc[i] - unfiltered_pc[j])
+            if dist <= threshold:
+                indices.append(j)
+    selected_indices = [x for x in range(len(unfiltered_pc)) if x not in indices]
+    data = np.vstack((anchors, data[tuple(selected_indices), :]))
+    names = names[:names.index(0)] + [x for x in range(len(selected_indices))]
+    return names, data

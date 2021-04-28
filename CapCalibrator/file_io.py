@@ -12,13 +12,14 @@ import re
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
 
 
-def read_template_file(template_path):
+def read_template_file(template_path, input_file_format=None):
     """
     reads a template file in telaviv format ("sensor x y z rx ry rz") or in princeton format ("name x y z")
     multiple sessions in same file are assumed to be delimited by a line "*" (and first session starts with it)
     note1: assumes certain order of capturing in telaviv format (since no names are given)
     note2: in tel-aviv format, two scalars in the beginning of the file are assumed to be skull sizes of subject.
     :param template_path: the path to template file
+    :param input_file_format: force reading file using a specific format (if this is None tries to infer format by content)
     :return: positions is a list of np array per session, names is a list of lists of names per session.
              note: if two sensors exists, they are stacked in a nx2x3 array, else nx3 for positions.
     """
@@ -49,12 +50,18 @@ def read_template_file(template_path):
         else:
             skulls = None
         names = [[], [], []]
-    if cond:
-        file_format = "princeton"
-        if "***" in non_empty_lines[0]:
-            non_empty_lines.pop(0)
+    if input_file_format:
+        file_format = input_file_format
+        if file_format == "princeton":
+            if "***" in non_empty_lines[0]:
+                non_empty_lines.pop(0)
     else:
-        file_format = "telaviv"
+        if cond:
+            file_format = "princeton"
+            if "***" in non_empty_lines[0]:
+                non_empty_lines.pop(0)
+        else:
+            file_format = "telaviv"
     data = []
     if file_format == "telaviv":
         labeled_names = ['leftear', 'nosebridge', 'nosetip', 'lefteye', 'righteye', 'rightear',
