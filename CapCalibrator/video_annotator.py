@@ -501,13 +501,14 @@ class GUI(tk.Tk):
         self.panels[CalibrationPage].update_labels()
 
     def save_coords(self, event=None, coords=None):
-        current_video = self.get_cur_video_hash()
-        if coords:
-            self.db[current_video][self.shift]["data"][0, self.cur_frame_index,
-            self.cur_sticker_index:self.cur_sticker_index + 2] = coords[0], coords[1]
-        else:
-            self.db[current_video][self.shift]["data"][0, self.cur_frame_index, self.cur_sticker_index:self.cur_sticker_index+2] = event.x, 540-event.y
-        self.go_to_next_coord()
+        if self.frames:
+            current_video = self.get_cur_video_hash()
+            if coords:
+                self.db[current_video][self.shift]["data"][0, self.cur_frame_index,
+                self.cur_sticker_index:self.cur_sticker_index + 2] = coords[0], coords[1]
+            else:
+                self.db[current_video][self.shift]["data"][0, self.cur_frame_index, self.cur_sticker_index:self.cur_sticker_index+2] = event.x, 540-event.y
+            self.go_to_next_coord()
 
     def set_coords(self):
         x = simpledialog.askinteger(title="Set Current Sticker Coordinates (Use mouse for faster annotation)",
@@ -528,12 +529,14 @@ class GUI(tk.Tk):
         :param event:
         :return:
         """
-        current_video = self.get_cur_video_hash()
-        self.db[current_video][self.shift]["data"][0, self.cur_frame_index, self.cur_sticker_index:self.cur_sticker_index+2] = 0, 0
-        self.go_to_next_coord()
+        if self.frames:
+            current_video = self.get_cur_video_hash()
+            self.db[current_video][self.shift]["data"][0, self.cur_frame_index, self.cur_sticker_index:self.cur_sticker_index+2] = 0, 0
+            self.go_to_next_coord()
 
     def next_coords(self, event=None):
-        self.go_to_next_coord()
+        if self.frames:
+            self.go_to_next_coord()
 
     def auto_annotate(self):
         """
