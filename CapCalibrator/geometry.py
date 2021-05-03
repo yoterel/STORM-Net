@@ -39,15 +39,15 @@ def to_standard_coordinate_system(names, data):
     left_eye_index = names.index('lefteye')
     right_eye_index = names.index('righteye')
     cz_index = names.index('cz')
-    fpz_index = names.index('fpz')  # todo: figure out better way to know z axis. this requires user to measure fpz...
-    fp1_index = names.index('fp1')
-    fp2_index = names.index('fp2')
+    # fpz_index = names.index('fpz')  # todo: figure out better way to know z axis. this requires user to measure fpz...
+    left_triangle = names.index('left_triangle')
+    right_triangle = names.index('right_triangle')
     # swap x axis with the best candidate
     x_axis = np.argmax(np.abs(data[right_eye_index] - data[left_eye_index]))
     data[:, [0, x_axis]] = data[:, [x_axis, 0]]
     # swap z axis with the best candidate (but not x)
     eyes_midpoint = ((data[left_eye_index] + data[right_eye_index]) / 2)
-    fp1fp2_midpoint = ((data[fp1_index] + data[fp2_index]) / 2)
+    fp1fp2_midpoint = ((data[left_triangle] + data[right_triangle]) / 2)
     z_axis = np.argmax(np.abs(eyes_midpoint - fp1fp2_midpoint))
     if z_axis != 0:
         data[:, [2, z_axis]] = data[:, [z_axis, 2]]
@@ -213,11 +213,11 @@ def fix_yaw(names, data):
     rightEye = names.index('righteye')
     leftEar = names.index('leftear')
     rightEar = names.index('rightear')
-    Fp2 = names.index('fp2')
-    Fp1 = names.index('fp1')
+    right_triangle = names.index('right_triangle')
+    left_triangle = names.index('left_triangle')
     yaw_vec_1 = (data[rightEye] - data[leftEye]) * np.array([1, 1, 0])
     yaw_vec_2 = (data[rightEar] - data[leftEar]) * np.array([1, 1, 0])
-    yaw_vec_3 = (data[Fp2] - data[Fp1]) * np.array([1, 1, 0])
+    yaw_vec_3 = (data[right_triangle] - data[left_triangle]) * np.array([1, 1, 0])
     yaw_vec_1 /= np.linalg.norm(yaw_vec_1)
     yaw_vec_2 /= np.linalg.norm(yaw_vec_2)
     yaw_vec_3 /= np.linalg.norm(yaw_vec_3)

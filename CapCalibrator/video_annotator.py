@@ -892,8 +892,13 @@ class ThreadedPeriodicTask(threading.Thread):
 
     def handle_finetune(self):
         model_name, pretrained_stormnet_path, synth_output_dir, finetune_log_file = self.msg[1:]
-        train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
-                    self.stoprequest)
+        try:
+            train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
+                        self.stoprequest)
+        except IndexError:
+            logging.warning("Fine tunning STORM-Net failed. Maybe the synthetic data is incorrect / corrupted ?")
+            self.queue.put(["finetune_done"])
+
 
     def handle_render(self):
         path = self.msg[1]
