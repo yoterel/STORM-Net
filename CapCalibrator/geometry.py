@@ -40,8 +40,12 @@ def to_standard_coordinate_system(names, data):
     right_eye_index = names.index('righteye')
     cz_index = names.index('cz')
     # fpz_index = names.index('fpz')  # todo: figure out better way to know z axis. this requires user to measure fpz...
-    left_triangle = names.index('left_triangle')
-    right_triangle = names.index('right_triangle')
+    try:
+        left_triangle = names.index('left_triangle')
+        right_triangle = names.index('right_triangle')
+    except ValueError:
+        left_triangle = names.index('fp1')
+        right_triangle = names.index('fp2')
     # swap x axis with the best candidate
     x_axis = np.argmax(np.abs(data[right_eye_index] - data[left_eye_index]))
     data[:, [0, x_axis]] = data[:, [x_axis, 0]]
@@ -253,9 +257,6 @@ def from_sim_to_standard_space(names, data):
 
 
 def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, video_names, args):
-    if args.mode == "experimental":
-        reproduce_experiments(r_matrix, s_matrix, video_names, args)
-        exit()
     vid_est = []
     if template_names:
         names, data = template_names, template_data

@@ -6,6 +6,36 @@ import logging
 from pathlib import Path
 from scipy.stats import pearsonr, ttest_rel
 from scipy.spatial.transform import Rotation as R
+import predict
+
+
+def do_network_robustness_test(sticker_locations, args):
+    """
+    reports results of network robustness to various noises introduced to annotation
+    :param sticker_locations: the original locations as marked by the user / AI in the GUI
+    :param args: args
+    :return:
+    """
+    orig_r_matrix, orig_s_matrix = predict.predict_rigid_transform(np.copy(sticker_locations), None, None, args)
+    orig_euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in orig_r_matrix]
+    r_rmse = []
+    s_rmse = []
+    b_shape = sticker_locations.shape[0]
+    t_shape = sticker_locations.shape[1]
+    for i in range(100):
+        sticker_locations_copy = np.copy(sticker_locations)
+        another_view = np.reshape(sticker_locations_copy, (b_shape, t_shape, sticker_locations_copy.shape[-1] // 2, 2))
+        zero_locs = np.where(another_view == np.array([0, 0]))
+        noise_mag = 5
+        noise_shift = noise_mag / 2
+        noise = (np.random.random_sample(sticker_locations_copy.shape) * noise_mag) - noise_shift
+        sticker_locations_copy += noise
+        another_view[zero_locs] = 0
+        r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations_copy, None, None, args)
+        euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in r_matrix]
+        r_rmse.append(np.linalg.norm(np.array(orig_euler) - np.array(euler), axis=0))
+        s_rmse.append(np.linalg.norm(np.array(orig_s_matrix) - np.array(s_matrix)))
+    logging.info("r_rmse: {}, s_rmse: {}".format(np.mean(r_rmse), np.mean(s_rmse)))
 
 
 def do_opt2dig_experiment(digi_ses1, digi_ses2, opt_ses1, opt_ses2, net_rots, rots, scales, video_names):
@@ -159,7 +189,7 @@ def do_find_optimal_rotation_experiment(template_path):
            rots, scales
 
 
-def reproduce_experiments(r_matrix, s_matrix, video_names, args):
+def reproduce_experiments(video_names, sticker_locations, args):
     """
     reproduces original experiments reported in manuscript, results are printed to log or plotted where applicable
     :param r_matrix: see caller
@@ -168,6 +198,10 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
     :param args: see caller
     :return: -
     """
+    do_network_robustness_test(sticker_locations, args)
+
+    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
+
     opt_ses1, opt_ses2, rots, scales = do_find_optimal_rotation_experiment(args.template)
 
     do_MNI_sensitivity_experiment(args.template)
@@ -192,7 +226,7 @@ def reproduce_experiments(r_matrix, s_matrix, video_names, args):
 
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
 
-    do_old_experiment(r_matrix, s_matrix, video_names, args)
+    # do_old_experiment(r_matrix, s_matrix, video_names, args)
 
 
 def do_digi_error_experiment():

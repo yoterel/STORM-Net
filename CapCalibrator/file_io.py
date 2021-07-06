@@ -166,7 +166,7 @@ def extract_session_data(file, use_scale=True):
             else:
                 sticker_count += 1
         # mask facial landmarks if one is missing, also mask if frame is above 6 (no facial landmarks expected there)
-        if sticker_2d_locs[0] == [0, 0] or sticker_2d_locs[1] == [0, 0] or sticker_2d_locs[2] == [0, 0] or i >= 7:
+        if sticker_2d_locs[0] == [0, 0] or sticker_2d_locs[1] == [0, 0] or sticker_2d_locs[2] == [0, 0] or i >= 5:
             sticker_2d_locs[0] = [0, 0]
             sticker_2d_locs[1] = [0, 0]
             sticker_2d_locs[2] = [0, 0]

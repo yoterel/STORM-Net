@@ -7,6 +7,7 @@ import predict
 import geometry
 import logging
 from file_io import save_results
+import experimental
 import sys
 
 
@@ -90,10 +91,8 @@ if __name__ == "__main__":
     # configure computing environment
     configure_compute_environment(args.gpu_id)
     # run GUI / automatic annotation
-    if args.mode == "gui":
-        video.process_video(args)
-    else:
-        sticker_locations, video_names = video.process_video(args)
+    sticker_locations, video_names = video.process_video(args)
+    if args.mode == "auto":
         r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
         sensor_locations = geometry.apply_rigid_transform(r_matrix, s_matrix, None, None, video_names, args)
         if args.mni:
@@ -101,3 +100,5 @@ if __name__ == "__main__":
         else:
             projected_data = sensor_locations
         save_results(projected_data[0], args.output_file)
+    elif args.mode == "experimental":
+        experimental.reproduce_experiments(video_names, sticker_locations, args)
