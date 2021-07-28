@@ -66,12 +66,12 @@ class DataGenerator(tf.keras.utils.Sequence):
 
             # Store class
             y[i] = self.Y[index]
+        if self.perturb_stickers:
+            perturb_data(X)
         if self.shuffle_timestamps:
             shuffle_timeseries(X)
         if self.shuffle_stickers:
             shuffle_data(X)
-        if self.perturb_stickers:
-            perturb_data(X)
         if self.mask_stickers:
             mask_data(X)
         if self.center_stickers:
@@ -140,6 +140,16 @@ def perturb_data(x):
     perturbs the stickers in-place for augmentation.
     Each sticker is perturbed separately
     """
+    b_shape = x.shape[0]
+    t_shape = x.shape[1]
+    b = np.copy(x)
+    another_view = np.reshape(b, (b_shape, t_shape, b.shape[-1] // 2, 2))
+    zero_locs = np.where(another_view == np.array([0, 0]))
+    noise_mag = 5
+    noise_shift = noise_mag / 2
+    noise = (np.random.random_sample(b.shape) * noise_mag) - noise_shift
+    b += noise
+    another_view[zero_locs] = 0
     mag = 1.
     my_perturbation = np.random.normal(size=x.shape)
     x += my_perturbation * mag
