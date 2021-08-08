@@ -1,7 +1,5 @@
 import numpy as np
 from pathlib import Path
-import logging
-# import time
 
 
 def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN):
