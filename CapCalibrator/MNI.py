@@ -88,10 +88,6 @@ def find_closest_on_surface_naive(othersRefList, XYZ, pointN):
         # ----- Back projection ----- (l 707)
         PP = np.broadcast_to(AA, XYZ.shape)
         D = np.linalg.norm(XYZ - PP, axis=1)
-        # preD = XYZ - PP
-        # preD2 = preD*preD
-        # preD3 = np.sum(preD2, axis=1)
-        # D = preD3 ** 0.5
         IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
         # ID = np.argsort(D)
         # IDtop = ID[0: top]
@@ -144,12 +140,6 @@ def find_closest_on_surface_full(othersRefList, refN, pointN):
             P = othersRefList[i, j, :3]
             PP = np.broadcast_to(P, XYZ.shape)
             D = np.linalg.norm(XYZ - PP, axis=1)
-            # PP = np.ones(XYZ.shape)
-            # PP[:, 0], PP[:, 1], PP[:, 2] = P[0], P[1], P[2]
-            # PreD = XYZ - PP
-            # PreD2 = PreD*PreD
-            # PreD3 = np.sum(PreD2, axis=1)
-            # D = PreD3 ** 0.5
             top = round(XYZ.shape[0] * 0.05)  # select 5% of data (original paper selects 1000 points)
             IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
             # ID = np.argsort(D)
@@ -163,44 +153,31 @@ def find_closest_on_surface_full(othersRefList, refN, pointN):
             PNear = np.mean(XYZclose, axis=0)  # select mean of closest 200 points
 
             # Line between P and PNear
-            # NXYZtop = XYZtop.shape[0]
-            PVec = P - PNear
-            A, B, C = PVec[0], PVec[1], PVec[2]
+            p1 = P
+            p2 = PNear
+            p3 = XYZtop
+            # cross product the line with the point and normalize gives exactly distance from line
+            distance_from_line = np.linalg.norm(np.cross(p2 - p1, p3 - p1) / np.linalg.norm(p2-p1), axis=1)
+            # PVec = P - PNear
+            # A, B, C = PVec[0], PVec[1], PVec[2]
+            #
+            # t = (A * (XYZtop[:, 0] - P[0]) + B * (XYZtop[:, 1] - P[1]) + C * (XYZtop[:, 2] - P[2])) / (
+            #         A * A + B * B + C * C)
+            # H = np.array([A * t + P[0], B * t + P[1], C * t + P[2]]).T
+            # distance_from_line = np.linalg.norm(XYZtop - H, axis=1)
 
-            t = (A * (XYZtop[:, 0] - P[0]) + B * (XYZtop[:, 1] - P[1]) + C * (XYZtop[:, 2] - P[2])) / (
-                    A * A + B * B + C * C)
-            H = np.array([A * t + P[0], B * t + P[1], C * t + P[2]]).T
-
-            # H = np.ones(XYZtop.shape)
-            # for k in range(NXYZtop):
-            #     xc, yc, zc = XYZtop[k,0], XYZtop[k, 1], XYZtop[k, 2]
-            #     t = (A * (xc - P[0]) + B * (yc - P[1]) + C * (zc - P[2])) / (A * A + B * B + C * C)
-            #     H[k, :] = np.column_stack((A * t + P[0], B * t + P[1], C *t + P[2]))
-
-            # Find deviation between points in XYZclose and H (l 841)
-            # PreDH = XYZtop - H
-            # PreDH2 = PreDH * PreDH
-            # PreDH3 = np.sum(PreDH2, axis=1)
-            # DH = PreDH3 ** 0.5
-            DH = np.linalg.norm(XYZtop - H, axis=1)
             # Extend the line P-Pnear to a rod (l 851)
             det = 0
             rodR = 0
             while det == 0:
                 rodR += 1
-                Iless2 = np.where(DH <= rodR)
+                Iless2 = np.where(distance_from_line <= rodR)
                 rod = XYZtop[Iless2, :][0]
                 det = np.sum(rod ** 2)
 
             # Find brain surface points on the vicinity of P (l 862)
             PPB = np.broadcast_to(P, rod.shape)
             VicD = np.linalg.norm(rod - PPB, axis=1)
-            # PPB = np.ones(rod.shape)
-            # PPB[:, 0], PPB[:, 1], PPB[:, 2] = P[0], P[1], P[2]
-            # PreVicD = rod - PPB
-            # PreVicD2 = PreVicD*PreVicD
-            # PreVicD3 = np.sum(PreVicD2, axis=1)
-            # VicD = PreVicD3**0.5
             NVic = 3
             if rod.shape[0] < NVic:
                 NVic = rod.shape[0]
@@ -276,12 +253,12 @@ def project(origin_xyz, others_xyz, selected_indices):
                                                        pointN)
     # load head surface raw data
     XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallHEM", "head")
-    # get closest location of sensors on head surface
+    # get closest location of sensors on average head surface
     otherH, otherHVar, otherHSD = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN)
-    # get location of sensors projected onto cortical surface by inflating a rod
+    # get location of sensors projected onto reference cortical surface by inflating a rod
     others_projected_to_ref = find_closest_on_surface_full(others_transformed_to_ref, refN, pointN)
     XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
-    # get closest points of projected sensors on cortical surface to avoid penetration error
+    # get closest points of projected sensors on average cortical surface
     otherC, otherCVar, otherCSD = find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN)
 
     # SSwsH = otherHVar * (refN - 1)
