@@ -6,7 +6,33 @@ import video
 from pathlib import Path
 import file_io
 import MNI
+import MNI_torch
 import render
+import torch
+
+@pytest.fixture
+def anchors_and_sensors():
+    names, data, _, _ = file_io.read_template_file(Path("../example_models/example_model.txt"))
+    names = names[0]
+    data = data[0]
+    data = geometry.to_standard_coordinate_system(names, data)
+    assert 0 in names
+    unsorted_origin_xyz = data[:names.index(0),
+                          :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+    unsorted_origin_names = np.array(names[:names.index(0)])
+    others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
+    # these names are written in an order the algorithm expects (and MNI template data was written in)
+    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
+                                    "fp1", "fp2", "fz", "f3",
+                                    "f4", "f7", "f8", "cz",
+                                    "c3", "c4", "t3", "t4",
+                                    "pz", "p3", "p4", "t5",
+                                    "t6", "o1", "o2"])
+
+    # sort our anchors using the order above
+    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
+    origin_xyz = unsorted_origin_xyz[sorting_indices]
+    return [origin_xyz, others_xyz, selected_indices]
 
 
 def test_3d_rigid_transform():
@@ -95,3 +121,28 @@ def test_render():
     X, Y = file_io.load_raw_json_db(render_dir)
     assert X.shape == (1, 10, 14)
     assert Y.shape == (1, 3)
+
+
+def test_differentiable_MNI_projection(anchors_and_sensors):
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    _, test1, _, _ = MNI.project(origin_xyz, others_xyz, selected_indices)
+    origin_xyz = torch.from_numpy(origin_xyz).float()
+    others_xyz = torch.from_numpy(others_xyz).float()
+    selected_indices = torch.from_numpy(selected_indices)
+    test2 = MNI_torch.torch_project(origin_xyz, others_xyz, selected_indices)
+    assert torch.mean(torch.linalg.norm(torch.from_numpy(test1) - test2, dim=1)) < 1.5
+
+
+def test_differentiable_find_affine(anchors_and_sensors):
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    refN = 17  # number of reference brains
+    pointN = others_xyz.shape[0]  # number of sensors to project
+    classic_result = MNI.find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN, pointN)
+    origin_xyz = torch.from_numpy(origin_xyz).float()
+    others_xyz = torch.from_numpy(others_xyz).float()
+    selected_indices = torch.from_numpy(selected_indices)
+    differentiable_result = MNI_torch.torch_find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN,
+                                                                   pointN)
+    test1 = classic_result.astype(np.float32)
+    test2 = differentiable_result.numpy()
+    assert np.all(np.isclose(test1, test2, rtol=1e-3))
