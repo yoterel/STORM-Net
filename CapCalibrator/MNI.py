@@ -1,7 +1,226 @@
 import numpy as np
 from pathlib import Path
-import logging
-# import time
+
+
+def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN):
+    """
+    finds refN affine transforms between our anchors and anchors from all reference template brains
+    :param our_anchors_xyz: our anchors
+    :param our_sensors_xyz: our sensors (on head surface)
+    :param selected_indices: our selected anchors out of the 23 10-20 points
+    :param refN: number of reference brains in template data
+    :return: numpy array of size refN x number_of_sensors x 3
+    represents for each refernce brain all our sensors locations in its frame of reference
+    """
+    # path_wo_ext = "resource/MNI_templates/DMNIHAve"
+    # dmnihavePath = Path(path_wo_ext + ".csv")
+    # if Path(path_wo_ext+".npy").is_file():
+    #     DMNIHAve = np.load(path_wo_ext+".npy", allow_pickle=True)
+    # else:
+    #     DMNIHAve = np.genfromtxt(dmnihavePath, delimiter=',')
+    #     np.save(path_wo_ext, DMNIHAve)
+    # template_anchors_xyz = DMNIHAve[selected_indices, :]
+    # ==================== AffineEstimation4 ====================== (l 225)
+    size = len(selected_indices)
+    assert size >= 4
+
+    # find affine transformation with ideal brain (not used anywhere..)
+    listOri = np.c_[our_anchors_xyz, np.ones(size)]
+    # template_anchors_xyz[:, 3] = 1
+    # listDist = DD
+    # W = np.linalg.lstsq(listOri, listDist, rcond=None)[0]  # affine transformation matrix
+    # listCur = np.matmul(listOri, W)
+
+    # ------------ Transformation to reference brains -------------- ( l 271)
+    # find affine transformation with every brain in the 17 templates
+
+    refBList = np.empty((refN, 2), dtype=object)
+
+    # load 17 brain templates from disk
+    DMS = []
+    for i in range(1, refN+1):
+        path_wo_ext = "resource/MNI_templates/DMNI{:0>4d}".format(i)
+        if Path(path_wo_ext+".npy").is_file():
+            DMS.append(np.load(path_wo_ext+".npy", allow_pickle=True))
+        else:
+            csv_path = Path(path_wo_ext+".csv")
+            DM = np.genfromtxt(csv_path, delimiter=',')
+            np.save(path_wo_ext, DM)
+            DMS.append(DM)
+    # find affine transformation between our anchors and all brains
+    for i in range(1, refN+1):
+        DM = DMS[i-1][selected_indices, :]
+        refDist = np.c_[DM, np.ones(size)]
+        WW = np.linalg.lstsq(listOri, refDist, rcond=None)[0]
+        refBList[i-1, 0] = np.matmul(listOri, WW)
+        refBList[i-1, 1] = WW
+
+    # ---------- Transforming given head surface points stored in others to the ideal brain and each ref brain ----- (l 310)
+
+    DDDD = np.c_[our_sensors_xyz, np.ones(pointN)]
+    othersRefList = np.empty((refN, pointN, DDDD.shape[1]), dtype=np.float)
+
+    for i in range(refN):
+        WR = refBList[i, 1]
+        othersRef = np.matmul(DDDD, WR)
+        othersRefList[i] = othersRef
+    return othersRefList[:, :, :3]
+
+
+def find_closest_on_surface_naive(othersRefList, XYZ, pointN):
+    """
+    finds closest point on cortical surface for every (transformed) sensor location
+    by averaging over 3 closest points on cortical surface
+    :param othersRefList: the refN x pointN x 3 transformed sensor locations (into ref brains)
+    :param XYZ the raw measurements from template reference brains
+    :param pointN: number of sensors
+    :return:
+    other - location on cortical surface per sensor
+    otherVar - variance of each otherH sensor
+    otherSD - root of variance of each otherH sensor
+    """
+    other = np.ones((pointN, 3))
+    otherVar = np.ones((pointN, 4))
+    otherSD = np.ones((pointN, 4))
+    top = 3
+    for i in range(pointN):
+        AA = np.mean(othersRefList[:, i], axis=0)
+        # ----- Back projection ----- (l 707)
+        PP = np.broadcast_to(AA, XYZ.shape)
+        D = np.linalg.norm(XYZ - PP, axis=1)
+        IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
+        # ID = np.argsort(D)
+        # IDtop = ID[0: top]
+        XYZtop = XYZ[IDtop, :]
+        closest = np.mean(XYZtop, axis=0)
+        # -------- End of back projection ----------
+
+        other[i, :] = closest
+
+        # ---- Variance calculation ---- (line 739)
+
+        AAA = othersRefList[:, i]
+        AV = closest
+        N = AAA.shape[0]
+        subMat = np.ones(AAA.shape)
+        for j in range(N):
+            subMat[j, :] = AV
+
+        dispEach = AAA - subMat
+        dispEachSq = dispEach * dispEach
+        XYZSS = np.sum(dispEachSq, axis=0)
+        RSS = np.sum(XYZSS)
+
+        XYZVar = XYZSS / (N - 1)
+        RSSVar = RSS / (N - 1)
+
+        VV = np.append(XYZVar, RSSVar)
+        otherVar[i, :] = VV
+        otherSD[i, :] = np.sqrt(VV)
+    return other, otherVar, otherSD
+
+
+def find_closest_on_surface_full(othersRefList, refN, pointN):
+    """
+    full implementation of cortical projection using the balloon inflation algorithm described in
+    https://doi.org/10.1016/j.neuroimage.2005.01.018
+    :param othersRefList: the refN x pointN x 3 transformed sensor locations (into ref brains)
+    :param refN: number of reference brains
+    :param pointN: number of sensors
+    :return:
+    """
+    otherRefCList = np.empty((refN, pointN, 3), dtype=np.float)
+    # otherRefCList = np.empty((1, refN), dtype=object)
+    for i in range(refN):
+        projectionListC = np.ones((pointN, 3))
+        my_str = "resource/MNI_templates/xyzall{}.npy".format(str(i + 1))
+        XYZ = load_raw_MNI_data(my_str, i)
+
+        for j in range(pointN):
+            P = othersRefList[i, j, :3]
+            PP = np.broadcast_to(P, XYZ.shape)
+            D = np.linalg.norm(XYZ - PP, axis=1)
+            top = round(XYZ.shape[0] * 0.05)  # select 5% of data (original paper selects 1000 points)
+            IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
+            # ID = np.argsort(D)
+            # IDtop = ID[0:top]
+            XYZtop = XYZ[IDtop, :]
+
+            Nclose = 200
+            IDclose = np.argpartition(D, Nclose)[:Nclose]  # sort by lowest norm
+            # IDclose = ID[0:Nclose]
+            XYZclose = XYZ[IDclose, :]
+            PNear = np.mean(XYZclose, axis=0)  # select mean of closest 200 points
+
+            # Line between P and PNear
+            p1 = P
+            p2 = PNear
+            p3 = XYZtop
+            # cross product the line with the point and normalize gives exactly distance from line
+            distance_from_line = np.linalg.norm(np.cross(p2 - p1, p3 - p1) / np.linalg.norm(p2-p1), axis=1)
+            # PVec = P - PNear
+            # A, B, C = PVec[0], PVec[1], PVec[2]
+            #
+            # t = (A * (XYZtop[:, 0] - P[0]) + B * (XYZtop[:, 1] - P[1]) + C * (XYZtop[:, 2] - P[2])) / (
+            #         A * A + B * B + C * C)
+            # H = np.array([A * t + P[0], B * t + P[1], C * t + P[2]]).T
+            # distance_from_line = np.linalg.norm(XYZtop - H, axis=1)
+
+            # Extend the line P-Pnear to a rod (l 851)
+            det = 0
+            rodR = 0
+            while det == 0:
+                rodR += 1
+                Iless2 = np.where(distance_from_line <= rodR)
+                rod = XYZtop[Iless2, :][0]
+                det = np.sum(rod ** 2)
+
+            # Find brain surface points on the vicinity of P (l 862)
+            PPB = np.broadcast_to(P, rod.shape)
+            VicD = np.linalg.norm(rod - PPB, axis=1)
+            NVic = 3
+            if rod.shape[0] < NVic:
+                NVic = rod.shape[0]
+            IVicD = np.argsort(VicD)
+            NIVicD = IVicD[0:NVic]
+            Vic = rod[NIVicD, :]
+            CP = np.mean(Vic, axis=0)
+            # --- End of projection BS -----
+            projectionListC[j, :] = CP
+
+        otherRefCList[i] = projectionListC
+    return otherRefCList
+
+
+def load_raw_MNI_data(location, type):
+    """
+    loads raw MNi data from disk
+    :param location: where is the data located
+    :param type: what does the data represent
+     "brain" = average brain surface,
+     "head" = average head surface,
+      or number indicating reference brain index (brain surface data))
+    :return:
+    """
+    if type == "brain":
+        shortcut = "BEM"
+    elif type == "head":
+        shortcut = "HEM"
+    else:
+        shortcut = "M0" + str(type + 1)
+    my_str = location
+    if Path(my_str).is_file():
+        XYZ = np.load(my_str, allow_pickle=True)
+    else:
+        xallbemPath = Path("resource/MNI_templates/xall"+shortcut+".csv")
+        yallbemPath = Path("resource/MNI_templates/yall"+shortcut+".csv")
+        zallbemPath = Path("resource/MNI_templates/zall"+shortcut+".csv")
+        xallBEM = np.genfromtxt(xallbemPath, delimiter=',')
+        yallBEM = np.genfromtxt(yallbemPath, delimiter=',')
+        zallBEM = np.genfromtxt(zallbemPath, delimiter=',')
+        XYZ = np.column_stack((xallBEM, yallBEM, zallBEM))
+        np.save(location, XYZ)
+    return XYZ
 
 
 def project(origin_xyz, others_xyz, selected_indices):
@@ -24,306 +243,26 @@ def project(origin_xyz, others_xyz, selected_indices):
              otherCSD - transformation standard deviation per axis, point manner (for otherC).
                         Last channel is SD across all axes (root sum of squares).
     """
-    path_wo_ext = "resource/MNI_templates/DMNIHAve"
-    dmnihavePath = Path(path_wo_ext + ".csv")
-    if Path(path_wo_ext+".npy").is_file():
-        DMNIHAve = np.load(path_wo_ext+".npy", allow_pickle=True)
-    else:
-        DMNIHAve = np.genfromtxt(dmnihavePath, delimiter=',')
-        np.save(path_wo_ext, DMNIHAve)
+    refN = 17  # number of reference brains
+    pointN = others_xyz.shape[0]  # number of sensors to project
+    # get sensors transformed into reference brains coordinate systems
+    others_transformed_to_ref = find_affine_transforms(origin_xyz,
+                                                       others_xyz,
+                                                       selected_indices,
+                                                       refN,
+                                                       pointN)
+    # load head surface raw data
+    XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallHEM", "head")
+    # get closest location of sensors on average head surface
+    otherH, otherHVar, otherHSD = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN)
+    # get location of sensors projected onto reference cortical surface by inflating a rod
+    others_projected_to_ref = find_closest_on_surface_full(others_transformed_to_ref, refN, pointN)
+    XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
+    # get closest points of projected sensors on average cortical surface
+    otherC, otherCVar, otherCSD = find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN)
 
-    size = len(selected_indices)
-
-    assert size >= 4
-
-    D = origin_xyz  # our anchors
-    DD = DMNIHAve[selected_indices, :]  # contains locations of anchors in original experiment
-    DDD = others_xyz  # our sensors
-
-
-    # ==================== AffineEstimation4 ====================== (l 225)
-
-    # find affine transformation with ideal brain (not used anywhere..)
-    listOri = np.c_[D, np.ones(size)]
-    DD[:, 3] = 1
-    listDist = DD
-    W = np.linalg.lstsq(listOri, listDist, rcond=None)[0]  # affine transformation matrix
-    listCur = np.matmul(listOri, W)
-
-    # ------------ Transformation to reference brains -------------- ( l 271)
-    # find affine transformation with every brain in the 17 templates
-    refN = 17
-    refBList = np.empty((refN, 2), dtype=object)
-
-    # load 17 brain templates from disk
-    DMS = []
-    for i in range(1, refN+1):
-        path_wo_ext = "resource/MNI_templates/DMNI{:0>4d}".format(i)
-        if Path(path_wo_ext+".npy").is_file():
-            DMS.append(np.load(path_wo_ext+".npy", allow_pickle=True))
-        else:
-            csv_path = Path(path_wo_ext+".csv")
-            DM = np.genfromtxt(csv_path, delimiter=',')
-            np.save(path_wo_ext, DM)
-            DMS.append(DM)
-    # find affine transformation between our anchors and all brains
-    for i in range(1, refN+1):
-        DM = DMS[i-1][selected_indices, :]
-        refDist = np.c_[DM, np.ones(size)]
-        WW = np.linalg.lstsq(listOri, refDist, rcond=None)[0]
-        refBListCur = np.matmul(listOri, WW)
-        refBList[i-1, 0] = refBListCur
-        refBList[i-1, 1] = WW
-
-    # ---------- Transforming given head surface points stored in others to the ideal brain and each ref brain ----- (l 310)
-
-    DDDD = np.c_[DDD, np.ones(DDD.shape[0])]
-    othersRefList = np.empty((1, refN), dtype=object)
-
-    for i in range(refN):
-        WR = refBList[i, 1]
-        othersRef = np.matmul(DDDD, WR)
-        othersRefList[0, i] = othersRef
-
-
-    # --------------Restore data across reference brains----------------  (l 335)
-
-    pointN = DDD.shape[0]
-    pListOverPoint = np.empty((1, pointN), dtype=object)
-
-    for i in range(pointN):                             # for each point from others
-        pList = np.ones((refN, 3))
-
-        for j in range(refN):                           # iterate over all the reference brains (17)
-            pList[j, :] = othersRefList[0, j][i, 0:3]
-
-        pListOverPoint[0, i] = pList
-
-
-    # --------- Finding the representative point on the head surface ------- (l 361)
-
-    otherH = np.ones((pointN, 3))
-    otherHMean = np.ones((pointN, 3))
-    otherHVar = np.ones((pointN, 4))
-    otherHSD = np.ones((pointN, 4))
-
-    path_wo_ext = "resource/MNI_templates/xyzallHEM"
-    if Path(path_wo_ext+".npy").is_file():
-        XYZ = np.load(path_wo_ext+".npy", allow_pickle=True)
-    else:
-        xallhemPath = Path("resource/MNI_templates/xallHEM.csv")
-        yallhemPath = Path("resource/MNI_templates/yallHEM.csv")
-        zallhemPath = Path("resource/MNI_templates/zallHEM.csv")
-        xallHEM = np.genfromtxt(xallhemPath, delimiter=',')
-        yallHEM = np.genfromtxt(yallhemPath, delimiter=',')
-        zallHEM = np.genfromtxt(zallhemPath, delimiter=',')
-        XYZ = np.column_stack((xallHEM, yallHEM, zallHEM))
-        np.save(path_wo_ext, XYZ)
-    top = 3
-
-    for i in range(pointN):
-        AA = np.mean(pListOverPoint[0, i], axis=0)
-        otherHMean[i, :] = AA
-
-        # ----- Back projection ----- (l 707)
-        PP = np.broadcast_to(AA, XYZ.shape)
-        D = np.linalg.norm(XYZ - PP, axis=1)
-        # preD = XYZ - PP
-        # preD2 = preD*preD
-        # preD3 = np.sum(preD2, axis=1)
-        # D = preD3 ** 0.5
-        IDtop = np.argpartition(D, top)[:top] # sort by lowest norm
-        # ID = np.argsort(D)
-        # IDtop = ID[0: top]
-        XYZtop = XYZ[IDtop, :]
-        closest = np.mean(XYZtop, axis=0)
-        # -------- End of back projection ----------
-
-        otherH[i, :] = closest
-
-        # ---- Variance calculation ---- (line 739)
-
-        AAA = pListOverPoint[0, i]
-        AV = closest
-        N = AAA.shape[0]
-        subMat = np.ones(AAA.shape)
-        for j in range(N):
-            subMat[j, :] = AV
-
-        dispEach = AAA - subMat
-        dispEachSq = dispEach * dispEach
-        XYZSS = np.sum(dispEachSq, axis=0)
-        RSS = np.sum(XYZSS)
-
-        XYZVar = XYZSS / (N-1)
-        RSSVar = RSS / (N-1)
-
-        VV = np.append(XYZVar, RSSVar)
-        otherHVar[i, :] = VV
-        otherHSD[i, :] = np.sqrt(VV)
-
-
-    # --------- Calculating errors on cortical surface -------------
-    # start = time.process_time()
-    otherRefCList = np.empty((1, refN), dtype=object)
-    for i in range(refN):
-        projectionListC = np.ones((pointN, 3))
-        my_str = "resource/MNI_templates/xyzall{}.npy".format(str(i+1))
-        if Path(my_str).is_file():
-            XYZ = np.load(my_str, allow_pickle=True)
-        else:
-            pathX = Path("resource/MNI_templates/xallM0" + str(i+1) + ".csv")
-            pathY = Path("resource/MNI_templates/yallM0" + str(i+1) + ".csv")
-            pathZ = Path("resource/MNI_templates/zallM0" + str(i+1) + ".csv")
-            xall = np.genfromtxt(pathX, delimiter=',')
-            yall = np.genfromtxt(pathY, delimiter=',')
-            zall = np.genfromtxt(pathZ, delimiter=',')
-            XYZ = np.column_stack((xall, yall, zall))
-            np.save("resource/MNI_templates/xyzall{}".format(str(i+1)), XYZ)
-        # logging.info("Projection to MNI in progress [" + str(round(100/17*(i+1))) + "%]")
-
-        for j in range(pointN):
-            P = othersRefList[0, i][j, 0:3]
-            PP = np.broadcast_to(P, XYZ.shape)
-            D = np.linalg.norm(XYZ - PP, axis=1)
-            # PP = np.ones(XYZ.shape)
-            # PP[:, 0], PP[:, 1], PP[:, 2] = P[0], P[1], P[2]
-            # PreD = XYZ - PP
-            # PreD2 = PreD*PreD
-            # PreD3 = np.sum(PreD2, axis=1)
-            # D = PreD3 ** 0.5
-            top = round(XYZ.shape[0] * 0.05)
-            IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
-            # ID = np.argsort(D)
-            # IDtop = ID[0:top]
-            XYZtop = XYZ[IDtop, :]
-
-            Nclose = 200
-            IDclose = np.argpartition(D, Nclose)[:Nclose]  # sort by lowest norm
-            # IDclose = ID[0:Nclose]
-            XYZclose = XYZ[IDclose, :]
-            PNear = np.mean(XYZclose, axis=0)
-
-            # Line between P and PNear
-            # NXYZtop = XYZtop.shape[0]
-            PVec = P - PNear
-            A, B, C = PVec[0], PVec[1], PVec[2]
-
-            t = (A * (XYZtop[:, 0] - P[0]) + B * (XYZtop[:, 1] - P[1]) + C * (XYZtop[:, 2] - P[2])) / (
-                        A * A + B * B + C * C)
-            H = np.array([A * t + P[0], B * t + P[1], C * t + P[2]]).T
-
-            # H = np.ones(XYZtop.shape)
-            # for k in range(NXYZtop):
-            #     xc, yc, zc = XYZtop[k,0], XYZtop[k, 1], XYZtop[k, 2]
-            #     t = (A * (xc - P[0]) + B * (yc - P[1]) + C * (zc - P[2])) / (A * A + B * B + C * C)
-            #     H[k, :] = np.column_stack((A * t + P[0], B * t + P[1], C *t + P[2]))
-
-            # Find deviation between points in XYZclose and H (l 841)
-            # PreDH = XYZtop - H
-            # PreDH2 = PreDH * PreDH
-            # PreDH3 = np.sum(PreDH2, axis=1)
-            # DH = PreDH3 ** 0.5
-            DH = np.linalg.norm(XYZtop - H, axis=1)
-            # Extend the line P-Pnear to a rod (l 851)
-            det = 0
-            rodR = 0
-            while det == 0:
-                rodR += 1
-                Iless2 = np.where(DH <= rodR)
-                rod = XYZtop[Iless2, :][0]
-                det = np.sum(rod**2)
-
-            # Find brain surface points on the vicinity of P (l 862)
-            PPB = np.broadcast_to(P, rod.shape)
-            VicD = np.linalg.norm(rod - PPB, axis=1)
-            # PPB = np.ones(rod.shape)
-            # PPB[:, 0], PPB[:, 1], PPB[:, 2] = P[0], P[1], P[2]
-            # PreVicD = rod - PPB
-            # PreVicD2 = PreVicD*PreVicD
-            # PreVicD3 = np.sum(PreVicD2, axis=1)
-            # VicD = PreVicD3**0.5
-            NVic = 3
-            if rod.shape[0] < NVic:
-                NVic = rod.shape[0]
-            IVicD = np.argsort(VicD)
-            NIVicD = IVicD[0:NVic]
-            Vic = rod[NIVicD, :]
-            CP = np.mean(Vic, axis=0)
-            # --- End of projection BS -----
-            projectionListC[j, :] = CP
-
-        otherRefCList[0, i] = projectionListC
-    # # your code here
-    # print(time.process_time() - start)
-    # ----- Restore data across reference brains -----
-    CPListOverPoint = np.empty((1, pointN), dtype=object)
-
-    for i in range(pointN):
-        CPlist = np.ones((refN, 3))
-
-        for j in range(refN):
-            CPlist[j, :] = otherRefCList[0, j][i, :]
-
-        CPListOverPoint[0, i] = CPlist
-
-
-    # ------ Finding the representive point on the head surface -----
-
-    otherC = np.ones(otherH.shape)
-    otherCVar = np.ones((pointN, 4))
-    otherCSD = np.ones((pointN, 4))
-    my_str = "resource/MNI_templates/xyzallBEM.npy"
-    if Path(my_str).is_file():
-        XYZ = np.load(my_str, allow_pickle=True)
-    else:
-        xallbemPath = Path("resource/MNI_templates/xallBEM.csv")
-        yallbemPath = Path("resource/MNI_templates/yallBEM.csv")
-        zallbemPath = Path("resource/MNI_templates/zallBEM.csv")
-        xallBEM = np.genfromtxt(xallbemPath, delimiter=',')
-        yallBEM = np.genfromtxt(yallbemPath, delimiter=',')
-        zallBEM = np.genfromtxt(zallbemPath, delimiter=',')
-        XYZ = np.column_stack((xallBEM, yallBEM, zallBEM))
-        np.save("resource/MNI_templates/xyzallBEM", XYZ)
-    top = 3
-
-    for i in range(pointN):
-        AA = np.mean(CPListOverPoint[0, i], axis=0)
-        PP = np.ones(XYZ.shape)
-        PP[:, 0], PP[:, 1], PP[:, 2] = AA[0], AA[1], AA[2]
-        PreD = XYZ - PP
-        PreD2 = PreD * PreD
-        PreD3 = np.sum(PreD2, axis=1)
-        D = PreD3 ** 0.5
-        ID = np.argsort(D)
-        IDtop = ID[0:top]
-        XYZtop = XYZ[IDtop, :]
-        closest = np.mean(XYZtop, axis=0)
-        BB = closest
-        otherC[i, :] = BB
-
-        # --- variance calculation ---
-        AA = CPListOverPoint[0, i]
-        AV = BB
-        N = AA.shape[0]
-        subMat = np.ones(AA.shape)
-        for j in range(N):
-            subMat[j, :] = AV
-
-        DispEach = AA - subMat
-        DispEachSq = DispEach*DispEach
-        XYZSS = np.sum(DispEachSq, axis=0)
-        RSS = np.sum(XYZSS)
-
-        XYZVar = XYZSS / (N - 1)
-        RSSVar = RSS / (N - 1)
-        VV = np.append(XYZVar, RSSVar)
-        otherCVar[i, :] = VV
-        otherCSD[i, :] = np.sqrt(VV)
-
-
-    SSwsH = otherHVar * (refN - 1)
-    SSwsC = otherCVar * (refN - 1)
+    # SSwsH = otherHVar * (refN - 1)
+    # SSwsC = otherCVar * (refN - 1)
 
     # ---- what he have by now ----
     # otherH - given head surface points transformed to the MNI ideal head (within-subject hat)

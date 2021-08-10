@@ -141,7 +141,7 @@ def save_results(data, output_file):
             f.write(my_line)
 
 
-def extract_session_data(file, use_scale=True):
+def extract_session_data(file, use_scale=True, scale_by_z=False):
     timesteps_per_sample = 0
     session = open(file, 'r')
     number_of_features = 0
@@ -182,7 +182,12 @@ def extract_session_data(file, use_scale=True):
             cap_scalex = my_dict["scalex"]
             cap_scaley = my_dict["scaley"]
             cap_scalez = my_dict["scalez"]
-            cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley, cap_scalez)
+            if scale_by_z:
+                cap_scalex /= cap_scalez
+                cap_scaley /= cap_scalez
+                cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley)
+            else:
+                cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley, cap_scalez)
         else:
             cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'])
         x_session.append(sticker_2d_locs)
@@ -195,7 +200,7 @@ def extract_session_data(file, use_scale=True):
     return x_session, y_session
 
 
-def load_raw_json_db(db_path, use_scale=False):
+def load_raw_json_db(db_path, use_scale=False, scale_by_z=False):
     """
     loads data from folder containing json files in the format defined by synthetic data renderer
     :param db_path: path to folder
@@ -206,7 +211,7 @@ def load_raw_json_db(db_path, use_scale=False):
     X = []
     Y = []
     for file in sorted(db_path.glob("*.json")):
-        x, y = extract_session_data(file, use_scale=use_scale)
+        x, y = extract_session_data(file, use_scale=use_scale, scale_by_z=scale_by_z)
         if x is not None:
             X.append(x)
             Y.append(y)
@@ -301,8 +306,15 @@ def load_semantic_seg_model(weights_loc):
     return new_model, g
 
 
-def load_keras_model(pretrained_model_path, learning_rate):
+def load_keras_model(pretrained_model_path, output_shape, learning_rate):
     model = tf.keras.models.load_model(str(pretrained_model_path))
+    if model.output_shape[-1] != output_shape:
+        model.pop()  # to remove last layer
+        new_model = tf.keras.Sequential([
+            model,
+            tf.keras.layers.Dense(output_shape)
+        ])
+        model = new_model
     opt = tf.keras.optimizers.Adam(lr=learning_rate)
     model.compile(loss='mean_squared_error', optimizer=opt)
     # model.summary()

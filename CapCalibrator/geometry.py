@@ -354,6 +354,7 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
     """
     project new sensor locations to MNI
     :param list_of_sensor_locations: a list of lists of [names ,data (nx3)] of all sensor locations
+    :param origin_optodes_names:
     :return:
     """
     projected_locations = list_of_sensor_locations.copy()
