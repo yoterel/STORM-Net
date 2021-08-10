@@ -4,6 +4,5 @@
 /plots
 /build
 /dist
-/cache
-/old_cache
+*cache
 *.txt
