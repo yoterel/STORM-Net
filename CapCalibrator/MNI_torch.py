@@ -41,7 +41,8 @@ def torch_find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indi
     B = torch.FloatTensor(DMS, device=device)
     B = B[:, selected_indices, :]
     B = torch.cat((B, torch.ones((refN, size, 1), device=device)), dim=-1)
-    W = torch.linalg.lstsq(A, B).solution
+    W = A.pinverse() @ B
+    # W = torch.linalg.lstsq(A, B).solution
     # find affine transformation between our anchors and all brains
     DDDD = torch.cat((our_sensors_xyz, torch.ones((pointN, 1), device=device)), dim=-1)
     DDDD = DDDD.repeat(refN, 1).reshape((refN, pointN, 4))
