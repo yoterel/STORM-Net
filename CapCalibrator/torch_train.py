@@ -45,7 +45,9 @@ class MyDataSet(torch.utils.data.Dataset):
         self.center_data(x)
         y = self.labels[idx]
 
-        return x, y
+        x_torch = torch.from_numpy(x, dtype=torch.float)
+        y_torch = torch.from_numpy(y, dtype=torch.float)
+        return x_torch, y_torch
 
     def __len__(self):
         return len(self.data)
