@@ -118,14 +118,17 @@ def load_raw_MNI_data(location, type):
 
 def torch_project(origin_xyz, others_xyz, selected_indices):
     refN = 17  # number of reference brains
-    pointN = others_xyz.shape[0]  # number of sensors to project
+    batch_size = others_xyz.shape[0]
+    pointN = others_xyz.shape[1]  # number of sensors to project
     # get sensors transformed into reference brains coordinate systems
-    others_transformed_to_ref = torch_find_affine_transforms(origin_xyz,
-                                                             others_xyz,
-                                                             selected_indices,
-                                                             refN,
-                                                             pointN)
-    # XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
-    # XYZ = torch.FloatTensor(XYZ, device=others_xyz.device)
-    others_final = find_closest_on_surface_differentiable(others_transformed_to_ref, refN, pointN)
-    return others_final
+    for i in range(batch_size):
+        others_transformed_to_ref = torch_find_affine_transforms(origin_xyz,
+                                                                 others_xyz[i],
+                                                                 selected_indices,
+                                                                 refN,
+                                                                 pointN)
+        # XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
+        # XYZ = torch.FloatTensor(XYZ, device=others_xyz.device)
+        projected_sensors = find_closest_on_surface_differentiable(others_transformed_to_ref, refN, pointN)
+        others_xyz[i] = projected_sensors
+    return others_xyz
