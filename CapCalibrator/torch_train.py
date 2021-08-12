@@ -37,7 +37,7 @@ class MyDataSet(torch.utils.data.Dataset):
             self.labels = y_val
         self.data = self.data[:10]
         self.labels = self.labels[:10]
-        self.labels = self.transform_labels_to_point_cloud(True)
+        self.labels = self.transform_labels_to_point_cloud(True, False)
 
     def __getitem__(self, idx):
         x = self.data[idx]
@@ -89,7 +89,7 @@ class MyDataSet(torch.utils.data.Dataset):
             data_others = transformed_data_sim.T
             transformed_data.append([names, np.vstack((data_origin, data_others))])
         projected_data = geometry.project_sensors_to_MNI(transformed_data)
-        raw_projected_data = np.array([x[1] for x in projected_data])
+        raw_projected_data = np.array([x[1] for x in projected_data])[:, names.index(0):, :]
         if save_result:
             file_io.dump_to_pickle(projected_data_file, raw_projected_data)
         return raw_projected_data
@@ -205,10 +205,13 @@ class MyNetwork(torch.nn.Module):
     def forward(self, x):
         out = self.naive_net(x)
         mat_out = self.euler_to_matrix(out)
-        # rots = np.empty((10, 3, 3), dtype=float)
-        # for i in range(10):
-        #     rot = R.from_euler('xyz', list(out[i].cpu().detach().numpy()), degrees=True)
-        #     rots[i] = rot.as_matrix()
+
+        rots = np.empty((x.shape[0], 3, 3), dtype=float)
+        # for i in range(x.shape[0]):
+        #      rot = R.from_euler('xyz', list(out[i].cpu().detach().numpy()), degrees=True)
+        #      rots[i] = rot.as_matrix()
+        # if not torch.all(torch.isclose(mat_out, torch.from_numpy(rots).float())):
+        #     logging.warning("matrix from euler different than scipy matrix!")
         transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
         projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
         return projected_out
@@ -239,8 +242,8 @@ class MyNetwork(torch.nn.Module):
 
         Ry[:, 1, 1] = 1
         Ry[:, 0, 0] = cos[:, 1]
-        Ry[:, 0, 2] = -sin[:, 1]
-        Ry[:, 2, 0] = sin[:, 1]
+        Ry[:, 0, 2] = sin[:, 1]
+        Ry[:, 2, 0] = -sin[:, 1]
         Ry[:, 2, 2] = cos[:, 1]
 
         Rz[:, 2, 2] = 1
@@ -278,7 +281,7 @@ def train_loop(opt):
             logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
                                                                      batch_index,
                                                                      len(train_dataset) // opt.batch_size,
-                                                                     train_loss.cpu().numpy()))
+                                                                     train_loss.cpu().detach().numpy()))
             train_loss.backward()
             model.optimizer.step()
         with torch.no_grad():
@@ -289,7 +292,7 @@ def train_loop(opt):
                 val_loss = loss_fn(output, target)
                 val_loss_total += val_loss
             val_loss_total /= len(val_dataset)
-            logging.info("validation: epoch: {}, loss: {}".format(epoch, val_loss_total.cpu().numpy()))
+            logging.info("validation: epoch: {}, loss: {}".format(epoch, val_loss_total.cpu().detach().numpy()))
         model.scheduler.step(val_loss)
 
 
