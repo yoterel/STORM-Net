@@ -229,6 +229,11 @@ class MyNetwork(torch.nn.Module):
         return torch.from_numpy(anchors_xyz).float(), torch.from_numpy(data_sensors).float(), selected_indices
 
     def euler_to_matrix(self, x):
+        """
+        converts euler angels to matrix (x is batched, b x 3)
+        :param x:
+        :return:
+        """
         Rx = torch.zeros(x.shape[0], 3, 3)
         Ry = torch.zeros(x.shape[0], 3, 3)
         Rz = torch.zeros(x.shape[0], 3, 3)
