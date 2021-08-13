@@ -106,9 +106,13 @@ def read_template_file(template_path, input_file_format=None):
     return names, data, file_format, skulls
 
 
-def delete_content_of_folder(folder_path):
-    for file in folder_path.glob("*"):
-        file.unlink()
+def delete_content_of_folder(folder_path, subfolders_also=True):
+    for x in folder_path.glob("*"):
+        if x.is_file():
+            x.unlink()
+        elif x.is_dir():
+            if subfolders_also:
+                x.rmdir()
 
 
 def is_process_active(process_name):

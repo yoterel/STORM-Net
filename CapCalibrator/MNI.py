@@ -221,7 +221,7 @@ def load_raw_MNI_data(location, type):
     return XYZ
 
 
-def project(origin_xyz, others_xyz, selected_indices):
+def project(origin_xyz, others_xyz, selected_indices, output_errors=False):
     """
     projects others_xyz to MNI coordiantes given anchors in origin_xyz
     :param origin_xyz: anchors given as nx3 np array (n >= 4)
@@ -234,6 +234,7 @@ def project(origin_xyz, others_xyz, selected_indices):
                               "c3", "c4", "t3", "t4",
                               "pz", "p3", "p4", "t5",
                               "t6", "o1", "o2"]
+    :param output_errors: whether to output error in estimation as well.
     :return: otherH - others transformed to MNI of ideal head (head surface)
              otherC - others transformed to MNI of ideal head  (cortical surface)
              otherHSD - transformation standard deviation per axis, point manner (for otherH).
@@ -252,12 +253,12 @@ def project(origin_xyz, others_xyz, selected_indices):
     # load head surface raw data
     XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallHEM", "head")
     # get closest location of sensors on average head surface
-    otherH, otherHVar, otherHSD = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN)
+    otherH, otherHVar, otherHSD = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN, output_errors)
     # get location of sensors projected onto reference cortical surface by inflating a rod
     others_projected_to_ref = find_closest_on_surface_full(others_transformed_to_ref, refN, pointN)
     XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
     # get closest points of projected sensors on average cortical surface
-    otherC, otherCVar, otherCSD = find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN)
+    otherC, otherCVar, otherCSD = find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN, output_errors)
     # test, _, _ = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN)
     # SSwsH = otherHVar * (refN - 1)
     # SSwsC = otherCVar * (refN - 1)

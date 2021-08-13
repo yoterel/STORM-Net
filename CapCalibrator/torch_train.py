@@ -9,6 +9,7 @@ import geometry
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import MNI_torch
+import time
 
 
 class MyDataSet(torch.utils.data.Dataset):
@@ -35,9 +36,9 @@ class MyDataSet(torch.utils.data.Dataset):
         else:
             self.data = x_val
             self.labels = y_val
-        self.data = self.data[:10]
-        self.labels = self.labels[:10]
-        self.labels = self.transform_labels_to_point_cloud(True, False)
+        self.data = self.data[:2]
+        self.labels = {"rot_and_scale": self.labels[:2]}
+        self.transform_labels_to_point_cloud(save_result=True, force_recreate=True)
 
     def __getitem__(self, idx):
         x = self.data[idx]
@@ -45,11 +46,15 @@ class MyDataSet(torch.utils.data.Dataset):
         self.shuffle_data(x)
         self.mask_data(x)
         self.center_data(x)
-        y = self.labels[idx]
-
+        y1 = self.labels["rot_and_scale"][idx]
+        y1_torch = torch.from_numpy(y1).float()
+        y2 = self.labels["raw_projected_data"][idx]
+        y2_torch = torch.from_numpy(y2).float()
+        y_to_return = {"rot_and_scale": y1_torch,
+                       "raw_projected_data": y2_torch}
         x_torch = torch.from_numpy(x).float()
-        y_torch = torch.from_numpy(y).float()
-        return x_torch, y_torch
+
+        return x_torch, y_to_return
 
     def __len__(self):
         return len(self.data)
@@ -59,18 +64,19 @@ class MyDataSet(torch.utils.data.Dataset):
         if not force_recreate:
             if projected_data_file.is_file():
                 data = file_io.load_from_pickle(projected_data_file)
-                return data
-        labels = self.labels
+                self.labels = data
+                return
+        rot_and_scale_labels = self.labels["rot_and_scale"]
         rs = []
         sc = []
-        for i in range(len(labels)):
+        for i in range(len(rot_and_scale_labels)):
             # logging.info("Network Euler angels:" + str([y_predict[i][0], -y_predict[i][1], -y_predict[i][2]]))
-            rot = R.from_euler('xyz', [labels[i][0], -labels[i][1], -labels[i][2]], degrees=True)
+            rot = R.from_euler('xyz', [rot_and_scale_labels[i][0], -rot_and_scale_labels[i][1], -rot_and_scale_labels[i][2]], degrees=True)
             scale_mat = np.identity(3)
-            if labels.shape[-1] > 3:
-                scale_mat[0, 0] = labels[0][3]  # xscale
-                scale_mat[1, 1] = labels[0][4]  # yscale
-                scale_mat[2, 2] = labels[0][5]  # zscale
+            if rot_and_scale_labels.shape[-1] > 3:
+                scale_mat[0, 0] = rot_and_scale_labels[0][3]  # xscale
+                scale_mat[1, 1] = rot_and_scale_labels[0][4]  # yscale
+                scale_mat[2, 2] = rot_and_scale_labels[0][5]  # zscale
             rotation_mat = rot.as_matrix()
             rs.append(rotation_mat)
             sc.append(scale_mat)
@@ -90,9 +96,10 @@ class MyDataSet(torch.utils.data.Dataset):
             transformed_data.append([names, np.vstack((data_origin, data_others))])
         projected_data = geometry.project_sensors_to_MNI(transformed_data)
         raw_projected_data = np.array([x[1] for x in projected_data])[:, names.index(0):, :]
+        self.labels["raw_projected_data"] = raw_projected_data
         if save_result:
-            file_io.dump_to_pickle(projected_data_file, raw_projected_data)
-        return raw_projected_data
+            file_io.dump_to_pickle(projected_data_file, self.labels)
+        return
 
 
     def shuffle_timeseries(self, x):
@@ -183,30 +190,30 @@ class MyNetwork(torch.nn.Module):
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(32, opt.network_output_size),
+            nn.Linear(32, self.opt.network_output_size),
         )
-        self.net = torch.nn.Sequential(
-            nn.Conv1d(in_channels=opt.network_input_size, out_channels=64, kernel_size=2),
-            nn.ReLU(),
-            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2),
-            nn.ReLU(),
-            nn.MaxPool1d(2),
-            nn.Conv1d(in_channels=64, out_channels=128, kernel_size=2),
-            nn.ReLU(),
-            nn.Conv1d(in_channels=128, out_channels=128, kernel_size=2),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(128, 16),
-            nn.ReLU(),
-            nn.Linear(16, opt.network_output_size),
-        ).to(self.opt.device)
+        # self.net = torch.nn.Sequential(
+        #     nn.Conv1d(in_channels=opt.network_input_size, out_channels=64, kernel_size=2),
+        #     nn.ReLU(),
+        #     nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2),
+        #     nn.ReLU(),
+        #     nn.MaxPool1d(2),
+        #     nn.Conv1d(in_channels=64, out_channels=128, kernel_size=2),
+        #     nn.ReLU(),
+        #     nn.Conv1d(in_channels=128, out_channels=128, kernel_size=2),
+        #     nn.ReLU(),
+        #     nn.Flatten(),
+        #     nn.Linear(128, 16),
+        #     nn.ReLU(),
+        #     nn.Linear(16, opt.network_output_size),
+        # ).to(self.opt.device)
         self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
 
     def forward(self, x):
         out = self.naive_net(x)
         mat_out = self.euler_to_matrix(out)
 
-        rots = np.empty((x.shape[0], 3, 3), dtype=float)
+        # rots = np.empty((x.shape[0], 3, 3), dtype=float)
         # for i in range(x.shape[0]):
         #      rot = R.from_euler('xyz', list(out[i].cpu().detach().numpy()), degrees=True)
         #      rots[i] = rot.as_matrix()
@@ -217,7 +224,7 @@ class MyNetwork(torch.nn.Module):
         return projected_out
 
     def load_static_model(self):
-        names, data, format, _ = file_io.read_template_file(opt.template)
+        names, data, format, _ = file_io.read_template_file(self.opt.template)
         names = names[0]
         data = data[0]
         data = geometry.to_standard_coordinate_system(names, data)
@@ -264,12 +271,38 @@ class MyModel():
     def __init__(self, opt):
         self.opt = opt
         self.network = MyNetwork(opt)
+        if opt.continue_train:
+            self.load_network("latest")
         self.optimizer = torch.optim.Adam(self.network.parameters(),
                                           lr=opt.lr,
                                           betas=(opt.beta1, 0.999),
                                           weight_decay=1e-5)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
 
+    def load_network(self, which_epoch):
+        """load model from disk"""
+        save_filename = '{}_net.pth'.format(str(which_epoch))
+        load_path = Path.joinpath(self.opt.root, save_filename)
+        net = self.network
+        if isinstance(net, torch.nn.DataParallel):
+            net = net.module
+        print('loading the model from %s' % load_path)
+        # PyTorch newer than 0.4 (e.g., built from
+        # GitHub source), you can remove str() on self.device
+        state_dict = torch.load(load_path, map_location=str(self.opt.device))
+        if hasattr(state_dict, '_metadata'):
+            del state_dict._metadata
+        net.load_state_dict(state_dict)
+
+    def save_network(self, which_epoch):
+        """save model to disk"""
+        save_filename = '{}_net.pth'.format(str(which_epoch))
+        save_path = Path.joinpath(self.opt.root, save_filename)
+        if self.opt.gpu_ids >= 0 and torch.cuda.is_available():
+            torch.save(self.network.module.cpu().state_dict(), save_path)
+            self.network.cuda(self.device)
+        else:
+            torch.save(self.network.cpu().state_dict(), save_path)
 
 def train_loop(opt):
     opt.is_train = True
@@ -282,19 +315,23 @@ def train_loop(opt):
         for batch_index, (input, target) in enumerate(train_dataset):
             model.optimizer.zero_grad()
             output = model.network(input)
-            train_loss = loss_fn(output, target)
+            train_loss = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output, dim=2))
+            # train_loss = loss_fn(output, target["raw_projected_data"])
             logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
                                                                      batch_index,
                                                                      len(train_dataset) // opt.batch_size,
                                                                      train_loss.cpu().detach().numpy()))
             train_loss.backward()
             model.optimizer.step()
+        model.save_network(which_epoch=str(epoch))
+        model.save_network(which_epoch="latest")
         with torch.no_grad():
             val_loss_total = torch.zeros(1)
             for input, target in val_dataset:
                 model.optimizer.zero_grad()
                 output = model.network(input)
-                val_loss = loss_fn(output, target)
+                val_loss = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output, dim=2))
+                # val_loss = loss_fn(output, target)
                 val_loss_total += val_loss
             val_loss_total /= len(val_dataset)
             logging.info("validation: epoch: {}, loss: {}".format(epoch, val_loss_total.cpu().detach().numpy()))
@@ -303,11 +340,10 @@ def train_loop(opt):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='This script trains STORM-Net')
-    parser.add_argument("model_name", help="The name to give the newly trained model (without extension).")
+    parser.add_argument("experiment_name", help="The name to give the experiment")
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
-    parser.add_argument("--output_path", default="models", help="The trained model will be saved to this folder")
-    parser.add_argument("--pretrained_model_path", help="The path to the pretrained model file")
     parser.add_argument("--gpu_ids", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
+    parser.add_argument("--continue_train", action="store_true", help="continue from latest epoch")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for training")
     parser.add_argument("--number_of_epochs", type=int, default=2000, help="Number of epochs for training loop")
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for optimizer")
@@ -317,22 +353,19 @@ def parse_arguments():
     parser.add_argument("--network_input_size", type=int, default=10, help="Input layer size for STORM-Net")
     parser.add_argument("--network_output_size", type=int, default=3, help="Output layer size for STORM-Net")
     parser.add_argument("--num_threads", type=int, default=0, help="Number of worker threads for dataloader")
-    parser.add_argument("--log", help="If present, writes training log to this path")
+    parser.add_argument("--log", action="store_true", help="If present, writes training log")
     parser.add_argument("--tensorboard",
                         help="If present, writes training stats to this path (readable with tensorboard)")
     parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd = "test_torch cache/renders/telaviv_model --template C:/src/UnityCap/example_models/example_model.txt".split()
+    cmd = "test_torch cache/renders/telaviv_model --template C:/src/UnityCap/example_models/example_model.txt --continue_train".split()
     args = parser.parse_args(cmd)
-    if args.pretrained_model_path:
-        args.pretrained_model_path = Path(args.pretrained_model_path)
-    else:
-        args.pretrained_model_path = None
-    args.output_path = Path(args.output_path)
+    args.root = Path("runs", args.experiment_name)
+    args.root.mkdir(parents=True, exist_ok=True)
     if args.log:
-        args.log = Path(args.log)
+        args.log = Path(args.root, "log_{}".format(str(time.time())))
     if args.tensorboard:
         args.tensorboard = Path(args.tensorboard)
     args.data_path = Path(args.data_path)
@@ -347,7 +380,6 @@ def parse_arguments():
 if __name__ == "__main__":
     opt = parse_arguments()
     if opt.log:
-        opt.log.parent.mkdir(parents=True, exist_ok=True)
         logging.basicConfig(filename=opt.log, filemode='w', level=opt.verbosity.upper())
     else:
         logging.basicConfig(level=opt.verbosity.upper())

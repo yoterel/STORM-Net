@@ -34,6 +34,48 @@ def anchors_and_sensors():
     origin_xyz = unsorted_origin_xyz[sorting_indices]
     return [origin_xyz, others_xyz, selected_indices]
 
+@pytest.fixture
+def network():
+    import torch_train
+
+    class Options():
+        def __init__(self):
+            self.network_output_size = 3
+            self.template = Path("../example_models/example_model.txt")
+    opt = Options()
+    network = torch_train.MyNetwork(opt)
+    return network
+
+
+def test_batched_euler_to_matrix(network):
+    batch_size = 16
+    euler = (np.random.rand(batch_size, 3) * 10) - 5
+    scipy_matrices = np.empty((batch_size, 3, 3))
+    for i in range(batch_size):
+        rot = R.from_euler('xyz', list(euler[i]), degrees=True)
+        rot_mat = rot.as_matrix()
+        scipy_matrices[i] = rot_mat
+    torch_euler = torch.from_numpy(euler)
+    torch_matrcies = network.euler_to_matrix(torch_euler)
+    assert torch.all(torch.isclose(torch_matrcies, torch.from_numpy(scipy_matrices).float()))
+
+
+def test_differentiable_MNI_projection(anchors_and_sensors):
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    selected_indices_torch = torch.from_numpy(selected_indices)
+    euler = (np.random.rand(3) * 10) - 5
+    rot = R.from_euler('xyz', list(euler), degrees=True)
+    rot_mat = rot.as_matrix()
+    transformed_others_xyz = (rot_mat @ others_xyz.T).T
+    _, test1, _, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices)
+    origin_xyz_torch = torch.from_numpy(origin_xyz).float()
+    transformed_others_xyz_torch = torch.from_numpy(transformed_others_xyz).float()
+    test2 = MNI_torch.torch_project(origin_xyz_torch, transformed_others_xyz_torch.unsqueeze(0), selected_indices_torch)
+    print("mean:", torch.mean(torch.linalg.norm(torch.from_numpy(test1) - test2.squeeze(0), dim=1)))
+    print(torch.linalg.norm(torch.from_numpy(test1) - test2.squeeze(0), dim=1))
+    assert torch.mean(torch.linalg.norm(torch.from_numpy(test1) - test2.squeeze(0), dim=1)) < 1.5
+
+
 
 def test_3d_rigid_transform():
     a1 = np.array([
@@ -89,7 +131,7 @@ def test_MNI_projection():
     # sort our anchors using the order above
     selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
     origin_xyz = unsorted_origin_xyz[sorting_indices]
-    otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
+    otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices, output_errors=True)
     # np.savez('resource/mni_projection_test.npz', name1=otherH, name2=otherC, name3=otherHSD, name4=otherCSD)
     data = np.load('resource/mni_projection_test.npz')
     otherH_loaded, otherC_loaded, otherHSD_loaded, otherCSD_loaded = data["name1"], data["name2"], data["name3"], data["name4"]
@@ -107,7 +149,7 @@ def test_render():
     names = names[0]  # select first (and only) session
     render_dir = Path("cache/renders")
     render_dir.mkdir(parents=True, exist_ok=True)
-    file_io.delete_content_of_folder(render_dir)
+    file_io.delete_content_of_folder(render_dir, subfolders_also=False)
     status, process = render.render(names,
                                     data,
                                     render_dir,
@@ -121,16 +163,6 @@ def test_render():
     X, Y = file_io.load_raw_json_db(render_dir)
     assert X.shape == (1, 10, 14)
     assert Y.shape == (1, 3)
-
-
-def test_differentiable_MNI_projection(anchors_and_sensors):
-    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
-    _, test1, _, _ = MNI.project(origin_xyz, others_xyz, selected_indices)
-    origin_xyz = torch.from_numpy(origin_xyz).float()
-    others_xyz = torch.from_numpy(others_xyz).float()
-    selected_indices = torch.from_numpy(selected_indices)
-    test2 = MNI_torch.torch_project(origin_xyz, others_xyz, selected_indices)
-    assert torch.mean(torch.linalg.norm(torch.from_numpy(test1) - test2, dim=1)) < 1.5
 
 
 def test_differentiable_find_affine(anchors_and_sensors):
