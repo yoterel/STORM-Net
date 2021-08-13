@@ -6,7 +6,7 @@ import video
 from pathlib import Path
 import file_io
 import MNI
-import MNI_torch
+import torch_src.MNI_torch as MNI_torch
 import render
 import torch
 
@@ -36,15 +36,46 @@ def anchors_and_sensors():
 
 @pytest.fixture
 def network():
-    import torch_train
+    import torch_src.torch_model as torch_model
 
     class Options():
         def __init__(self):
             self.network_output_size = 3
             self.template = Path("../example_models/example_model.txt")
     opt = Options()
-    network = torch_train.MyNetwork(opt)
+    network = torch_model.MyNetwork(opt)
     return network
+
+
+def test_differentiable_mni_optimization(network, anchors_and_sensors):
+    Niter = 3
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    euler = (np.random.rand(3) * 10) - 5
+    rot = R.from_euler('xyz', list(euler), degrees=True)
+    rot_mat = rot.as_matrix()
+    transformed_others_xyz = (rot_mat @ others_xyz.T).T
+    _, gt, _, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices)
+
+    euler_torch = torch.full([1, 3], 1.0, device="cpu", requires_grad=True)
+    optimizer = torch.optim.SGD([euler_torch], lr=1.0, momentum=0.9)
+    for i in range(Niter):
+        # Initialize optimizer
+        optimizer.zero_grad()
+
+        origin_xyz_torch = torch.from_numpy(origin_xyz).float()
+        others_xyz_torch = torch.from_numpy(others_xyz).float()
+        torch_matrcies = network.euler_to_matrix(euler_torch)
+        transformed_sensors = torch.transpose(torch.bmm(torch_matrcies, others_xyz_torch.T.repeat(1, 1, 1)), 1, 2)
+        projected_out = MNI_torch.torch_project(origin_xyz_torch, transformed_sensors, selected_indices,
+                                                resource_folder="resource")
+        loss = torch.mean(torch.linalg.norm(torch.from_numpy(gt).unsqueeze(0) - projected_out, dim=2))
+        print(loss.cpu().detach().numpy())
+        print("euler:", euler)
+        print("euler_torch:", euler_torch.cpu().detach().numpy())
+        loss.backward()
+        optimizer.step()
+
+
 
 
 def test_batched_euler_to_matrix(network):

@@ -349,7 +349,7 @@ def normalize_coordinates(names, data):
     # zscale = new_data[names.index('cz'), 1] - np.min(data[:, 2])
 
 
-def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
+def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, resource_folder="resource"):
     """
     project new sensor locations to MNI
     :param list_of_sensor_locations: a list of lists of [names ,data (nx3)] of all sensor locations
@@ -375,7 +375,7 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
             assert False, "can't resolve origin & others from sensors."
 
         origin_xyz, selected_indices = sort_anchors(unsorted_origin_names, unsorted_origin_xyz)
-        otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
+        otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
         # todo: should we report anything but cortex locations to caller?
         if origin_optodes_names:
             sensor_locations[1][others_selector, :] = otherC

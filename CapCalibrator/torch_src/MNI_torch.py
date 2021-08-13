@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 
 
-def torch_find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN):
+def torch_find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN, resource_folder="resource"):
     """
     finds refN affine transforms between our anchors and anchors from all reference template brains
     :param our_anchors_xyz: our anchors
@@ -30,7 +30,7 @@ def torch_find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indi
     # load 17 brain templates from disk
     DMS = []
     for i in range(1, refN+1):
-        path_wo_ext = "resource/MNI_templates/DMNI{:0>4d}".format(i)
+        path_wo_ext = resource_folder+"/MNI_templates/DMNI{:0>4d}".format(i)
         if Path(path_wo_ext+".npy").is_file():
             DMS.append(np.load(path_wo_ext+".npy", allow_pickle=True))
         else:
@@ -55,13 +55,13 @@ def k_softmin(k, x):
     return nominator / demonimator
 
 
-def find_closest_on_surface_differentiable(others, refN, pointN, soft_mask_func="softkmin"):
+def find_closest_on_surface_differentiable(others, refN, pointN, soft_mask_func="softkmin", resource_folder="resource"):
     k = 10
     eps = 1e-5
     new_others = torch.empty(others.shape, device=others.device)
     for i in range(refN):
-        my_str = "resource/MNI_templates/xyzall{}.npy".format(str(i + 1))
-        xyz = load_raw_MNI_data(my_str, i)
+        my_str = resource_folder+"/MNI_templates/xyzall{}.npy".format(str(i + 1))
+        xyz = load_raw_MNI_data(my_str, i, resource_folder)
         xyz = torch.FloatTensor(xyz, device=others.device)
         single_instance = others[i].unsqueeze(1)
         distances = torch.linalg.norm(single_instance - xyz.repeat(85, 1, 1), dim=-1).double()
@@ -85,7 +85,7 @@ def find_closest_on_surface_differentiable(others, refN, pointN, soft_mask_func=
     return torch.mean(new_others, axis=0)
 
 
-def load_raw_MNI_data(location, type):
+def load_raw_MNI_data(location, type, resource_folder):
     """
     loads raw MNi data from disk
     :param location: where is the data located
@@ -105,9 +105,9 @@ def load_raw_MNI_data(location, type):
     if Path(my_str).is_file():
         XYZ = np.load(my_str, allow_pickle=True)
     else:
-        xallbemPath = Path("resource/MNI_templates/xall"+shortcut+".csv")
-        yallbemPath = Path("resource/MNI_templates/yall"+shortcut+".csv")
-        zallbemPath = Path("resource/MNI_templates/zall"+shortcut+".csv")
+        xallbemPath = Path(resource_folder+"/MNI_templates/xall"+shortcut+".csv")
+        yallbemPath = Path(resource_folder+"/MNI_templates/yall"+shortcut+".csv")
+        zallbemPath = Path(resource_folder+"/MNI_templates/zall"+shortcut+".csv")
         xallBEM = np.genfromtxt(xallbemPath, delimiter=',')
         yallBEM = np.genfromtxt(yallbemPath, delimiter=',')
         zallBEM = np.genfromtxt(zallbemPath, delimiter=',')
@@ -116,7 +116,7 @@ def load_raw_MNI_data(location, type):
     return XYZ
 
 
-def torch_project(origin_xyz, others_xyz, selected_indices):
+def torch_project(origin_xyz, others_xyz, selected_indices, resource_folder="resource"):
     refN = 17  # number of reference brains
     batch_size = others_xyz.shape[0]
     pointN = others_xyz.shape[1]  # number of sensors to project
@@ -126,9 +126,14 @@ def torch_project(origin_xyz, others_xyz, selected_indices):
                                                                  others_xyz[i],
                                                                  selected_indices,
                                                                  refN,
-                                                                 pointN)
+                                                                 pointN,
+                                                                 resource_folder)
+        if torch.any(torch.isnan(others_transformed_to_ref)):
+            print("what the ?")
         # XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
         # XYZ = torch.FloatTensor(XYZ, device=others_xyz.device)
-        projected_sensors = find_closest_on_surface_differentiable(others_transformed_to_ref, refN, pointN)
+        projected_sensors = find_closest_on_surface_differentiable(others_transformed_to_ref, refN, pointN, resource_folder=resource_folder)
+        if torch.any(torch.isnan(projected_sensors)):
+            print("what the ?")
         others_xyz[i] = projected_sensors
     return others_xyz

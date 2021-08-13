@@ -1,12 +1,10 @@
 import numpy as np
 import imageio
 from PIL import Image
-import video_annotator
 from pathlib import Path
 import utils
-import cv2
+
 import file_io
-import predict
 import logging
 
 
@@ -69,6 +67,7 @@ def measure_blur(frame):
     :param frame: the frame to analyze
     :return: a float representing the score
     """
+    import cv2
     return cv2.Laplacian(np.array(frame), cv2.CV_64F).var()
 
 
@@ -117,6 +116,7 @@ def process_video(args):
     :param args:
     :return: sticker locations in a nx14x3 numpy array
     """
+    import video_annotator
     vid_paths = args.video
     new_db = []
     if args.mode == "gui":
@@ -154,6 +154,7 @@ def auto_annotate_videos(args):
     :param args: command line arguments
     :return: db
     """
+    import predict
     vid_path = args.video
     force_annotate = True
     dump_to_db = False
