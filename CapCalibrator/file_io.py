@@ -1,15 +1,22 @@
 import numpy as np
-import utils
 import subprocess
 import pickle
 import json
 import logging
 import shutil
 from pathlib import Path
-import tensorflow as tf
-import models
 import re
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
+
+
+def pairwise(iterable):
+    """
+    turns an iterable into a pairwise iterable
+    "s -> (s0, s1), (s2, s3), (s4, s5), ..."
+    :param iterable:
+    :return:
+    """
+    a = iter(iterable)
+    return zip(a, a)
 
 
 def read_template_file(template_path, input_file_format=None):
@@ -69,7 +76,7 @@ def read_template_file(template_path, input_file_format=None):
         for j, session in enumerate(sessions):
             sensor1_data = []
             sensor2_data = []
-            for i, (sens1, sens2) in enumerate(utils.pairwise(session)):
+            for i, (sens1, sens2) in enumerate(pairwise(session)):
                 if i < len(labeled_names):
                     name = labeled_names[i]
                 else:
@@ -294,47 +301,6 @@ def deserialize_data(file_path, with_test_set=True):
         return x_train, x_val, y_train, y_val
 
 
-def load_semantic_seg_model(weights_loc):
-    logging.info("Loading unet model from: " + str(weights_loc))
-    g = tf.Graph()
-    with g.as_default():
-        old_model = tf.keras.models.load_model(weights_loc,
-                                               custom_objects={'iou': models.iou, 'iou_thresholded': models.iou_thresholded})
-        old_model.layers.pop(0)
-        input_shape = (512, 1024, 3)  # replace input layer with this shape so unet forward will work
-        new_input = tf.keras.layers.Input(input_shape)
-        new_outputs = old_model(new_input)
-        new_model = tf.keras.Model(new_input, new_outputs)
-        # if verbosity:
-        #     new_model.summary()
-    return new_model, g
-
-
-def load_keras_model(pretrained_model_path, output_shape, learning_rate):
-    model = tf.keras.models.load_model(str(pretrained_model_path))
-    if model.output_shape[-1] != output_shape:
-        model.pop()  # to remove last layer
-        new_model = tf.keras.Sequential([
-            model,
-            tf.keras.layers.Dense(output_shape)
-        ])
-        model = new_model
-    opt = tf.keras.optimizers.Adam(lr=learning_rate)
-    model.compile(loss='mean_squared_error', optimizer=opt)
-    # model.summary()
-    return model
-
-
-def load_clean_keras_model(path):
-    logging.info("Loading STORM model from: " + str(path))
-    g = tf.Graph()
-    with g.as_default():
-        model = tf.keras.models.load_model(str(path))
-        # if v:
-        #     model.summary()
-    return model, g
-
-
 def load_from_pickle(pickle_file_path):
     f = open(pickle_file_path, 'rb')
     data = pickle.load(f)
@@ -384,7 +350,7 @@ def read_digitizer_multi_noptodes_experiment_file(exp_file_loc):
         session = non_empty_lines[delimiters[i]+1:delimiters[i+1]]
         sensor1_data = []
         sensor2_data = []
-        for sens1, sens2 in utils.pairwise(session):
+        for sens1, sens2 in pairwise(session):
             data1 = sens1.split()
             x, y, z = float(data1[1]), float(data1[2]), float(data1[3])
             sensor1_data.append(np.array([x, y, z]))

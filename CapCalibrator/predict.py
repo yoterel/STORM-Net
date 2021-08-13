@@ -1,6 +1,6 @@
 import tensorflow as tf
+import tf_file_io
 import utils
-import file_io
 from pathlib import Path
 import cv2
 import pickle
@@ -40,7 +40,7 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     #     model = preloaded_model
     # else:
     model_full_path = Path(args.storm_net)
-    model, graph = file_io.load_clean_keras_model(model_full_path)
+    model, graph = tf_file_io.load_clean_keras_model(model_full_path)
     with graph.as_default():
         y_predict = model.predict(sticker_locations)
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
@@ -146,7 +146,7 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     #     my_model = preloaded_model
     # else:
     model_full_path = Path(args.u_net)
-    my_model, graph = file_io.load_semantic_seg_model(str(model_full_path))
+    my_model, graph = tf_file_io.load_semantic_seg_model(str(model_full_path))
     imgs_list = []
     for image in frames:
         img_data = np.array(image.resize((1024, 512)))  # our unet only accepts powers of 2 image sizes

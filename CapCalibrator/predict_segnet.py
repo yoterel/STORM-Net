@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 import draw
-import file_io
+import tf_file_io
 import pickle
 import logging
 
@@ -34,7 +34,7 @@ if not pred_results_file.is_file():
     x = np.asarray(imgs_np, dtype=np.float32)/255
     y = np.expand_dims(masks_np, axis=-1)
     input_shape = (None, None, 3)
-    my_model = file_io.load_semantic_seg_model(str(best_weight_location))
+    my_model = tf_file_io.load_semantic_seg_model(str(best_weight_location))
     y_pred_list = []
     for i in range(x.shape[0]):
         logging.info("predicting on image: " + str(i))

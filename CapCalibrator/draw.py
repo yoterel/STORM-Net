@@ -7,6 +7,7 @@ import numpy as np
 from pathlib import Path
 import utils
 import file_io
+import tf_file_io
 
 
 class Arrow3D(FancyArrowPatch):
@@ -356,7 +357,7 @@ def visualize_network_performance(model_name, root_dir):
     data_dir = Path.joinpath(root_dir, "scene3_100k")
     model_dir = Path.joinpath(root_dir, "models")
     best_weight_location = Path.joinpath(model_dir, model_name)
-    model, _ = file_io.load_clean_keras_model(best_weight_location)
+    model, _ = tf_file_io.load_clean_keras_model(best_weight_location)
     gt_pred = model.predict(np.expand_dims(A, axis=0))
     y_predict_special = model.predict(np.expand_dims(x_train[min_index], axis=0))
     print("gt pred: ", gt_pred, gt[vid_name]["label"])

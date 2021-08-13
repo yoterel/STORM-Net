@@ -357,11 +357,8 @@ def parse_arguments():
     parser.add_argument("--tensorboard",
                         help="If present, writes training stats to this path (readable with tensorboard)")
     parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
-    # if len(sys.argv) == 1:
-    #     parser.print_help(sys.stderr)
-    #     sys.exit(1)
-    cmd = "test_torch cache/renders/telaviv_model --template C:/src/UnityCap/example_models/example_model.txt --continue_train".split()
-    args = parser.parse_args(cmd)
+
+    args = parser.parse_args()
     args.root = Path("runs", args.experiment_name)
     args.root.mkdir(parents=True, exist_ok=True)
     if args.log:
