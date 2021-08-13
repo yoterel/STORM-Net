@@ -29,11 +29,13 @@ class MyDataSet(torch.utils.data.Dataset):
         if self.opt.is_train:
             self.data = x_train
             self.labels = y_train
+            self.data = self.data[:100]
+            self.labels = {"rot_and_scale": self.labels[:100]}
         else:
             self.data = x_val
             self.labels = y_val
-        self.data = self.data[:2]
-        self.labels = {"rot_and_scale": self.labels[:2]}
+            self.data = self.data[:10]
+            self.labels = {"rot_and_scale": self.labels[:10]}
         self.transform_labels_to_point_cloud(save_result=True, force_recreate=False)
 
     def __getitem__(self, idx):
@@ -90,7 +92,7 @@ class MyDataSet(torch.utils.data.Dataset):
             transformed_data_sim = rot_mat @ (scale_mat @ data_others.T)
             data_others = transformed_data_sim.T
             transformed_data.append([names, np.vstack((data_origin, data_others))])
-        projected_data = geometry.project_sensors_to_MNI(transformed_data, resource_folder="../resource")
+        projected_data = geometry.project_sensors_to_MNI(transformed_data)
         raw_projected_data = np.array([x[1] for x in projected_data])[:, names.index(0):, :]
         self.labels["raw_projected_data"] = raw_projected_data
         if save_result:

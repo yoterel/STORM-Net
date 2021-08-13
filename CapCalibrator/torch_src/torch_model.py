@@ -39,8 +39,8 @@ class MyNetwork(torch.nn.Module):
         self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
 
     def forward(self, x):
-        out = self.naive_net(x)
-        mat_out = self.euler_to_matrix(out)
+        euler_out = self.naive_net(x)
+        mat_out = self.euler_to_matrix(euler_out)
 
         # rots = np.empty((x.shape[0], 3, 3), dtype=float)
         # for i in range(x.shape[0]):
@@ -49,8 +49,8 @@ class MyNetwork(torch.nn.Module):
         # if not torch.all(torch.isclose(mat_out, torch.from_numpy(rots).float())):
         #     logging.warning("matrix from euler different than scipy matrix!")
         transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
-        projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices, resource_folder="../resource")
-        return projected_out
+        projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
+        return projected_out, euler_out
 
     def load_static_model(self):
         names, data, format, _ = file_io.read_template_file(self.opt.template)

@@ -14,12 +14,15 @@ def train_loop(opt):
     opt.is_train = False
     val_dataset = torch_data.MyDataLoader(opt)
     model = torch_model.MyModel(opt)
-    loss_fn = torch.nn.MSELoss()
+    # loss_fn = torch.nn.MSELoss()
+    alpha = 0.7
     for epoch in range(opt.number_of_epochs):
         for batch_index, (input, target) in enumerate(train_dataset):
             model.optimizer.zero_grad()
-            output = model.network(input)
-            train_loss = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output, dim=2))
+            output_sensors, output_euler = model.network(input)
+            train_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
+            train_loss_euler = torch.mean(torch.linalg.norm(target["rot_and_scale"] - output_euler, dim=1))
+            train_loss = (1-alpha)*train_loss_sensors + alpha*train_loss_euler
             # train_loss = loss_fn(output, target["raw_projected_data"])
             logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
                                                                      batch_index,
@@ -33,8 +36,10 @@ def train_loop(opt):
             val_loss_total = torch.zeros(1)
             for input, target in val_dataset:
                 model.optimizer.zero_grad()
-                output = model.network(input)
-                val_loss = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output, dim=2))
+                output_sensors, output_euler = model.network(input)
+                val_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
+                val_loss_euler = torch.mean(torch.linalg.norm(target["rot_and_scale"] - output_euler, dim=1))
+                val_loss = (1 - alpha) * val_loss_sensors + alpha * val_loss_euler
                 # val_loss = loss_fn(output, target)
                 val_loss_total += val_loss
             val_loss_total /= len(val_dataset)
@@ -64,8 +69,8 @@ def parse_arguments():
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
     #     sys.exit(1)
-    cmd = "test_torch ../../renders --template ../../example_models/example_model.txt".split()
-    args = parser.parse_args(cmd)
+    # cmd = "test_torch ../../renders --template ../../example_models/example_model.txt".split()
+    args = parser.parse_args()
     args.root = Path("runs", args.experiment_name)
     args.root.mkdir(parents=True, exist_ok=True)
     if args.log:
