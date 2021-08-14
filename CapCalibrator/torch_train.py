@@ -33,7 +33,7 @@ def train_loop(opt):
         model.save_network(which_epoch=str(epoch))
         model.save_network(which_epoch="latest")
         with torch.no_grad():
-            val_loss_total = torch.zeros(1)
+            val_loss_total = torch.zeros(1).to(opt.device)
             for input, target in val_dataset:
                 model.optimizer.zero_grad()
                 output_sensors, output_euler = model.network(input)
@@ -45,12 +45,15 @@ def train_loop(opt):
             val_loss_total /= len(val_dataset)
             logging.info("validation: epoch: {}, loss: {}".format(epoch, val_loss_total.cpu().detach().numpy()))
         model.scheduler.step(val_loss)
+        logging.info("lr: {}".format(model.optimizer.param_groups[0]['lr']))
+
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='This script trains STORM-Net')
     parser.add_argument("experiment_name", help="The name to give the experiment")
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
+    parser.add_argument("--architecture", type=str, choices=["fc", "1dconv"], default="fc", help="Selects architecture")
     parser.add_argument("--gpu_ids", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
     parser.add_argument("--continue_train", action="store_true", help="continue from latest epoch")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for training")

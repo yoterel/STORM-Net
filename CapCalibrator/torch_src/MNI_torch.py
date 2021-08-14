@@ -38,7 +38,7 @@ def torch_find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indi
             DM = np.genfromtxt(csv_path, delimiter=',')
             np.save(path_wo_ext, DM)
             DMS.append(DM)
-    B = torch.FloatTensor(DMS, device=device)
+    B = torch.FloatTensor(DMS).to(device)
     B = B[:, selected_indices, :]
     B = torch.cat((B, torch.ones((refN, size, 1), device=device)), dim=-1)
     W = A.pinverse() @ B
@@ -62,7 +62,7 @@ def find_closest_on_surface_differentiable(others, refN, pointN, soft_mask_func=
     for i in range(refN):
         my_str = resource_folder+"/MNI_templates/xyzall{}.npy".format(str(i + 1))
         xyz = load_raw_MNI_data(my_str, i, resource_folder)
-        xyz = torch.FloatTensor(xyz, device=others.device)
+        xyz = torch.FloatTensor(xyz).to(others.device)
         single_instance = others[i].unsqueeze(1)
         distances = torch.linalg.norm(single_instance - xyz.repeat(85, 1, 1), dim=-1).double()
         # hard_min = torch.min(distances, dim=-1).values

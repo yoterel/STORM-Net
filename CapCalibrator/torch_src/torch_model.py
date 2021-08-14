@@ -11,35 +11,40 @@ class MyNetwork(torch.nn.Module):
     def __init__(self, opt):
         super(MyNetwork, self).__init__()
         self.opt = opt
-        self.naive_net = torch.nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(140, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, self.opt.network_output_size),
-        )
-        # self.net = torch.nn.Sequential(
-        #     nn.Conv1d(in_channels=opt.network_input_size, out_channels=64, kernel_size=2),
-        #     nn.ReLU(),
-        #     nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2),
-        #     nn.ReLU(),
-        #     nn.MaxPool1d(2),
-        #     nn.Conv1d(in_channels=64, out_channels=128, kernel_size=2),
-        #     nn.ReLU(),
-        #     nn.Conv1d(in_channels=128, out_channels=128, kernel_size=2),
-        #     nn.ReLU(),
-        #     nn.Flatten(),
-        #     nn.Linear(128, 16),
-        #     nn.ReLU(),
-        #     nn.Linear(16, opt.network_output_size),
-        # ).to(self.opt.device)
+        if opt.architecture == "fc":
+            self.net = torch.nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(140, 128),
+                nn.ReLU(),
+                nn.Linear(128, 64),
+                nn.ReLU(),
+                nn.Linear(64, 32),
+                nn.ReLU(),
+                nn.Linear(32, self.opt.network_output_size),
+            )
+        elif opt.architecture == "1dconv":
+            self.net = torch.nn.Sequential(
+                nn.Conv1d(in_channels=opt.network_input_size, out_channels=64, kernel_size=2),
+                nn.ReLU(),
+                nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2),
+                nn.ReLU(),
+                nn.MaxPool1d(2),
+                nn.Conv1d(in_channels=64, out_channels=128, kernel_size=2),
+                nn.ReLU(),
+                nn.Conv1d(in_channels=128, out_channels=128, kernel_size=2),
+                nn.ReLU(),
+                nn.Flatten(),
+                nn.Linear(128, 16),
+                nn.ReLU(),
+                nn.Linear(16, opt.network_output_size),
+            )
+        else:
+            raise NotImplementedError
+
         self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
 
     def forward(self, x):
-        euler_out = self.naive_net(x)
+        euler_out = self.net(x)
         mat_out = self.euler_to_matrix(euler_out)
 
         # rots = np.empty((x.shape[0], 3, 3), dtype=float)
@@ -62,7 +67,9 @@ class MyNetwork(torch.nn.Module):
         origin_names = np.array(names[:names.index(0)])
         data_sensors = data[names.index(0):, :]  # selects optodes for applying calibration
         anchors_xyz, selected_indices = geometry.sort_anchors(origin_names, data_anchors)
-        return torch.from_numpy(anchors_xyz).float(), torch.from_numpy(data_sensors).float(), selected_indices
+        return torch.from_numpy(anchors_xyz).float().to(self.opt.device),\
+               torch.from_numpy(data_sensors).float().to(self.opt.device),\
+               selected_indices
 
     def euler_to_matrix(self, x):
         """
@@ -70,9 +77,9 @@ class MyNetwork(torch.nn.Module):
         :param x:
         :return:
         """
-        Rx = torch.zeros(x.shape[0], 3, 3)
-        Ry = torch.zeros(x.shape[0], 3, 3)
-        Rz = torch.zeros(x.shape[0], 3, 3)
+        Rx = torch.zeros(x.shape[0], 3, 3).to(self.opt.device)
+        Ry = torch.zeros(x.shape[0], 3, 3).to(self.opt.device)
+        Rz = torch.zeros(x.shape[0], 3, 3).to(self.opt.device)
         cos = torch.cos(x * np.pi / 180)
         sin = torch.sin(x * np.pi / 180)
         Rx[:, 0, 0] = 1
@@ -96,7 +103,7 @@ class MyNetwork(torch.nn.Module):
         return torch.bmm(torch.bmm(Rz, Ry), Rx)
 
 
-class MyModel():
+class MyModel:
     def __init__(self, opt):
         self.opt = opt
         self.network = MyNetwork(opt)
@@ -107,6 +114,7 @@ class MyModel():
                                           betas=(opt.beta1, 0.999),
                                           weight_decay=1e-5)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+        self.network.to(self.opt.device)
 
     def load_network(self, which_epoch):
         """load model from disk"""
@@ -115,7 +123,7 @@ class MyModel():
         net = self.network
         if isinstance(net, torch.nn.DataParallel):
             net = net.module
-        print('loading the model from %s' % load_path)
+        print('loading the model from {}'.format(str(load_path)))
         # PyTorch newer than 0.4 (e.g., built from
         # GitHub source), you can remove str() on self.device
         state_dict = torch.load(load_path, map_location=str(self.opt.device))
@@ -127,8 +135,8 @@ class MyModel():
         """save model to disk"""
         save_filename = '{}_net.pth'.format(str(which_epoch))
         save_path = Path.joinpath(self.opt.root, save_filename)
-        if self.opt.gpu_ids >= 0 and torch.cuda.is_available():
-            torch.save(self.network.module.cpu().state_dict(), save_path)
-            self.network.cuda(self.device)
-        else:
-            torch.save(self.network.cpu().state_dict(), save_path)
+        torch.save(self.network.cpu().state_dict(), save_path)
+        self.network.to(self.opt.device)
+
+    def count_parameters(self):
+        return sum(p.numel() for p in self.network.parameters() if p.requires_grad)
