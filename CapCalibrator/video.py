@@ -51,7 +51,7 @@ def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, local_env_
         selected_sites = []
         for i in range(len(frames)):
             cur = frames[i, :]
-            blur = np.array([measure_blur(xi) for xi in cur])
+            blur = np.array([measure_blur_cv2(xi) for xi in cur])
             selected_sites.append(np.argmax(blur).astype(int))
         indices = [x[s] for x, s in zip(indices, selected_sites)]
         frames = [x[s] for x, s in zip(frames.tolist(), selected_sites)]
@@ -61,7 +61,7 @@ def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, local_env_
     return frames, indices
 
 
-def measure_blur(frame):
+def measure_blur_cv2(frame):
     """
     returns a score measureing how blurry is the frame (the higher, the less blurry)
     :param frame: the frame to analyze
@@ -69,6 +69,21 @@ def measure_blur(frame):
     """
     import cv2
     return cv2.Laplacian(np.array(frame), cv2.CV_64F).var()
+
+
+def measure_blur(frame):
+    """
+    returns a score measureing how blurry is the frame (the higher, the less blurry)
+    :param frame: the frame to analyze
+    :return: a float representing the score
+    """
+    from scipy import ndimage
+    kernel = np.ones((21, 21))
+    middle = int((np.size(kernel, 0) - 1) / 2)
+    kernel[middle, middle] = -((np.size(kernel, 0) ** 2) - 1)
+    gray_scale = np.mean(frame, axis=-1)
+    laplacian = ndimage.convolve(gray_scale, kernel, mode='constant', cval=0.0)
+    return np.var(laplacian)
 
 
 def video_to_frames(vid_path, vid_hash=None, dump_frames=False, starting_frame=0, force_reselect=False, frame_indices=None):
