@@ -6,11 +6,12 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import utils
+import copy
 
 
 class MyDataSet(torch.utils.data.Dataset):
     def __init__(self, opt):
-        self.opt = opt
+        self.opt = copy.deepcopy(opt)
         self.raw_data_file = opt.data_path / "serialized.pickle"
         if not self.raw_data_file.is_file():
             logging.info("loading raw data")
@@ -29,27 +30,33 @@ class MyDataSet(torch.utils.data.Dataset):
         if self.opt.is_train:
             self.data = x_train
             self.labels = y_train
-            self.data = self.data[:1000]
-            self.labels = {"rot_and_scale": self.labels[:1000]}
+            # self.data = self.data[:1000]
+            # self.labels = {"rot_and_scale": self.labels[:1000]}
+            self.labels = {"rot_and_scale": self.labels}
         else:
             self.data = x_val
             self.labels = y_val
-            self.data = self.data[:50]
-            self.labels = {"rot_and_scale": self.labels[:50]}
-        self.transform_labels_to_point_cloud(save_result=True, force_recreate=False)
+            # self.data = self.data[:50]
+            # self.labels = {"rot_and_scale": self.labels[:50]}
+            self.labels = {"rot_and_scale": self.labels}
+        # self.transform_labels_to_point_cloud(save_result=True, force_recreate=False)
 
     def __getitem__(self, idx):
         x = self.data[idx]
         self.shuffle_timeseries(x)
         self.shuffle_data(x)
-        self.mask_data(x)
         self.center_data(x)
+        if self.opt.is_train:
+            self.mask_data(x)
         y1 = self.labels["rot_and_scale"][idx]
         y1_torch = torch.from_numpy(y1).float().to(self.opt.device)
-        y2 = self.labels["raw_projected_data"][idx]
-        y2_torch = torch.from_numpy(y2).float().to(self.opt.device)
-        y_to_return = {"rot_and_scale": y1_torch,
-                       "raw_projected_data": y2_torch}
+        if self.opt.loss == "l2+projection":
+            y2 = self.labels["raw_projected_data"][idx]
+            y2_torch = torch.from_numpy(y2).float().to(self.opt.device)
+            y_to_return = {"rot_and_scale": y1_torch,
+                           "raw_projected_data": y2_torch}
+        else:
+            y_to_return = {"rot_and_scale": y1_torch}
         x_torch = torch.from_numpy(x).float().to(self.opt.device)
 
         return x_torch, y_to_return
@@ -151,7 +158,7 @@ class MyDataSet(torch.utils.data.Dataset):
 
 class MyDataLoader:
     def __init__(self, opt):
-        self.opt = opt
+        self.opt = copy.deepcopy(opt)
         self.dataset = MyDataSet(opt)
         if self.opt.is_train:
             self.dataloader = torch.utils.data.DataLoader(

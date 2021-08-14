@@ -129,11 +129,11 @@ def torch_project(origin_xyz, others_xyz, selected_indices, resource_folder="res
                                                                  pointN,
                                                                  resource_folder)
         if torch.any(torch.isnan(others_transformed_to_ref)):
-            print("what the ?")
+            print("nans in torch affine !!")
         # XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
         # XYZ = torch.FloatTensor(XYZ, device=others_xyz.device)
         projected_sensors = find_closest_on_surface_differentiable(others_transformed_to_ref, refN, pointN, resource_folder=resource_folder)
         if torch.any(torch.isnan(projected_sensors)):
-            print("what the ?")
+            print("nans in torch project !!")
         others_xyz[i] = projected_sensors
     return others_xyz

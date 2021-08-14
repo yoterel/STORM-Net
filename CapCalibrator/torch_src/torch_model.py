@@ -5,14 +5,15 @@ import file_io
 import geometry
 import numpy as np
 from pathlib import Path
+import copy
 
 
 class MyNetwork(torch.nn.Module):
     def __init__(self, opt):
         super(MyNetwork, self).__init__()
-        self.opt = opt
+        self.opt = copy.deepcopy(opt)
         if opt.architecture == "fc":
-            self.net = torch.nn.Sequential(
+            self.net = torch.nn.ModuleList([
                 nn.Flatten(),
                 nn.Linear(140, 128),
                 nn.ReLU(),
@@ -21,9 +22,9 @@ class MyNetwork(torch.nn.Module):
                 nn.Linear(64, 32),
                 nn.ReLU(),
                 nn.Linear(32, self.opt.network_output_size),
-            )
+            ])
         elif opt.architecture == "1dconv":
-            self.net = torch.nn.Sequential(
+            self.net = torch.nn.ModuleList([
                 nn.Conv1d(in_channels=opt.network_input_size, out_channels=64, kernel_size=2),
                 nn.ReLU(),
                 nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2),
@@ -34,27 +35,32 @@ class MyNetwork(torch.nn.Module):
                 nn.Conv1d(in_channels=128, out_channels=128, kernel_size=2),
                 nn.ReLU(),
                 nn.Flatten(),
-                nn.Linear(128, 16),
+                nn.Linear(256, 16),
                 nn.ReLU(),
                 nn.Linear(16, opt.network_output_size),
-            )
+            ])
         else:
             raise NotImplementedError
-
-        self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
+        if self.opt.loss == "l2+projection":
+            self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
 
     def forward(self, x):
-        euler_out = self.net(x)
-        mat_out = self.euler_to_matrix(euler_out)
+        x = x.permute(0, 2, 1)
+        for i, layer in enumerate(self.net):
+            x = layer(x)
+        euler_out = x
+        projected_out = None
+        if self.opt.loss == "l2+projection":
+            mat_out = self.euler_to_matrix(euler_out)
 
-        # rots = np.empty((x.shape[0], 3, 3), dtype=float)
-        # for i in range(x.shape[0]):
-        #      rot = R.from_euler('xyz', list(out[i].cpu().detach().numpy()), degrees=True)
-        #      rots[i] = rot.as_matrix()
-        # if not torch.all(torch.isclose(mat_out, torch.from_numpy(rots).float())):
-        #     logging.warning("matrix from euler different than scipy matrix!")
-        transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
-        projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
+            # rots = np.empty((x.shape[0], 3, 3), dtype=float)
+            # for i in range(x.shape[0]):
+            #      rot = R.from_euler('xyz', list(out[i].cpu().detach().numpy()), degrees=True)
+            #      rots[i] = rot.as_matrix()
+            # if not torch.all(torch.isclose(mat_out, torch.from_numpy(rots).float())):
+            #     logging.warning("matrix from euler different than scipy matrix!")
+            transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
+            projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
         return projected_out, euler_out
 
     def load_static_model(self):
@@ -105,7 +111,7 @@ class MyNetwork(torch.nn.Module):
 
 class MyModel:
     def __init__(self, opt):
-        self.opt = opt
+        self.opt = copy.deepcopy(opt)
         self.network = MyNetwork(opt)
         if opt.continue_train:
             self.load_network("latest")
@@ -113,7 +119,7 @@ class MyModel:
                                           lr=opt.lr,
                                           betas=(opt.beta1, 0.999),
                                           weight_decay=1e-5)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True)
         self.network.to(self.opt.device)
 
     def load_network(self, which_epoch):

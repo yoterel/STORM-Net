@@ -5,7 +5,7 @@ import logging
 import time
 import torch_src.torch_data as torch_data
 import torch_src.torch_model as torch_model
-
+import numpy as np
 
 
 def train_loop(opt):
@@ -15,36 +15,49 @@ def train_loop(opt):
     val_dataset = torch_data.MyDataLoader(opt)
     model = torch_model.MyModel(opt)
     # loss_fn = torch.nn.MSELoss()
-    alpha = 0.7
+    alpha = 1.0
     for epoch in range(opt.number_of_epochs):
+        train_loss_total = []
         for batch_index, (input, target) in enumerate(train_dataset):
             model.optimizer.zero_grad()
             output_sensors, output_euler = model.network(input)
-            train_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
-            train_loss_euler = torch.mean(torch.linalg.norm(target["rot_and_scale"] - output_euler, dim=1))
-            train_loss = (1-alpha)*train_loss_sensors + alpha*train_loss_euler
+            train_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
+            if opt.loss == "l2+projection":
+                train_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
+                train_loss = (1-alpha)*train_loss_sensors + alpha*train_loss_euler
+            else:
+                train_loss = train_loss_euler
             # train_loss = loss_fn(output, target["raw_projected_data"])
-            logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
-                                                                     batch_index,
-                                                                     len(train_dataset) // opt.batch_size,
-                                                                     train_loss.cpu().detach().numpy()))
+
             train_loss.backward()
             model.optimizer.step()
+            train_loss_np = train_loss.cpu().detach().numpy()
+            train_loss_total.append(train_loss_np)
+            logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
+                                                                            batch_index,
+                                                                            len(train_dataset) // opt.batch_size,
+                                                                            train_loss_np))
+        train_loss_total = np.mean(np.array(train_loss_total))
+        logging.info("train: epoch: {}, training loss: {}".format(epoch,
+                                                                  train_loss_total))
         model.save_network(which_epoch=str(epoch))
         model.save_network(which_epoch="latest")
         with torch.no_grad():
-            val_loss_total = torch.zeros(1).to(opt.device)
+            val_loss_total = []
             for input, target in val_dataset:
                 model.optimizer.zero_grad()
                 output_sensors, output_euler = model.network(input)
-                val_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
-                val_loss_euler = torch.mean(torch.linalg.norm(target["rot_and_scale"] - output_euler, dim=1))
-                val_loss = (1 - alpha) * val_loss_sensors + alpha * val_loss_euler
+                val_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
+                if opt.loss == "l2+projection":
+                    val_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
+                    val_loss = (1 - alpha) * val_loss_sensors + alpha * val_loss_euler
+                else:
+                    val_loss = val_loss_euler
                 # val_loss = loss_fn(output, target)
-                val_loss_total += val_loss
-            val_loss_total /= len(val_dataset)
-            logging.info("validation: epoch: {}, loss: {}".format(epoch, val_loss_total.cpu().detach().numpy()))
-        model.scheduler.step(val_loss)
+                val_loss_total.append(val_loss.cpu().detach().numpy())
+            val_loss_total = np.mean(np.array(val_loss_total))
+            logging.info("validation: epoch: {}, loss: {}".format(epoch, val_loss_total))
+        model.scheduler.step(val_loss_total)
         logging.info("lr: {}".format(model.optimizer.param_groups[0]['lr']))
 
 
@@ -54,15 +67,16 @@ def parse_arguments():
     parser.add_argument("experiment_name", help="The name to give the experiment")
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
     parser.add_argument("--architecture", type=str, choices=["fc", "1dconv"], default="fc", help="Selects architecture")
+    parser.add_argument("--loss", type=str, choices=["l2", "l2+projection"], help="loss function to use")
     parser.add_argument("--gpu_ids", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
     parser.add_argument("--continue_train", action="store_true", help="continue from latest epoch")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for training")
     parser.add_argument("--number_of_epochs", type=int, default=2000, help="Number of epochs for training loop")
-    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for optimizer")
+    parser.add_argument("--lr", type=float, default=1e-5, help="learning rate for optimizer")
     parser.add_argument('--beta1', type=float, default=0.9, help='momentum term of adam')
     parser.add_argument("--template",
                         help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
-    parser.add_argument("--network_input_size", type=int, default=10, help="Input layer size for STORM-Net")
+    parser.add_argument("--network_input_size", type=int, default=14, help="Input layer size for STORM-Net")
     parser.add_argument("--network_output_size", type=int, default=3, help="Output layer size for STORM-Net")
     parser.add_argument("--num_threads", type=int, default=0, help="Number of worker threads for dataloader")
     parser.add_argument("--log", action="store_true", help="If present, writes training log")
