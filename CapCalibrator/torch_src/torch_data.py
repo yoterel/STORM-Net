@@ -40,7 +40,7 @@ class MyDataSet(torch.utils.data.Dataset):
             self.data = self.data[:500]
             self.labels = {"rot_and_scale": self.labels[:500]}
             # self.labels = {"rot_and_scale": self.labels}
-        self.transform_labels_to_point_cloud(save_result=True, force_recreate=True, use_gpu=True)
+        self.transform_labels_to_point_cloud(save_result=True, force_recreate=False, use_gpu=True)
 
     def __getitem__(self, idx):
         x = self.data[idx]

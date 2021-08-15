@@ -15,7 +15,7 @@ def train_loop(opt):
     val_dataset = torch_data.MyDataLoader(opt)
     model = torch_model.MyModel(opt)
     # loss_fn = torch.nn.MSELoss()
-    alpha = 1.0
+    alpha = 0.8
     for epoch in range(opt.number_of_epochs):
         train_loss_total = []
         for batch_index, (input, target) in enumerate(train_dataset):
