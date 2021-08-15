@@ -1,6 +1,7 @@
 import logging
 import file_io
 import geometry
+import torch_src.MNI_torch as MNI_torch
 import torch
 from pathlib import Path
 import numpy as np
@@ -12,42 +13,42 @@ import copy
 class MyDataSet(torch.utils.data.Dataset):
     def __init__(self, opt):
         self.opt = copy.deepcopy(opt)
-        self.raw_data_file = opt.data_path / "serialized.pickle"
+        self.raw_data_file = opt.data_path / "data.pickle"
         if not self.raw_data_file.is_file():
             logging.info("loading raw data")
             X, Y = file_io.load_raw_json_db(opt.data_path, False, False)
             logging.info("creating train-validation split")
-            x_train, x_val, y_train, y_val = utils.split_data(X, Y, with_test_set=False)
+            x_train, x_val, y_train, y_val, x_test, y_test = utils.split_data(X, Y, with_test_set=True)
             # X_train = np.expand_dims(X_train, axis=0)
             # X_val = np.expand_dims(X_val, axis=0)
             # y_train = np.expand_dims(y_train, axis=0)
             # y_val = np.expand_dims(y_val, axis=0)
             logging.info("saving train-validation split to: " + str(self.raw_data_file))
-            file_io.serialize_data(self.raw_data_file, x_train, x_val, y_train, y_val)
+            file_io.serialize_data(self.raw_data_file, x_train, x_val, y_train, y_val, x_test, y_test)
         else:
             logging.info("loading train-validation split from: " + str(self.raw_data_file))
-            x_train, x_val, y_train, y_val = file_io.deserialize_data(self.raw_data_file, with_test_set=False)
+            x_train, x_val, y_train, y_val, x_test, y_test = file_io.deserialize_data(self.raw_data_file, with_test_set=True)
         if self.opt.is_train:
             self.data = x_train
             self.labels = y_train
-            # self.data = self.data[:1000]
-            # self.labels = {"rot_and_scale": self.labels[:1000]}
-            self.labels = {"rot_and_scale": self.labels}
+            self.data = self.data[:10000]
+            self.labels = {"rot_and_scale": self.labels[:10000]}
+            # self.labels = {"rot_and_scale": self.labels}
         else:
             self.data = x_val
             self.labels = y_val
-            # self.data = self.data[:50]
-            # self.labels = {"rot_and_scale": self.labels[:50]}
-            self.labels = {"rot_and_scale": self.labels}
-        # self.transform_labels_to_point_cloud(save_result=True, force_recreate=False)
+            self.data = self.data[:500]
+            self.labels = {"rot_and_scale": self.labels[:500]}
+            # self.labels = {"rot_and_scale": self.labels}
+        self.transform_labels_to_point_cloud(save_result=True, force_recreate=True, use_gpu=True)
 
     def __getitem__(self, idx):
         x = self.data[idx]
-        self.shuffle_timeseries(x)
+        # self.shuffle_timeseries(x)
         self.shuffle_data(x)
         self.center_data(x)
-        if self.opt.is_train:
-            self.mask_data(x)
+        # if self.opt.is_train:
+        #     self.mask_data(x)
         y1 = self.labels["rot_and_scale"][idx]
         y1_torch = torch.from_numpy(y1).float().to(self.opt.device)
         if self.opt.loss == "l2+projection":
@@ -64,7 +65,7 @@ class MyDataSet(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data)
 
-    def transform_labels_to_point_cloud(self, save_result=True, force_recreate=False):
+    def transform_labels_to_point_cloud(self, save_result=True, force_recreate=False, use_gpu=False):
         projected_data_file = Path.joinpath(self.raw_data_file.parent, self.raw_data_file.stem + "_" + str(self.opt.is_train) + "_projected.pickle")
         if not force_recreate:
             if projected_data_file.is_file():
@@ -94,13 +95,31 @@ class MyDataSet(torch.utils.data.Dataset):
         assert 0 in names
         data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
         data_others = data[names.index(0):, :]  # selects optodes for applying calibration
-        transformed_data = []
-        for i, (rot_mat, scale_mat) in enumerate(zip(rs, sc)):
-            transformed_data_sim = rot_mat @ (scale_mat @ data_others.T)
-            data_others = transformed_data_sim.T
-            transformed_data.append([names, np.vstack((data_origin, data_others))])
-        projected_data = geometry.project_sensors_to_MNI(transformed_data)
-        raw_projected_data = np.array([x[1] for x in projected_data])[:, names.index(0):, :]
+        origin_names = np.array(names[:names.index(0)])
+
+        projected_data = []
+        if use_gpu:
+            anchors_xyz, selected_indices = geometry.sort_anchors(origin_names, data_origin)
+            origin_xyz_torch = torch.from_numpy(anchors_xyz).float().to(self.opt.device)
+            selected_indices_torch = torch.from_numpy(selected_indices).to(self.opt.device)
+            for i, (rot_mat, scale_mat) in enumerate(zip(rs, sc)):
+                logging.info("processing: {} / {}".format(i, len(rs)))
+                transformed_data_sim = rot_mat @ (scale_mat @ data_others.T)
+                data_others = transformed_data_sim.T
+                transformed_others_xyz_torch = torch.from_numpy(data_others).float().to(self.opt.device)
+                torch_mni, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                          transformed_others_xyz_torch.unsqueeze(0),
+                                                                          selected_indices_torch)
+                # transformed_data.append([names, np.vstack((data_origin, data_others))])
+                projected_data.append(torch_mni.cpu().numpy())
+            raw_projected_data = np.array(projected_data)
+        else:
+            for i, (rot_mat, scale_mat) in enumerate(zip(rs, sc)):
+                transformed_data_sim = rot_mat @ (scale_mat @ data_others.T)
+                data_others = transformed_data_sim.T
+                projected_data.append([names, np.vstack((data_origin, data_others))])
+            projected_data = geometry.project_sensors_to_MNI(projected_data)
+            raw_projected_data = np.array([x[1] for x in projected_data])[:, names.index(0):, :]
         self.labels["raw_projected_data"] = raw_projected_data
         if save_result:
             file_io.dump_to_pickle(projected_data_file, self.labels)

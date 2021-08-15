@@ -48,10 +48,9 @@ class MyNetwork(torch.nn.Module):
         x = x.permute(0, 2, 1)
         for i, layer in enumerate(self.net):
             x = layer(x)
-        euler_out = x
         projected_out = None
         if self.opt.loss == "l2+projection":
-            mat_out = self.euler_to_matrix(euler_out)
+            mat_out = self.euler_to_matrix(x)
 
             # rots = np.empty((x.shape[0], 3, 3), dtype=float)
             # for i in range(x.shape[0]):
@@ -61,7 +60,7 @@ class MyNetwork(torch.nn.Module):
             #     logging.warning("matrix from euler different than scipy matrix!")
             transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
             projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
-        return projected_out, euler_out
+        return projected_out, x
 
     def load_static_model(self):
         names, data, format, _ = file_io.read_template_file(self.opt.template)

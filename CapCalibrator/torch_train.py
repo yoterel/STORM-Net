@@ -28,7 +28,6 @@ def train_loop(opt):
             else:
                 train_loss = train_loss_euler
             # train_loss = loss_fn(output, target["raw_projected_data"])
-
             train_loss.backward()
             model.optimizer.step()
             train_loss_np = train_loss.cpu().detach().numpy()

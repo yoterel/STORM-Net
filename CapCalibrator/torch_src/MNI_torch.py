@@ -55,7 +55,7 @@ def k_softmin(k, x):
     return nominator / demonimator
 
 
-def find_closest_on_surface_differentiable(others, refN, pointN, soft_mask_func="softkmin", resource_folder="resource"):
+def torch_find_closest_on_surface(others, refN, pointN, soft_mask_func="softkmin", resource_folder="resource"):
     k = 10
     eps = 1e-5
     new_others = torch.empty(others.shape, device=others.device)
@@ -132,8 +132,199 @@ def torch_project(origin_xyz, others_xyz, selected_indices, resource_folder="res
             print("nans in torch affine !!")
         # XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
         # XYZ = torch.FloatTensor(XYZ, device=others_xyz.device)
-        projected_sensors = find_closest_on_surface_differentiable(others_transformed_to_ref, refN, pointN, resource_folder=resource_folder)
+        projected_sensors = torch_find_closest_on_surface(others_transformed_to_ref, refN, pointN, resource_folder=resource_folder)
         if torch.any(torch.isnan(projected_sensors)):
             print("nans in torch project !!")
         others_xyz[i] = projected_sensors
     return others_xyz
+
+
+def torch_find_affine_transforms_non_diff(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN, resource_folder="resource"):
+    """
+    finds refN affine transforms between our anchors and anchors from all reference template brains
+    :param our_anchors_xyz: our anchors
+    :param our_sensors_xyz: our sensors (on head surface)
+    :param selected_indices: our selected anchors out of the 23 10-20 points
+    :param refN: number of reference brains in template data
+    :return: numpy array of size refN x number_of_sensors x 3
+    represents for each refernce brain all our sensors locations in its frame of reference
+    """
+    # path_wo_ext = "resource/MNI_templates/DMNIHAve"
+    # dmnihavePath = Path(path_wo_ext + ".csv")
+    # if Path(path_wo_ext+".npy").is_file():
+    #     DMNIHAve = np.load(path_wo_ext+".npy", allow_pickle=True)
+    # else:
+    #     DMNIHAve = np.genfromtxt(dmnihavePath, delimiter=',')
+    #     np.save(path_wo_ext, DMNIHAve)
+    # template_anchors_xyz = DMNIHAve[selected_indices, :]
+    # ==================== AffineEstimation4 ====================== (l 225)
+    size = len(selected_indices)
+    assert size >= 4
+    device = our_anchors_xyz.device
+    A = torch.cat((our_anchors_xyz, torch.ones((size, 1), device=device)), dim=-1)
+    A = A.repeat(refN, 1).reshape((refN, size, 4))
+    # load 17 brain templates from disk
+    DMS = []
+    for i in range(1, refN+1):
+        path_wo_ext = resource_folder+"/MNI_templates/DMNI{:0>4d}".format(i)
+        if Path(path_wo_ext+".npy").is_file():
+            DMS.append(np.load(path_wo_ext+".npy", allow_pickle=True))
+        else:
+            csv_path = Path(path_wo_ext+".csv")
+            DM = np.genfromtxt(csv_path, delimiter=',')
+            np.save(path_wo_ext, DM)
+            DMS.append(DM)
+    B = torch.FloatTensor(DMS).to(device)
+    B = B[:, selected_indices, :]
+    B = torch.cat((B, torch.ones((refN, size, 1), device=device)), dim=-1)
+    W = torch.linalg.lstsq(A, B).solution
+    # W = A.pinverse() @ B
+    # W = torch.linalg.lstsq(A, B).solution
+    # find affine transformation between our anchors and all brains
+    DDDD = torch.cat((our_sensors_xyz, torch.ones((pointN, 1), device=device)), dim=-1)
+    DDDD = DDDD.repeat(refN, 1).reshape((refN, pointN, 4))
+    return torch.bmm(DDDD, W)[:, :, :3]
+
+
+def torch_find_closest_on_surface_naive(othersRefList, XYZ, pointN, calc_sd_and_var=False):
+    """
+    finds closest point on cortical surface for every (transformed) sensor location
+    by averaging over 3 closest points on cortical surface
+    :param othersRefList: the refN x pointN x 3 transformed sensor locations (into ref brains)
+    :param XYZ the raw measurements from template reference brains
+    :param pointN: number of sensors
+    :return:
+    other - location on cortical surface per sensor
+    otherVar - variance of each otherH sensor
+    otherSD - root of variance of each otherH sensor
+    """
+    device = othersRefList.device
+    other = torch.ones((pointN, 3)).to(device)
+    otherVar = torch.ones((pointN, 4)).to(device)
+    otherSD = torch.ones((pointN, 4)).to(device)
+    top = 3
+    for i in range(pointN):
+        AA = torch.mean(othersRefList[:, i], dim=0)
+        PP = torch.broadcast_to(AA, XYZ.shape)
+        D = torch.linalg.norm(XYZ - PP, dim=1)
+        XYZtop = XYZ[torch.topk(D, largest=False, k=top).indices, :]
+        closest = torch.mean(XYZtop, dim=0)
+        other[i, :] = closest
+        if calc_sd_and_var:
+            AAA = othersRefList[:, i]
+            AV = closest
+            N = AAA.shape[0]
+            subMat = torch.ones(AAA.shape).to(device)
+            for j in range(N):
+                subMat[j, :] = AV
+
+            dispEach = AAA - subMat
+            dispEachSq = dispEach * dispEach
+            XYZSS = torch.sum(dispEachSq, dim=0)
+            RSS = torch.sum(XYZSS)
+
+            XYZVar = XYZSS / (N - 1)
+            RSSVar = RSS / (N - 1)
+
+            VV = torch.cat((XYZVar, RSSVar.unsqueeze(0)))
+            otherVar[i, :] = VV
+            otherSD[i, :] = torch.sqrt(VV)
+    return other, otherVar, otherSD
+
+
+def torch_find_closest_on_surface_full(othersRefList, refN, pointN, resource_folder):
+    """
+    full implementation of cortical projection using the balloon inflation algorithm described in
+    https://doi.org/10.1016/j.neuroimage.2005.01.018
+    :param othersRefList: the refN x pointN x 3 transformed sensor locations (into ref brains)
+    :param refN: number of reference brains
+    :param pointN: number of sensors
+    :return:
+    """
+    device = othersRefList.device
+    otherRefCList = torch.empty((refN, pointN, 3), dtype=torch.float).to(device)
+    # otherRefCList = np.empty((1, refN), dtype=object)
+    for i in range(refN):
+        my_str = resource_folder+"/MNI_templates/xyzall{}.npy".format(str(i + 1))
+        XYZ = load_raw_MNI_data(my_str, i, resource_folder=resource_folder)
+        XYZ = torch.FloatTensor(XYZ).to(othersRefList.device).to(device)
+        projectionListC = torch.ones((pointN, 3)).to(device)
+        for j in range(pointN):
+            P = othersRefList[i, j, :3]
+            PP = torch.broadcast_to(P, XYZ.shape)
+            D = torch.linalg.norm(XYZ - PP, dim=1)
+            top = round(XYZ.shape[0] * 0.05)  # select 5% of data (original paper selects 1000 points)
+            XYZtop = XYZ[torch.topk(D, largest=False, k=top).indices, :]
+            Nclose = 200
+            XYZclose = XYZ[torch.topk(D, largest=False, k=Nclose).indices, :]
+            PNear = torch.mean(XYZclose, dim=0)  # select mean of closest 200 points
+
+            # Line between P and PNear
+            p1 = P.unsqueeze(0)
+            p2 = PNear.unsqueeze(0)
+            p3 = XYZtop
+            # cross product the line with the point and normalize gives exactly distance from line
+            distance_from_line = torch.linalg.norm(torch.cross(torch.broadcast_to(p2 - p1, p3.shape), p3 - p1) / torch.linalg.norm(p2-p1), dim=1)
+            det = 0
+            rodR = 0
+            while det == 0:
+                rodR += 1
+                Iless2 = torch.where(distance_from_line <= rodR)
+                rod = XYZtop[Iless2]
+                det = torch.sum(rod ** 2)
+
+            # Find brain surface points on the vicinity of P (l 862)
+            PPB = torch.broadcast_to(P, rod.shape)
+            VicD = torch.linalg.norm(rod - PPB, dim=1)
+            NVic = 3
+            if rod.shape[0] < NVic:
+                NVic = rod.shape[0]
+            IVicD = torch.argsort(VicD)
+            NIVicD = IVicD[0:NVic]
+            Vic = rod[NIVicD, :]
+            CP = torch.mean(Vic, dim=0)
+
+            projectionListC[j, :] = CP
+        otherRefCList[i] = projectionListC
+    return otherRefCList
+
+
+def torch_project_non_differentiable(origin_xyz, others_xyz, selected_indices, output_errors=False, resource_folder="resource"):
+    """
+    projects others_xyz to MNI coordiantes given anchors in origin_xyz
+    :param origin_xyz: anchors given as nx3 np array (n >= 4)
+    :param others_xyz: optodes to project given as mx3 np array (m>=1)
+    :param selected_indices: which indices to select from origin_xyz as anchors given as np array (len must be at least 4)
+                             order matters! selection is based on this order:
+                             ["nosebridge", "inion", "rightear", "leftear",
+                              "fp1", "fp2", "fz", "f3",
+                              "f4", "f7", "f8", "cz",
+                              "c3", "c4", "t3", "t4",
+                              "pz", "p3", "p4", "t5",
+                              "t6", "o1", "o2"]
+    :param output_errors: whether to output error in estimation as well.
+    :param resource_folder: relative path to the fodler with the raw template data
+    :return: otherH - others transformed to MNI of ideal head (head surface)
+             otherC - others transformed to MNI of ideal head  (cortical surface)
+             otherHSD - transformation standard deviation per axis, point manner (for otherH).
+                        Last channel is SD across all axes (root sum of squares).
+             otherCSD - transformation standard deviation per axis, point manner (for otherC).
+                        Last channel is SD across all axes (root sum of squares).
+    """
+    refN = 17  # number of reference brains
+    batch_size = others_xyz.shape[0]  # number of sensors to project
+    pointN = others_xyz.shape[1]  # number of sensors to project
+    for i in range(batch_size):
+        others_transformed_to_ref = torch_find_affine_transforms_non_diff(origin_xyz,
+                                                           others_xyz[i],
+                                                           selected_indices,
+                                                           refN,
+                                                           pointN,
+                                                           resource_folder)
+        others_projected_to_ref = torch_find_closest_on_surface_full(others_transformed_to_ref, refN, pointN, resource_folder=resource_folder)
+        XYZ = load_raw_MNI_data(resource_folder+"/MNI_templates/xyzallBEM.npy", "brain", resource_folder=resource_folder)
+        XYZ = torch.FloatTensor(XYZ).to(others_xyz.device)
+        # get closest points of projected sensors on average cortical surface
+        otherC, otherCV, otherCSD = torch_find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN, output_errors)
+
+    return otherC, otherCSD

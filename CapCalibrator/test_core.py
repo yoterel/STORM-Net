@@ -42,21 +42,53 @@ def network():
         def __init__(self):
             self.network_output_size = 3
             self.template = Path("../example_models/example_model.txt")
+            self.architecture = "fc"
+            self.loss = "l2"
+            self.device = "cpu"
     opt = Options()
     network = torch_model.MyNetwork(opt)
     return network
 
 
+def test_mni_torch_vs_mni_numpy(anchors_and_sensors):
+    """
+    tests if mni projection using torch is the same as nump
+    :param anchors_and_sensors:
+    :return:
+    """
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    devices = ["cpu", "cuda:7"]
+    for device in devices:
+        euler = (np.random.rand(3) * 10) - 5
+        rot = R.from_euler('xyz', list(euler), degrees=True)
+        rot_mat = rot.as_matrix()
+        transformed_others_xyz = (rot_mat @ others_xyz.T).T
+        _, np_mni, _, np_mni_sd = MNI.project(origin_xyz, transformed_others_xyz, selected_indices, output_errors=True)
+        origin_xyz_torch = torch.from_numpy(origin_xyz).float().to(device)
+        transformed_others_xyz_torch = torch.from_numpy(transformed_others_xyz).float().to(device)
+        selected_indices_torch = torch.from_numpy(selected_indices).to(device)
+        torch_mni, torch_mni_sd = MNI_torch.torch_project_non_differentiable(origin_xyz_torch, transformed_others_xyz_torch.unsqueeze(0), selected_indices_torch, output_errors=True)
+        assert torch.all(torch.isclose(torch.from_numpy(np_mni).float().to(device), torch_mni.squeeze(0)))
+        assert torch.all(torch.isclose(torch.from_numpy(np_mni_sd).float().to(device), torch_mni_sd.squeeze(0)))
+
+
+
 def test_differentiable_mni_optimization(network, anchors_and_sensors):
-    Niter = 3
+    """
+    tests if optimizing through torch yields good gradients
+    :param network:
+    :param anchors_and_sensors:
+    :return:
+    """
+    Niter = 1
     origin_xyz, others_xyz, selected_indices = anchors_and_sensors
     euler = (np.random.rand(3) * 10) - 5
     rot = R.from_euler('xyz', list(euler), degrees=True)
     rot_mat = rot.as_matrix()
     transformed_others_xyz = (rot_mat @ others_xyz.T).T
     _, gt, _, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices)
-
     euler_torch = torch.full([1, 3], 1.0, device="cpu", requires_grad=True)
+    init_diff = np.linalg.norm(euler - euler_torch.cpu().detach().numpy())
     optimizer = torch.optim.SGD([euler_torch], lr=1.0, momentum=0.9)
     for i in range(Niter):
         # Initialize optimizer
@@ -69,16 +101,22 @@ def test_differentiable_mni_optimization(network, anchors_and_sensors):
         projected_out = MNI_torch.torch_project(origin_xyz_torch, transformed_sensors, selected_indices,
                                                 resource_folder="resource")
         loss = torch.mean(torch.linalg.norm(torch.from_numpy(gt).unsqueeze(0) - projected_out, dim=2))
-        print(loss.cpu().detach().numpy())
-        print("euler:", euler)
-        print("euler_torch:", euler_torch.cpu().detach().numpy())
+        # print(loss.cpu().detach().numpy())
+        # print("euler:", euler)
+        # print("euler_torch:", euler_torch.cpu().detach().numpy())
         loss.backward()
         optimizer.step()
-
+    final_diff = np.linalg.norm(euler - euler_torch.cpu().detach().numpy())
+    assert final_diff < init_diff
 
 
 
 def test_batched_euler_to_matrix(network):
+    """
+    tests conversion form euler angles to matrix representation
+    :param network:
+    :return:
+    """
     batch_size = 16
     euler = (np.random.rand(batch_size, 3) * 10) - 5
     scipy_matrices = np.empty((batch_size, 3, 3))
@@ -92,6 +130,11 @@ def test_batched_euler_to_matrix(network):
 
 
 def test_differentiable_MNI_projection(anchors_and_sensors):
+    """
+    tests how close the differentiable version of mni projection is to the actual algorithm
+    :param anchors_and_sensors:
+    :return:
+    """
     origin_xyz, others_xyz, selected_indices = anchors_and_sensors
     selected_indices_torch = torch.from_numpy(selected_indices)
     euler = (np.random.rand(3) * 10) - 5
@@ -107,8 +150,11 @@ def test_differentiable_MNI_projection(anchors_and_sensors):
     assert torch.mean(torch.linalg.norm(torch.from_numpy(test1) - test2.squeeze(0), dim=1)) < 1.5
 
 
-
 def test_3d_rigid_transform():
+    """
+    tests rigid transform based on svd
+    :return:
+    """
     a1 = np.array([
         [1, 0, 0],
         [0, 0, 0],
@@ -143,6 +189,10 @@ def test_force_frame_selection():
 
 
 def test_MNI_projection():
+    """
+    tests if the numpy implementation yields same results as matlab one
+    :return:
+    """
     names, data, _, _ = file_io.read_template_file(Path("../example_models/example_model.txt"))
     names = names[0]
     data = data[0]
