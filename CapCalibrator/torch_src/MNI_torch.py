@@ -41,7 +41,9 @@ def torch_find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indi
     B = torch.FloatTensor(DMS).to(device)
     B = B[:, selected_indices, :]
     B = torch.cat((B, torch.ones((refN, size, 1), device=device)), dim=-1)
-    W = A.pinverse() @ B
+    # W = A.pinverse() @ B
+    W = torch.inverse(A.transpose(1, 2) @ A) @ (A.transpose(1, 2) @ B)
+    # test = np.all(np.isclose(W, W_test, atol=1e-4))
     # W = torch.linalg.lstsq(A, B).solution
     # find affine transformation between our anchors and all brains
     DDDD = torch.cat((our_sensors_xyz, torch.ones((pointN, 1), device=device)), dim=-1)
@@ -55,9 +57,8 @@ def k_softmin(k, x):
     return nominator / demonimator
 
 
-def torch_find_closest_on_surface(others, refN, pointN, soft_mask_func="softkmin", resource_folder="resource"):
+def torch_find_closest_on_surface(others, refN, pointN, soft_dist_func="softkmin", resource_folder="resource"):
     k = 10
-    eps = 1e-5
     new_others = torch.empty(others.shape, device=others.device)
     for i in range(refN):
         my_str = resource_folder+"/MNI_templates/xyzall{}.npy".format(str(i + 1))
@@ -66,19 +67,12 @@ def torch_find_closest_on_surface(others, refN, pointN, soft_mask_func="softkmin
         single_instance = others[i].unsqueeze(1)
         distances = torch.linalg.norm(single_instance - xyz.repeat(85, 1, 1), dim=-1).double()
         # hard_min = torch.min(distances, dim=-1).values
-        soft_min = -torch.log(torch.sum(torch.exp(-k*distances), dim=-1)) / k
         # other_soft_min = torch.topk(distances, 1000, dim=-1, largest=False)
-        if soft_mask_func == "softkmin":
-            x = (torch.abs(soft_min.unsqueeze(1) - distances))
-            soft_mask = k_softmin(k, x)
-            denom = 1
-        elif soft_mask_func == "log":
-            soft_mask = -torch.log((torch.abs(soft_min.unsqueeze(1) - distances) + eps))
-            soft_mask = torch.clip(soft_mask, min=0)
-            denom = torch.sum(soft_mask, dim=-1, keepdim=True)
+        if soft_dist_func == "softkmin":
+            x = k_softmin(k, distances)
+            p = (x.float() @ xyz)
         else:
             raise NotImplementedError
-        p = (soft_mask.float() @ xyz) / denom
         # p_real = xyz[torch.argmin(distances, dim=-1)]
         # print("error: ", torch.mean(torch.norm(p - p_real, dim=1)))
         new_others[i] = p
@@ -132,7 +126,7 @@ def torch_project(origin_xyz, others_xyz, selected_indices, resource_folder="res
             print("nans in torch affine !!")
         # XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
         # XYZ = torch.FloatTensor(XYZ, device=others_xyz.device)
-        projected_sensors = torch_find_closest_on_surface(others_transformed_to_ref, refN, pointN, resource_folder=resource_folder)
+        projected_sensors = torch_find_closest_on_surface(others_transformed_to_ref, refN, pointN, soft_dist_func="softkmin", resource_folder=resource_folder)
         if torch.any(torch.isnan(projected_sensors)):
             print("nans in torch project !!")
         others_xyz[i] = projected_sensors
@@ -304,12 +298,10 @@ def torch_project_non_differentiable(origin_xyz, others_xyz, selected_indices, o
                               "t6", "o1", "o2"]
     :param output_errors: whether to output error in estimation as well.
     :param resource_folder: relative path to the fodler with the raw template data
-    :return: otherH - others transformed to MNI of ideal head (head surface)
-             otherC - others transformed to MNI of ideal head  (cortical surface)
-             otherHSD - transformation standard deviation per axis, point manner (for otherH).
-                        Last channel is SD across all axes (root sum of squares).
+    :return: otherC - others transformed to MNI of ideal head  (cortical surface)
              otherCSD - transformation standard deviation per axis, point manner (for otherC).
                         Last channel is SD across all axes (root sum of squares).
+             ref - others projected onto cortical surface without nearest neighbor search on the average template
     """
     refN = 17  # number of reference brains
     batch_size = others_xyz.shape[0]  # number of sensors to project
@@ -327,4 +319,4 @@ def torch_project_non_differentiable(origin_xyz, others_xyz, selected_indices, o
         # get closest points of projected sensors on average cortical surface
         otherC, otherCV, otherCSD = torch_find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN, output_errors)
 
-    return otherC, otherCSD
+    return otherC, otherCSD, torch.mean(others_projected_to_ref, dim=0)

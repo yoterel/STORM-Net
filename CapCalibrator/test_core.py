@@ -50,6 +50,50 @@ def network():
     return network
 
 
+
+def test_mni_ours_vs_naive_vs_full(anchors_and_sensors):
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    device = "cuda:7"
+    euler = (np.random.rand(3) * 10) - 5
+    rot = R.from_euler('xyz', list(euler), degrees=True)
+    rot_mat = rot.as_matrix()
+    transformed_others_xyz = (rot_mat @ others_xyz.T).T
+    origin_xyz_torch = torch.from_numpy(origin_xyz).float().to(device)
+    transformed_others_xyz_torch = torch.from_numpy(transformed_others_xyz).float().to(device)
+    selected_indices_torch = torch.from_numpy(selected_indices).to(device)
+    torch_mni, errors, naive_torch_mni = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                               transformed_others_xyz_torch.unsqueeze(0),
+                                                                               selected_indices_torch, output_errors=True)
+    diff_torch_mni_projection = MNI_torch.torch_project(origin_xyz_torch,
+                                                        transformed_others_xyz_torch.unsqueeze(0),
+                                                        selected_indices_torch)
+
+    naive_to_full = torch.mean(torch.linalg.norm(naive_torch_mni - torch_mni, dim=1))
+    ours_to_full = torch.mean(torch.linalg.norm(diff_torch_mni_projection.squeeze(0) - torch_mni, dim=1))
+    ours_to_naive = torch.mean(torch.linalg.norm(diff_torch_mni_projection.squeeze(0) - naive_torch_mni, dim=1))
+    assert True
+
+
+def test_differentiable_find_affine(anchors_and_sensors):
+    """
+    tests how close the differentiable version of finding the affine transformations is to the original
+    :param anchors_and_sensors:
+    :return:
+    """
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    refN = 17  # number of reference brains
+    pointN = others_xyz.shape[0]  # number of sensors to project
+    classic_result = MNI.find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN, pointN)
+    origin_xyz = torch.from_numpy(origin_xyz).float()
+    others_xyz = torch.from_numpy(others_xyz).float()
+    selected_indices = torch.from_numpy(selected_indices)
+    differentiable_result = MNI_torch.torch_find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN,
+                                                                   pointN)
+    test1 = classic_result.astype(np.float32)
+    test2 = differentiable_result.numpy()
+    assert np.all(np.isclose(test1, test2, atol=1e-5))
+
+
 def test_mni_torch_vs_mni_numpy(anchors_and_sensors):
     """
     tests if mni projection using torch is the same as nump
@@ -69,7 +113,7 @@ def test_mni_torch_vs_mni_numpy(anchors_and_sensors):
         selected_indices_torch = torch.from_numpy(selected_indices).to(device)
         torch_mni, torch_mni_sd = MNI_torch.torch_project_non_differentiable(origin_xyz_torch, transformed_others_xyz_torch.unsqueeze(0), selected_indices_torch, output_errors=True)
         assert torch.all(torch.isclose(torch.from_numpy(np_mni).float().to(device), torch_mni.squeeze(0)))
-        assert torch.all(torch.isclose(torch.from_numpy(np_mni_sd).float().to(device), torch_mni_sd.squeeze(0)))
+        assert torch.all(torch.isclose(torch.from_numpy(np_mni_sd).float().to(device), torch_mni_sd.squeeze(0), atol=1e-4))
 
 
 
@@ -244,18 +288,3 @@ def test_render():
     X, Y = file_io.load_raw_json_db(render_dir)
     assert X.shape == (1, 10, 14)
     assert Y.shape == (1, 3)
-
-
-def test_differentiable_find_affine(anchors_and_sensors):
-    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
-    refN = 17  # number of reference brains
-    pointN = others_xyz.shape[0]  # number of sensors to project
-    classic_result = MNI.find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN, pointN)
-    origin_xyz = torch.from_numpy(origin_xyz).float()
-    others_xyz = torch.from_numpy(others_xyz).float()
-    selected_indices = torch.from_numpy(selected_indices)
-    differentiable_result = MNI_torch.torch_find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN,
-                                                                   pointN)
-    test1 = classic_result.astype(np.float32)
-    test2 = differentiable_result.numpy()
-    assert np.all(np.isclose(test1, test2, rtol=1e-3))

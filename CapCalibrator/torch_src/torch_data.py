@@ -107,7 +107,7 @@ class MyDataSet(torch.utils.data.Dataset):
                 transformed_data_sim = rot_mat @ (scale_mat @ data_others.T)
                 data_others = transformed_data_sim.T
                 transformed_others_xyz_torch = torch.from_numpy(data_others).float().to(self.opt.device)
-                torch_mni, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
                                                                           transformed_others_xyz_torch.unsqueeze(0),
                                                                           selected_indices_torch)
                 # transformed_data.append([names, np.vstack((data_origin, data_others))])
