@@ -49,6 +49,44 @@ def network():
     network = torch_model.MyNetwork(opt)
     return network
 
+@pytest.fixture
+def dataloader():
+    import torch_src.torch_data as torch_data
+
+    class Options():
+        def __init__(self):
+            self.data_path = Path("/disk1/yotam/capnet/scene3_100k")
+            self.is_train = True
+            self.template = Path("../example_models/example_model.txt")
+            self.device = "cuda:7"
+            self.loss = "l2+projection"
+
+    opt = Options()
+    loader = torch_data.MyDataSet(opt)
+    return loader
+
+
+def test_raw_data_set(dataloader, anchors_and_sensors):
+    origin_xyz, others_xyz, selected_indices = anchors_and_sensors
+    device = "cuda:7"
+    x, y = dataloader.__getitem__(0)
+    y_euler = y["rot_and_scale"]
+    y_pc = y["raw_projected_data"]
+
+    y_euler_numpy = y_euler.cpu().numpy()
+    rot = R.from_euler('xyz', list(y_euler_numpy), degrees=True)
+    rot_mat = rot.as_matrix()
+    transformed_others_xyz = (rot_mat @ others_xyz.T).T
+
+    origin_xyz_torch = torch.from_numpy(origin_xyz).float().to(device)
+    transformed_others_xyz_torch = torch.from_numpy(transformed_others_xyz).float().to(device)
+    selected_indices_torch = torch.from_numpy(selected_indices).to(device)
+    torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                 transformed_others_xyz_torch.unsqueeze(0),
+                                                                 selected_indices_torch)
+    assert torch.all(torch.isclose(y_pc, torch_mni))
+
+
 
 
 def test_mni_ours_vs_naive_vs_full(anchors_and_sensors):
@@ -111,7 +149,10 @@ def test_mni_torch_vs_mni_numpy(anchors_and_sensors):
         origin_xyz_torch = torch.from_numpy(origin_xyz).float().to(device)
         transformed_others_xyz_torch = torch.from_numpy(transformed_others_xyz).float().to(device)
         selected_indices_torch = torch.from_numpy(selected_indices).to(device)
-        torch_mni, torch_mni_sd = MNI_torch.torch_project_non_differentiable(origin_xyz_torch, transformed_others_xyz_torch.unsqueeze(0), selected_indices_torch, output_errors=True)
+        torch_mni, torch_mni_sd, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                                transformed_others_xyz_torch.unsqueeze(0),
+                                                                                selected_indices_torch,
+                                                                                output_errors=True)
         assert torch.all(torch.isclose(torch.from_numpy(np_mni).float().to(device), torch_mni.squeeze(0)))
         assert torch.all(torch.isclose(torch.from_numpy(np_mni_sd).float().to(device), torch_mni_sd.squeeze(0), atol=1e-4))
 
@@ -152,7 +193,6 @@ def test_differentiable_mni_optimization(network, anchors_and_sensors):
         optimizer.step()
     final_diff = np.linalg.norm(euler - euler_torch.cpu().detach().numpy())
     assert final_diff < init_diff
-
 
 
 def test_batched_euler_to_matrix(network):

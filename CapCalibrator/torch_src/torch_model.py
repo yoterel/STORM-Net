@@ -51,13 +51,6 @@ class MyNetwork(torch.nn.Module):
         projected_out = None
         if self.opt.loss == "l2+projection":
             mat_out = self.euler_to_matrix(x)
-
-            # rots = np.empty((x.shape[0], 3, 3), dtype=float)
-            # for i in range(x.shape[0]):
-            #      rot = R.from_euler('xyz', list(out[i].cpu().detach().numpy()), degrees=True)
-            #      rots[i] = rot.as_matrix()
-            # if not torch.all(torch.isclose(mat_out, torch.from_numpy(rots).float())):
-            #     logging.warning("matrix from euler different than scipy matrix!")
             transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
             projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
         return projected_out, x

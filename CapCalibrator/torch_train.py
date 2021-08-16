@@ -15,21 +15,27 @@ def train_loop(opt):
     val_dataset = torch_data.MyDataLoader(opt)
     model = torch_model.MyModel(opt)
     # loss_fn = torch.nn.MSELoss()
-    alpha = 0.8
+    model.optimizer.zero_grad()
     for epoch in range(opt.number_of_epochs):
         train_loss_total = []
         for batch_index, (input, target) in enumerate(train_dataset):
-            model.optimizer.zero_grad()
+
             output_sensors, output_euler = model.network(input)
             train_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
             if opt.loss == "l2+projection":
                 train_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
-                train_loss = (1-alpha)*train_loss_sensors + alpha*train_loss_euler
+                train_loss = (1-opt.loss_alpha)*train_loss_sensors + opt.loss_alpha*train_loss_euler
             else:
                 train_loss = train_loss_euler
             # train_loss = loss_fn(output, target["raw_projected_data"])
             train_loss.backward()
-            model.optimizer.step()
+            if opt.batch_size == 1:
+                if batch_index % opt.batch_accumulatation == 0:
+                    model.optimizer.step()
+                    model.optimizer.zero_grad()
+            else:
+                model.optimizer.step()
+                model.optimizer.zero_grad()
             train_loss_np = train_loss.cpu().detach().numpy()
             train_loss_total.append(train_loss_np)
             logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
@@ -49,7 +55,7 @@ def train_loop(opt):
                 val_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
                 if opt.loss == "l2+projection":
                     val_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
-                    val_loss = (1 - alpha) * val_loss_sensors + alpha * val_loss_euler
+                    val_loss = (1 - opt.loss_alpha) * val_loss_sensors + opt.loss_alpha * val_loss_euler
                 else:
                     val_loss = val_loss_euler
                 # val_loss = loss_fn(output, target)
@@ -99,6 +105,9 @@ def parse_arguments():
         args.device = torch.device('cpu')
     else:
         args.device = torch.device('cuda:{}'.format(args.gpu_ids))
+    if args.batch_size == 1:
+        args.batch_accumulatation = 16
+    args.loss_alpha = 0.9
     return args
 
 

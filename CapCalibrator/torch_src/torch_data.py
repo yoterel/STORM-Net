@@ -31,12 +31,14 @@ class MyDataSet(torch.utils.data.Dataset):
         if self.opt.is_train:
             self.data = x_train
             self.labels = y_train
+            self.labels[:, 1:] *= -1
             self.data = self.data[:10000]
             self.labels = {"rot_and_scale": self.labels[:10000]}
             # self.labels = {"rot_and_scale": self.labels}
         else:
             self.data = x_val
             self.labels = y_val
+            self.labels[:, 1:] *= -1
             self.data = self.data[:500]
             self.labels = {"rot_and_scale": self.labels[:500]}
             # self.labels = {"rot_and_scale": self.labels}
@@ -77,7 +79,7 @@ class MyDataSet(torch.utils.data.Dataset):
         sc = []
         for i in range(len(rot_and_scale_labels)):
             # logging.info("Network Euler angels:" + str([y_predict[i][0], -y_predict[i][1], -y_predict[i][2]]))
-            rot = R.from_euler('xyz', [rot_and_scale_labels[i][0], -rot_and_scale_labels[i][1], -rot_and_scale_labels[i][2]], degrees=True)
+            rot = R.from_euler('xyz', [rot_and_scale_labels[i][0], rot_and_scale_labels[i][1], rot_and_scale_labels[i][2]], degrees=True)
             scale_mat = np.identity(3)
             if rot_and_scale_labels.shape[-1] > 3:
                 scale_mat[0, 0] = rot_and_scale_labels[0][3]  # xscale
@@ -100,16 +102,15 @@ class MyDataSet(torch.utils.data.Dataset):
         projected_data = []
         if use_gpu:
             anchors_xyz, selected_indices = geometry.sort_anchors(origin_names, data_origin)
-            origin_xyz_torch = torch.from_numpy(anchors_xyz).float().to(self.opt.device)
+            anchors_xyz_torch = torch.from_numpy(anchors_xyz).float().to(self.opt.device)
             selected_indices_torch = torch.from_numpy(selected_indices).to(self.opt.device)
             for i, (rot_mat, scale_mat) in enumerate(zip(rs, sc)):
                 logging.info("processing: {} / {}".format(i, len(rs)))
-                transformed_data_sim = rot_mat @ (scale_mat @ data_others.T)
-                data_others = transformed_data_sim.T
-                transformed_others_xyz_torch = torch.from_numpy(data_others).float().to(self.opt.device)
-                torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
-                                                                          transformed_others_xyz_torch.unsqueeze(0),
-                                                                          selected_indices_torch)
+                transformed_data_others = (rot_mat @ (scale_mat @ data_others.T)).T
+                transformed_others_xyz_torch = torch.from_numpy(transformed_data_others).float().to(self.opt.device)
+                torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(anchors_xyz_torch,
+                                                                             transformed_others_xyz_torch.unsqueeze(0),
+                                                                             selected_indices_torch)
                 # transformed_data.append([names, np.vstack((data_origin, data_others))])
                 projected_data.append(torch_mni.cpu().numpy())
             raw_projected_data = np.array(projected_data)
