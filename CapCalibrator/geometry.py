@@ -384,11 +384,11 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, 
     return projected_locations
 
 
-def sort_anchors(unsorted_origin_names, unsorted_origin_xyz):
+def sort_anchors(unsorted_anchors_names, unsorted_anchors_xyz):
     """
     sorts anchors according to expected order from MNi projection algorithm
-    :param unsorted_origin_names: names of anchors
-    :param unsorted_origin_xyz: location of anchors
+    :param unsorted_anchors_names: names of anchors
+    :param unsorted_anchors_xyz: location of anchors
     :return: the new location of anchors and the selected indices from the possible target anchors
     """
     # these names are written in an order the algorithm expects (and MNI template data was written in)
@@ -400,8 +400,8 @@ def sort_anchors(unsorted_origin_names, unsorted_origin_xyz):
                                     "t6", "o1", "o2"])
 
     # sort our anchors using the order above
-    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
-    origin_xyz = unsorted_origin_xyz[sorting_indices]
+    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_anchors_names[None, :])
+    origin_xyz = unsorted_anchors_xyz[sorting_indices]
     return origin_xyz, selected_indices
 
 def clean_model(names, data, threshold=0.3):

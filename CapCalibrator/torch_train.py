@@ -24,7 +24,7 @@ def train_loop(opt):
             train_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
             if opt.loss == "l2+projection":
                 train_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
-                train_loss = (1-opt.loss_alpha)*train_loss_sensors + opt.loss_alpha*train_loss_euler
+                train_loss = opt.loss_alpha*train_loss_sensors + (1 - opt.loss_alpha)*train_loss_euler
             else:
                 train_loss = train_loss_euler
             # train_loss = loss_fn(output, target["raw_projected_data"])
@@ -55,7 +55,7 @@ def train_loop(opt):
                 val_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
                 if opt.loss == "l2+projection":
                     val_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
-                    val_loss = (1 - opt.loss_alpha) * val_loss_sensors + opt.loss_alpha * val_loss_euler
+                    val_loss = opt.loss_alpha * val_loss_sensors + (1 - opt.loss_alpha) * val_loss_euler
                 else:
                     val_loss = val_loss_euler
                 # val_loss = loss_fn(output, target)

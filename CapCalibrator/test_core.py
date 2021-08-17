@@ -17,22 +17,12 @@ def anchors_and_sensors():
     data = data[0]
     data = geometry.to_standard_coordinate_system(names, data)
     assert 0 in names
-    unsorted_origin_xyz = data[:names.index(0),
-                          :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
-    unsorted_origin_names = np.array(names[:names.index(0)])
+    unsorted_anchors_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+    unsorted_anchors_names = np.array(names[:names.index(0)])
     others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
     # these names are written in an order the algorithm expects (and MNI template data was written in)
-    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
-                                    "fp1", "fp2", "fz", "f3",
-                                    "f4", "f7", "f8", "cz",
-                                    "c3", "c4", "t3", "t4",
-                                    "pz", "p3", "p4", "t5",
-                                    "t6", "o1", "o2"])
-
-    # sort our anchors using the order above
-    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
-    origin_xyz = unsorted_origin_xyz[sorting_indices]
-    return [origin_xyz, others_xyz, selected_indices]
+    anchors_xyz, selected_indices = geometry.sort_anchors(unsorted_anchors_names, unsorted_anchors_xyz)
+    return [anchors_xyz, others_xyz, selected_indices]
 
 @pytest.fixture
 def network():
