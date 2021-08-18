@@ -111,7 +111,7 @@ class MyModel:
                                           lr=opt.lr,
                                           betas=(opt.beta1, 0.999),
                                           weight_decay=1e-5)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience=5)
         self.network.to(self.opt.device)
 
     def load_network(self, which_epoch):

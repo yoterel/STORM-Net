@@ -5,10 +5,12 @@ import logging
 import time
 import torch_src.torch_data as torch_data
 import torch_src.torch_model as torch_model
+import torch_src.torch_writer as torch_writer
 import numpy as np
 
 
 def train_loop(opt):
+    writer = torch_writer.Writer(opt)
     opt.is_train = True
     train_dataset = torch_data.MyDataLoader(opt)
     opt.is_train = False
@@ -19,11 +21,12 @@ def train_loop(opt):
     for epoch in range(opt.number_of_epochs):
         train_loss_total = []
         for batch_index, (input, target) in enumerate(train_dataset):
-
             output_sensors, output_euler = model.network(input)
             train_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
+            writer.write_scaler("batch", "train_loss_euler", train_loss_euler.cpu().detach().numpy(), batch_index)
             if opt.loss == "l2+projection":
                 train_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
+                writer.write_scaler("batch", "train_loss_projection", train_loss_sensors.cpu().detach().numpy(), batch_index)
                 train_loss = opt.loss_alpha*train_loss_sensors + (1 - opt.loss_alpha)*train_loss_euler
             else:
                 train_loss = train_loss_euler
@@ -37,12 +40,14 @@ def train_loop(opt):
                 model.optimizer.step()
                 model.optimizer.zero_grad()
             train_loss_np = train_loss.cpu().detach().numpy()
-            train_loss_total.append(train_loss_np)
+            writer.write_scaler("batch", "train_loss_total", train_loss_np, batch_index)
             logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
                                                                             batch_index,
                                                                             len(train_dataset) // opt.batch_size,
                                                                             train_loss_np))
+            train_loss_total.append(train_loss_np)
         train_loss_total = np.mean(np.array(train_loss_total))
+        writer.write_scaler("epoch", "train_loss_total", train_loss_total, epoch)
         logging.info("train: epoch: {}, training loss: {}".format(epoch,
                                                                   train_loss_total))
         model.save_network(which_epoch=str(epoch))
@@ -61,9 +66,11 @@ def train_loop(opt):
                 # val_loss = loss_fn(output, target)
                 val_loss_total.append(val_loss.cpu().detach().numpy())
             val_loss_total = np.mean(np.array(val_loss_total))
+            writer.write_scaler("epoch", "val_loss_total", val_loss_total, epoch)
             logging.info("validation: epoch: {}, loss: {}".format(epoch, val_loss_total))
-        model.scheduler.step(val_loss_total)
+        writer.write_scaler("epoch", "learning rate", model.optimizer.param_groups[0]['lr'], epoch)
         logging.info("lr: {}".format(model.optimizer.param_groups[0]['lr']))
+        model.scheduler.step(val_loss_total)
 
 
 
