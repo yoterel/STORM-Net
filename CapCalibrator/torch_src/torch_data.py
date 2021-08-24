@@ -32,15 +32,17 @@ class MyDataSet(torch.utils.data.Dataset):
             self.data = x_train
             self.labels = y_train
             self.labels[:, 1:] *= -1
-            self.data = self.data[:10000]
-            self.labels = {"rot_and_scale": self.labels[:10000]}
+            selector = 10000
+            self.data = self.data[:selector]
+            self.labels = {"rot_and_scale": self.labels[:selector]}
             # self.labels = {"rot_and_scale": self.labels}
         else:
             self.data = x_val
             self.labels = y_val
             self.labels[:, 1:] *= -1
-            self.data = self.data[:500]
-            self.labels = {"rot_and_scale": self.labels[:500]}
+            selector = 500
+            self.data = self.data[:selector]
+            self.labels = {"rot_and_scale": self.labels[:selector]}
             # self.labels = {"rot_and_scale": self.labels}
         self.transform_labels_to_point_cloud(save_result=True, force_recreate=False, use_gpu=True)
 

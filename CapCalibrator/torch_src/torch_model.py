@@ -7,52 +7,65 @@ import numpy as np
 from pathlib import Path
 import copy
 
-
+class Convd1d():
+    def __init__(self, input_size, output_size):
+        self.network = torch.nn.ModuleList([
+            nn.Conv1d(in_channels=input_size, out_channels=64, kernel_size=2),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=64, out_channels=128, kernel_size=2),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=128, out_channels=128, kernel_size=2),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(256, 16),
+            nn.ReLU(),
+            nn.Linear(16, output_size),
+                ])
+class FullyConnected():
+    def __init__(self, output_size):
+        self.network = torch.nn.ModuleList([
+            nn.Flatten(),
+            nn.Linear(140, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, output_size),
+        ])
 class MyNetwork(torch.nn.Module):
-    def __init__(self, opt):
+    def __init__(self, opt, mini_network=False):
         super(MyNetwork, self).__init__()
-        self.opt = copy.deepcopy(opt)
-        if opt.architecture == "fc":
-            self.net = torch.nn.ModuleList([
-                nn.Flatten(),
-                nn.Linear(140, 128),
-                nn.ReLU(),
-                nn.Linear(128, 64),
-                nn.ReLU(),
-                nn.Linear(64, 32),
-                nn.ReLU(),
-                nn.Linear(32, self.opt.network_output_size),
-            ])
-        elif opt.architecture == "1dconv":
-            self.net = torch.nn.ModuleList([
-                nn.Conv1d(in_channels=opt.network_input_size, out_channels=64, kernel_size=2),
-                nn.ReLU(),
-                nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2),
-                nn.ReLU(),
-                nn.MaxPool1d(2),
-                nn.Conv1d(in_channels=64, out_channels=128, kernel_size=2),
-                nn.ReLU(),
-                nn.Conv1d(in_channels=128, out_channels=128, kernel_size=2),
-                nn.ReLU(),
-                nn.Flatten(),
-                nn.Linear(256, 16),
-                nn.ReLU(),
-                nn.Linear(16, opt.network_output_size),
-            ])
+        self.mini_network = mini_network
+        if not self.mini_network:
+            self.opt = copy.deepcopy(opt)
+            if opt.architecture == "fc":
+                fc_network = FullyConnected(self.opt.network_output_size)
+                self.net = fc_network.network
+            elif opt.architecture == "1dconv":
+                conv1d_network = Convd1d(opt.network_input_size, opt.network_output_size)
+                self.net = conv1d_network.network
+            else:
+                raise NotImplementedError
+            if self.opt.loss == "l2+projection":
+                self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
         else:
-            raise NotImplementedError
-        if self.opt.loss == "l2+projection":
-            self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
+            conv1d_network = Convd1d(14, 3)
+            self.net = conv1d_network.network
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
         for i, layer in enumerate(self.net):
             x = layer(x)
         projected_out = None
-        if self.opt.loss == "l2+projection":
-            mat_out = self.euler_to_matrix(x)
-            transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
-            projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
+        if not self.mini_network:
+            if self.opt.loss == "l2+projection":
+                mat_out = self.euler_to_matrix(x)
+                transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
+                projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
         return projected_out, x
 
     def load_static_model(self):
