@@ -23,24 +23,27 @@ def train_loop(opt):
         for batch_index, (input, target) in enumerate(train_dataset):
             output_sensors, output_euler = model.network(input)
             train_loss_euler = torch.mean((target["rot_and_scale"] - output_euler) ** 2)
-            writer.write_scaler("batch", "train_loss_euler", train_loss_euler.cpu().detach().numpy(), batch_index)
+            writer.write_scaler("batch", "train_loss_euler", train_loss_euler.cpu().detach().numpy(), epoch*(len(train_dataset) // opt.batch_size) + batch_index)
             if opt.loss == "l2+projection":
                 train_loss_sensors = torch.mean(torch.linalg.norm(target["raw_projected_data"] - output_sensors, dim=2))
-                writer.write_scaler("batch", "train_loss_projection", train_loss_sensors.cpu().detach().numpy(), batch_index)
+                writer.write_scaler("batch", "train_loss_projection", train_loss_sensors.cpu().detach().numpy(), epoch*(len(train_dataset) // opt.batch_size) + batch_index)
                 train_loss = opt.loss_alpha*train_loss_sensors + (1 - opt.loss_alpha)*train_loss_euler
             else:
                 train_loss = train_loss_euler
+            if opt.batch_size == 1:
+                #divide loss by accumulation steps to have equivilant performance of using batch size = "batch_accumulation"
+                train_loss /= opt.batch_accumulation
             # train_loss = loss_fn(output, target["raw_projected_data"])
             train_loss.backward()
             if opt.batch_size == 1:
-                if batch_index % opt.batch_accumulatation == 0:
+                if batch_index % opt.batch_accumulation == 0:
                     model.optimizer.step()
                     model.optimizer.zero_grad()
             else:
                 model.optimizer.step()
                 model.optimizer.zero_grad()
             train_loss_np = train_loss.cpu().detach().numpy()
-            writer.write_scaler("batch", "train_loss_total", train_loss_np, batch_index)
+            writer.write_scaler("batch", "train_loss_total", train_loss_np, epoch*(len(train_dataset) // opt.batch_size) + batch_index)
             logging.info("train: epoch: {}, batch {} / {}, loss: {}".format(epoch,
                                                                             batch_index,
                                                                             len(train_dataset) // opt.batch_size,
@@ -80,9 +83,11 @@ def parse_arguments():
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
     parser.add_argument("--architecture", type=str, choices=["fc", "1dconv"], default="fc", help="Selects architecture")
     parser.add_argument("--loss", type=str, choices=["l2", "l2+projection"], help="loss function to use")
+    parser.add_argument('--loss_alpha', type=float, help='coefficient of projection loss if used')
     parser.add_argument("--gpu_ids", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
     parser.add_argument("--continue_train", action="store_true", help="continue from latest epoch")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for training")
+    parser.add_argument("--batch_accumulation", type=int, default=16, help="Batch accumulation (onyl valid if batch size=1)")
     parser.add_argument("--number_of_epochs", type=int, default=2000, help="Number of epochs for training loop")
     parser.add_argument("--lr", type=float, default=1e-5, help="learning rate for optimizer")
     parser.add_argument('--beta1', type=float, default=0.9, help='momentum term of adam')
@@ -112,9 +117,6 @@ def parse_arguments():
         args.device = torch.device('cpu')
     else:
         args.device = torch.device('cuda:{}'.format(args.gpu_ids))
-    if args.batch_size == 1:
-        args.batch_accumulatation = 16
-    args.loss_alpha = 0.9
     return args
 
 
