@@ -9,13 +9,15 @@ from scipy.spatial.transform import Rotation as R
 import utils
 import copy
 import itertools
+import torch.distributions as D
+
 
 class HeatMap(torch.nn.Module):
     """
     Layer to create a heatmap from a given set of landmarks
     """
 
-    def __init__(self, img_size, patch_size, device):
+    def __init__(self, img_size, patch_size, dont_use_gmm, device):
         """
 
         Parameters
@@ -24,12 +26,14 @@ class HeatMap(torch.nn.Module):
             the image size of the returned heatmap
         patch_size : int
             the patchsize to use
-
+        dont_use_gmm: dont use a gmm to create the heat maps, instead use "offsets" like in DAN (deep alignment network)
+        device: the device to operate over
         """
 
         super().__init__()
 
         self.img_shape = img_size
+        self.dont_use_gmm = dont_use_gmm
         self.half_size = patch_size // 2
         self.device = device
         self.offsets = torch.tensor(
@@ -41,8 +45,20 @@ class HeatMap(torch.nn.Module):
             )
         ).float().to(self.device)
 
+    def draw_gmm(self, landmarks):
+        valid_landmarks = torch.where(torch.all(landmarks != 0, dim=1))[0]
+        mix = D.Categorical(torch.ones(len(valid_landmarks), ).to(landmarks.device))
+        my_distri = D.Normal(landmarks[valid_landmarks], torch.ones((len(valid_landmarks), 2)).to(landmarks.device)*5)
+        comp = D.Independent(my_distri, 1)
+        gmm = D.MixtureSameFamily(mix, comp)
 
-    def draw_lmk_helper(self, landmark):
+        grid = torch.meshgrid(torch.arange(256), torch.arange(256))
+        stacked_grid = torch.dstack((grid[0], grid[1])).to(landmarks.device)
+        log_pdf = torch.exp(gmm.log_prob(stacked_grid))
+        heatmap = (log_pdf - torch.min(log_pdf)) / (torch.max(log_pdf) - torch.min(log_pdf))
+        return heatmap.unsqueeze(0)
+
+    def draw_offsets(self, landmark):
         """
         Draws a single point only
 
@@ -73,7 +89,7 @@ class HeatMap(torch.nn.Module):
         return img
 
 
-    def draw_landmarks(self, landmarks):
+    def draw_landmarks(self, landmarks, dont_use_gmm):
         """
         Draws a group of landmarks
 
@@ -88,20 +104,21 @@ class HeatMap(torch.nn.Module):
             the heatmap containing all landmarks
             (of shape ``1 x self.img_shape[0] x self.img_shape[1]``)
         """
+        if dont_use_gmm:
+            landmarks = landmarks.view(-1, 2)
+            # landmarks = landmarks.clone()
 
-        landmarks = landmarks.view(-1, 2)
-
-        # landmarks = landmarks.clone()
-
-        for i in range(landmarks.size(-1)):
-            landmarks[:, i] = torch.clamp(
-                landmarks[:, i].clone(),
-                self.half_size,
-                self.img_shape[1 - i] - 1 - self.half_size)
-
-        return torch.max(torch.cat([self.draw_lmk_helper(lmk.unsqueeze(0))
-                                    for lmk in landmarks], dim=0), dim=0,
-                         keepdim=True)[0]
+            for i in range(landmarks.size(-1)):
+                landmarks[:, i] = torch.clamp(
+                    landmarks[:, i].clone(),
+                    self.half_size,
+                    self.img_shape[1 - i] - 1 - self.half_size)
+            heatmap = torch.max(torch.cat([self.draw_offsets(lmk.unsqueeze(0)) for lmk in landmarks], dim=0),
+                                dim=0,
+                                keepdim=True)[0]
+        else:
+            heatmap = self.draw_gmm(landmarks)
+        return heatmap
 
 
     def forward(self, landmark_batch):
@@ -121,9 +138,9 @@ class HeatMap(torch.nn.Module):
             (of shape ``N x 1 x self.img_shape[0] x self.img_shape[1]``)
 
         """
-        x = torch.cat([self.draw_landmarks(landmarks).unsqueeze(0)
+        x = torch.cat([self.draw_landmarks(landmarks, self.dont_use_gmm)
                    for landmarks in landmark_batch], dim=0)
-        return x.squeeze()
+        return x
 
 
 class MyDataSet(torch.utils.data.Dataset):
@@ -162,7 +179,7 @@ class MyDataSet(torch.utils.data.Dataset):
             # self.labels = {"rot_and_scale": self.labels}
         self.transform_labels_to_point_cloud(save_result=True, force_recreate=False, use_gpu=True)
         if self.opt.architecture == "2dconv":
-            self.heat_mapper = HeatMap((256, 256), 16, self.opt.device)
+            self.heat_mapper = HeatMap((256, 256), 16, self.opt.dont_use_gmm, self.opt.device)
 
 
     def __getitem__(self, idx):

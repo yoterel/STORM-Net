@@ -83,6 +83,7 @@ def parse_arguments():
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
     parser.add_argument("--architecture", type=str, choices=["fc", "1dconv", "2dconv"], default="fc", help="Selects architecture")
     parser.add_argument("--loss", type=str, choices=["l2", "l2+projection"], help="loss function to use")
+    parser.add_argument("--dont_use_gmm", action="store_true", default=False, help="do not use gmm to create heatmaps")
     parser.add_argument('--loss_alpha', type=float, help='coefficient of projection loss if used')
     parser.add_argument("--gpu_ids", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
     parser.add_argument("--continue_train", action="store_true", help="continue from latest epoch")
