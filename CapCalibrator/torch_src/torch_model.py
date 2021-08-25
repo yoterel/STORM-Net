@@ -7,6 +7,33 @@ import numpy as np
 from pathlib import Path
 import copy
 
+
+class Convd2d():
+    def __init__(self, input_size, output_size):
+        self.network = torch.nn.ModuleList([
+            nn.Conv2d(in_channels=10, out_channels=64, kernel_size=(3, 3), padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3), padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(3, 3), padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv1d(in_channels=256, out_channels=512, kernel_size=(3, 3), padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Flatten(),
+            nn.Linear(131072, 16),
+            nn.ReLU(),
+            nn.Linear(16, output_size),
+                ])
+
+
 class Convd1d():
     def __init__(self, input_size, output_size):
         self.network = torch.nn.ModuleList([
@@ -24,6 +51,8 @@ class Convd1d():
             nn.ReLU(),
             nn.Linear(16, output_size),
                 ])
+
+
 class FullyConnected():
     def __init__(self, output_size):
         self.network = torch.nn.ModuleList([
@@ -36,6 +65,8 @@ class FullyConnected():
             nn.ReLU(),
             nn.Linear(32, output_size),
         ])
+
+
 class MyNetwork(torch.nn.Module):
     def __init__(self, opt, mini_network=False):
         super(MyNetwork, self).__init__()
@@ -48,6 +79,9 @@ class MyNetwork(torch.nn.Module):
             elif opt.architecture == "1dconv":
                 conv1d_network = Convd1d(opt.network_input_size, opt.network_output_size)
                 self.net = conv1d_network.network
+            elif opt.architecture == "2dconv":
+                conv2d_network = Convd2d(opt.network_input_size, opt.network_output_size)
+                self.net = conv2d_network.network
             else:
                 raise NotImplementedError
             if self.opt.loss == "l2+projection":
@@ -57,7 +91,8 @@ class MyNetwork(torch.nn.Module):
             self.net = conv1d_network.network
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)
+        if not self.opt.architecture == "2dconv":
+            x = x.permute(0, 2, 1)
         for i, layer in enumerate(self.net):
             x = layer(x)
         projected_out = None

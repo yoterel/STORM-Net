@@ -8,6 +8,122 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 import utils
 import copy
+import itertools
+
+class HeatMap(torch.nn.Module):
+    """
+    Layer to create a heatmap from a given set of landmarks
+    """
+
+    def __init__(self, img_size, patch_size, device):
+        """
+
+        Parameters
+        ----------
+        img_size : tuple
+            the image size of the returned heatmap
+        patch_size : int
+            the patchsize to use
+
+        """
+
+        super().__init__()
+
+        self.img_shape = img_size
+        self.half_size = patch_size // 2
+        self.device = device
+        self.offsets = torch.tensor(
+            list(
+                itertools.product(
+                    range(-self.half_size, self.half_size + 1),
+                    range(-self.half_size, self.half_size + 1)
+                )
+            )
+        ).float().to(self.device)
+
+
+    def draw_lmk_helper(self, landmark):
+        """
+        Draws a single point only
+
+        Parameters
+        ----------
+        landmark : :class:`torch.Tensor`
+            the landmarkto draw (of shape 1x2)
+
+        Returns
+        -------
+        :class:`torch.Tensor`
+            the heatmap containing one landmark
+            (of shape ``1 x self.img_shape[0] x self.img_shape[1]``)
+
+        """
+
+        img = torch.zeros(1, *self.img_shape, device=landmark.device)
+        if not torch.all(landmark == self.half_size):
+            int_lmk = landmark.to(torch.long)
+            locations = self.offsets.to(torch.long) + int_lmk
+            diffs = landmark - int_lmk.to(landmark.dtype)
+
+            offsets_subpix = self.offsets - diffs
+            vals = 1 / (1 + (offsets_subpix ** 2).sum(dim=1) + 1e-6).sqrt()
+
+            img[0, locations[:, 0], locations[:, 1]] = vals.clone()
+
+        return img
+
+
+    def draw_landmarks(self, landmarks):
+        """
+        Draws a group of landmarks
+
+        Parameters
+        ----------
+        landmarks : :class:`torch.Tensor`
+            the landmarks to draw (of shape Num_Landmarks x 2)
+
+        Returns
+        -------
+        :class:`torch.Tensor`
+            the heatmap containing all landmarks
+            (of shape ``1 x self.img_shape[0] x self.img_shape[1]``)
+        """
+
+        landmarks = landmarks.view(-1, 2)
+
+        # landmarks = landmarks.clone()
+
+        for i in range(landmarks.size(-1)):
+            landmarks[:, i] = torch.clamp(
+                landmarks[:, i].clone(),
+                self.half_size,
+                self.img_shape[1 - i] - 1 - self.half_size)
+
+        return torch.max(torch.cat([self.draw_lmk_helper(lmk.unsqueeze(0))
+                                    for lmk in landmarks], dim=0), dim=0,
+                         keepdim=True)[0]
+
+
+    def forward(self, landmark_batch):
+        """
+        Draws all landmarks from one batch element in one heatmap
+
+        Parameters
+        ----------
+        landmark_batch : :class:`torch.Tensor`
+            the landmarks to draw
+            (of shape ``N x Num_landmarks x 2``))
+
+        Returns
+        -------
+        :class:`torch.Tensor`
+            a batch of heatmaps
+            (of shape ``N x 1 x self.img_shape[0] x self.img_shape[1]``)
+
+        """
+        x = torch.cat([self.draw_landmarks(landmarks).unsqueeze(0)
+                   for landmarks in landmark_batch], dim=0)
+        return x.squeeze()
 
 
 class MyDataSet(torch.utils.data.Dataset):
@@ -45,12 +161,20 @@ class MyDataSet(torch.utils.data.Dataset):
             self.labels = {"rot_and_scale": self.labels[:selector]}
             # self.labels = {"rot_and_scale": self.labels}
         self.transform_labels_to_point_cloud(save_result=True, force_recreate=False, use_gpu=True)
+        if self.opt.architecture == "2dconv":
+            self.heat_mapper = HeatMap((256, 256), 16, self.opt.device)
+
 
     def __getitem__(self, idx):
         x = self.data[idx]
         # self.shuffle_timeseries(x)
         self.shuffle_data(x)
         self.center_data(x)
+        x_torch = torch.from_numpy(x).float().to(self.opt.device)
+        if self.opt.architecture == "2dconv":
+            x_torch[:, 0::2] *= 256
+            x_torch[:, 1::2] *= 256
+            x_torch = self.heat_mapper(x_torch.reshape(10, 7, 2))
         # if self.opt.is_train:
         #     self.mask_data(x)
         y1 = self.labels["rot_and_scale"][idx]
@@ -62,12 +186,24 @@ class MyDataSet(torch.utils.data.Dataset):
                            "raw_projected_data": y2_torch}
         else:
             y_to_return = {"rot_and_scale": y1_torch}
-        x_torch = torch.from_numpy(x).float().to(self.opt.device)
+
 
         return x_torch, y_to_return
 
     def __len__(self):
         return len(self.data)
+
+    # def landmarks_to_heatmaps(self):
+    #     from scipy.stats import multivariate_normal
+    #     for instance in self.data:
+    #
+    #
+    #     new_data = np.empty((len(self.data), 10, 256, 256), dtype=np.float32)
+    #     grid = np.dstack(np.mgrid[:256, :256])
+    #     for instance in self.data:
+    #         spots = multivariate_normal(mea)
+    #         heat_map =
+
 
     def transform_labels_to_point_cloud(self, save_result=True, force_recreate=False, use_gpu=False):
         projected_data_file = Path.joinpath(self.raw_data_file.parent, self.raw_data_file.stem + "_" + str(self.opt.is_train) + "_projected.pickle")
