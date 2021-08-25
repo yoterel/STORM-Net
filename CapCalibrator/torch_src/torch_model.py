@@ -68,27 +68,22 @@ class FullyConnected():
 
 
 class MyNetwork(torch.nn.Module):
-    def __init__(self, opt, mini_network=False):
+    def __init__(self, opt):
         super(MyNetwork, self).__init__()
-        self.mini_network = mini_network
-        if not self.mini_network:
-            self.opt = copy.deepcopy(opt)
-            if opt.architecture == "fc":
-                fc_network = FullyConnected(self.opt.network_output_size)
-                self.net = fc_network.network
-            elif opt.architecture == "1dconv":
-                conv1d_network = Convd1d(opt.network_input_size, opt.network_output_size)
-                self.net = conv1d_network.network
-            elif opt.architecture == "2dconv":
-                conv2d_network = Convd2d(opt.network_input_size, opt.network_output_size)
-                self.net = conv2d_network.network
-            else:
-                raise NotImplementedError
-            if self.opt.loss == "l2+projection":
-                self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
-        else:
-            conv1d_network = Convd1d(14, 3)
+        self.opt = copy.deepcopy(opt)
+        if opt.architecture == "fc":
+            fc_network = FullyConnected(self.opt.network_output_size)
+            self.net = fc_network.network
+        elif opt.architecture == "1dconv":
+            conv1d_network = Convd1d(opt.network_input_size, opt.network_output_size)
             self.net = conv1d_network.network
+        elif opt.architecture == "2dconv":
+            conv2d_network = Convd2d(opt.network_input_size, opt.network_output_size)
+            self.net = conv2d_network.network
+        else:
+            raise NotImplementedError
+        if self.opt.loss == "l2+projection":
+            self.anchors_xyz, self.sensors_xyz, self.selected_indices = self.load_static_model()
 
     def forward(self, x):
         if not self.opt.architecture == "2dconv":
@@ -96,11 +91,10 @@ class MyNetwork(torch.nn.Module):
         for i, layer in enumerate(self.net):
             x = layer(x)
         projected_out = None
-        if not self.mini_network:
-            if self.opt.loss == "l2+projection":
-                mat_out = self.euler_to_matrix(x)
-                transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
-                projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
+        if self.opt.loss == "l2+projection":
+            mat_out = self.euler_to_matrix(x)
+            transformed_sensors = torch.transpose(torch.bmm(mat_out, self.sensors_xyz.T.repeat(x.shape[0], 1, 1)), 1, 2)
+            projected_out = MNI_torch.torch_project(self.anchors_xyz, transformed_sensors, self.selected_indices)
         return projected_out, x
 
     def load_static_model(self):

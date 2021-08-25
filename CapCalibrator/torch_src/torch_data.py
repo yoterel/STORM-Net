@@ -185,8 +185,9 @@ class MyDataSet(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         x = self.data[idx]
         # self.shuffle_timeseries(x)
-        self.shuffle_data(x)
         self.center_data(x)
+        if not self.opt.architecture == "2dconv":
+            self.shuffle_data(x)
         x_torch = torch.from_numpy(x).float().to(self.opt.device)
         if self.opt.architecture == "2dconv":
             x_torch[:, 0::2] *= 256
