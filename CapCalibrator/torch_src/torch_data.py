@@ -47,15 +47,18 @@ class HeatMap(torch.nn.Module):
 
     def draw_gmm(self, landmarks):
         valid_landmarks = torch.where(torch.all(landmarks != 0, dim=1))[0]
-        mix = D.Categorical(torch.ones(len(valid_landmarks), ).to(landmarks.device))
-        my_distri = D.Normal(landmarks[valid_landmarks], torch.ones((len(valid_landmarks), 2)).to(landmarks.device)*5)
-        comp = D.Independent(my_distri, 1)
-        gmm = D.MixtureSameFamily(mix, comp)
+        if len(valid_landmarks):
+            mix = D.Categorical(torch.ones(len(valid_landmarks), ).to(landmarks.device))
+            my_distri = D.Normal(landmarks[valid_landmarks], torch.ones((len(valid_landmarks), 2)).to(landmarks.device)*5)
+            comp = D.Independent(my_distri, 1)
+            gmm = D.MixtureSameFamily(mix, comp)
 
-        grid = torch.meshgrid(torch.arange(256), torch.arange(256))
-        stacked_grid = torch.dstack((grid[0], grid[1])).to(landmarks.device)
-        log_pdf = torch.exp(gmm.log_prob(stacked_grid))
-        heatmap = (log_pdf - torch.min(log_pdf)) / (torch.max(log_pdf) - torch.min(log_pdf))
+            grid = torch.meshgrid(torch.arange(256), torch.arange(256))
+            stacked_grid = torch.dstack((grid[0], grid[1])).to(landmarks.device)
+            log_pdf = torch.exp(gmm.log_prob(stacked_grid))
+            heatmap = (log_pdf - torch.min(log_pdf)) / (torch.max(log_pdf) - torch.min(log_pdf))
+        else:
+            heatmap = torch.zeros((256, 256)).to(landmarks.device)
         return heatmap.unsqueeze(0)
 
     def draw_offsets(self, landmark):
@@ -149,7 +152,7 @@ class MyDataSet(torch.utils.data.Dataset):
         self.raw_data_file = opt.data_path / "data.pickle"
         if not self.raw_data_file.is_file():
             logging.info("loading raw data")
-            X, Y = file_io.load_raw_json_db(opt.data_path, False, False)
+            X, Y = file_io.load_raw_json_db(opt.data_path, opt.use_scale, False)
             logging.info("creating train-validation split")
             x_train, x_val, y_train, y_val = utils.split_data(X, Y, with_test_set=False)
             # X_train = np.expand_dims(X_train, axis=0)
@@ -164,7 +167,7 @@ class MyDataSet(torch.utils.data.Dataset):
         if self.opt.is_train:
             self.data = x_train
             self.labels = y_train
-            self.labels[:, 1:] *= -1
+            self.labels[:, 1:3] *= -1
             selector = 10000
             self.data = self.data[:selector]
             self.labels = {"rot_and_scale": self.labels[:selector]}
@@ -172,7 +175,7 @@ class MyDataSet(torch.utils.data.Dataset):
         else:
             self.data = x_val
             self.labels = y_val
-            self.labels[:, 1:] *= -1
+            self.labels[:, 1:3] *= -1
             selector = 500
             self.data = self.data[:selector]
             self.labels = {"rot_and_scale": self.labels[:selector]}
