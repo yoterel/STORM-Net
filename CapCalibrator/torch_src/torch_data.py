@@ -151,16 +151,16 @@ class MyDataSet(torch.utils.data.Dataset):
             logging.info("loading raw data")
             X, Y = file_io.load_raw_json_db(opt.data_path, False, False)
             logging.info("creating train-validation split")
-            x_train, x_val, y_train, y_val, x_test, y_test = utils.split_data(X, Y, with_test_set=True)
+            x_train, x_val, y_train, y_val = utils.split_data(X, Y, with_test_set=False)
             # X_train = np.expand_dims(X_train, axis=0)
             # X_val = np.expand_dims(X_val, axis=0)
             # y_train = np.expand_dims(y_train, axis=0)
             # y_val = np.expand_dims(y_val, axis=0)
             logging.info("saving train-validation split to: " + str(self.raw_data_file))
-            file_io.serialize_data(self.raw_data_file, x_train, x_val, y_train, y_val, x_test, y_test)
+            file_io.serialize_data(self.raw_data_file, x_train, x_val, y_train, y_val)
         else:
             logging.info("loading train-validation split from: " + str(self.raw_data_file))
-            x_train, x_val, y_train, y_val, x_test, y_test = file_io.deserialize_data(self.raw_data_file, with_test_set=True)
+            x_train, x_val, y_train, y_val = file_io.deserialize_data(self.raw_data_file, with_test_set=False)
         if self.opt.is_train:
             self.data = x_train
             self.labels = y_train
@@ -177,7 +177,8 @@ class MyDataSet(torch.utils.data.Dataset):
             self.data = self.data[:selector]
             self.labels = {"rot_and_scale": self.labels[:selector]}
             # self.labels = {"rot_and_scale": self.labels}
-        self.transform_labels_to_point_cloud(save_result=True, force_recreate=False, use_gpu=True)
+        if self.opt.loss == "l2+projection":
+            self.transform_labels_to_point_cloud(save_result=True, force_recreate=False, use_gpu=True)
         if self.opt.architecture == "2dconv":
             self.heat_mapper = HeatMap((256, 256), 16, self.opt.dont_use_gmm, self.opt.device)
 
