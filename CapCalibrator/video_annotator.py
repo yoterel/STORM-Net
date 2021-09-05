@@ -19,20 +19,39 @@ import draw
 import logging
 import webbrowser
 import render
-import train
+import config
+# import train
+
+
+def post_process_db(db):
+    perform_pad = False
+    perform_type_conversion = False
+    for key in db:
+        landmarks_per_frame = db[key][0]["data"].shape[-1] // 2
+        diff = config.max_number_of_landmarks_per_frames - landmarks_per_frame
+        if diff != 0:
+            if perform_pad:
+                temp = db[key][0]["data"][:, :, 6:].copy()
+                db[key][0]["data"] = np.pad(db[key][0]["data"], ((0, 0), (0, 0), (0, 2*diff)), 'constant')
+                db[key][0]["data"][:, :, 6:10] = 0
+                db[key][0]["data"][:, :, 10:] = temp
+    return db
 
 
 def annotate_videos(args):  # contains GUI mainloop
     if args.mode == "experimental":
         special_db = Path.joinpath(Path("cache"), "telaviv_db.pickle")
         new_db = file_io.load_full_db(special_db)
+        new_db = post_process_db(new_db)
         paths = []
         if args.video:
             if Path.is_file(args.video):
                 paths.append(args.video)
             else:
-                for file in args.video.glob("**/*.MP4"):
+                for file in args.video.glob("**/*.[mM][pP]4"):
                     paths.append(file)
+        if args.headless:
+            return new_db
     else:
         new_db = file_io.load_full_db()
         paths = None
@@ -149,7 +168,7 @@ class GUI(tk.Tk):
             elif msg[0] == "video_to_frames":
                 self.frames, self.indices, my_hash = msg[1:]
                 if my_hash not in self.db.keys():
-                    data = np.zeros((1, 10, 14))
+                    data = np.zeros((1, config.number_of_frames_per_video, config.max_number_of_landmarks_per_frames))
                     my_dict = {"data": data,
                                "label": np.array([0, 0, 0]),
                                "frame_indices": self.indices}
@@ -494,7 +513,7 @@ class GUI(tk.Tk):
         moves to next sticker and updates display of calibration page
         :return:
         """
-        if self.cur_sticker_index >= 12:
+        if self.cur_sticker_index >= 2*(config.max_number_of_landmarks_per_frames - 1):
             self.cur_sticker_index = 0
         else:
             self.cur_sticker_index += 2
@@ -543,7 +562,7 @@ class GUI(tk.Tk):
         auto annotates a video (in a different thread)
         :return:
         """
-        if not np.array_equal(self.db[self.get_cur_video_hash()][self.shift]["data"], np.zeros((1, 10, 14))):
+        if np.any(self.db[self.get_cur_video_hash()][self.shift]["data"]):
             result = messagebox.askquestion("Manual Annotation Detected",
                                             "Are you sure you want to automaticaly annotate the frames? current manual annotations will be lost.",
                                             icon='warning')
@@ -556,7 +575,7 @@ class GUI(tk.Tk):
         calculates calibration from a video (in a different thread)
         :return:
         """
-        if np.array_equal(self.db[self.get_cur_video_hash()][self.shift]["data"], np.zeros((1, 10, 14))):
+        if not np.any(self.db[self.get_cur_video_hash()][self.shift]["data"]):
             result = messagebox.askquestion("No Annotation Detected",
                                             "Are you sure you want to calibrate? frames seem to be not annotated.",
                                             icon='warning')
@@ -601,7 +620,7 @@ class GUI(tk.Tk):
         self.take_async_action(["shift_video", self.paths[self.cur_video_index], new_indices])
 
     def next_frame(self, event=None):
-        if self.cur_frame_index < 9:
+        if self.cur_frame_index < config.number_of_frames_per_video - 1:
             self.cur_frame_index += 1
             self.cur_sticker_index = 0
             self.panels[CalibrationPage].update_canvas()
@@ -1030,11 +1049,12 @@ class CalibrationPage(tk.Frame):
         cur_video_hash = self.controller.get_cur_video_hash()
         template_name = self.controller.get_template_model_file_name()
         storm_net_name = self.controller.get_pretrained_stormnet_path()
-        db_to_show = np.zeros((7, 2))
+        sticker_names = config.gui_sticker_names
+        num_of_stickers = len(sticker_names)
+        db_to_show = np.zeros((num_of_stickers, 2))
         if db:
             if cur_video_hash in db.keys():
-                db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :], (7, 2))
-        sticker_names = ["Left Eye", "Nose Tip", "Right Eye", "CAP1", "CAP2", "CAP3", "CAP4"]
+                db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :2*num_of_stickers], (num_of_stickers, 2))
 
         my_string = "Template Model File: \n{}".format(template_name)
         label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
@@ -1052,7 +1072,7 @@ class CalibrationPage(tk.Frame):
         label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
         label.pack(fill="x")
 
-        for i in range(7):
+        for i in range(len(sticker_names)):
             my_string = "{}: {},{}".format(sticker_names[i], int(db_to_show[i, 0]), int(db_to_show[i, 1]))
             if i == cur_sticker_index // 2:
                 sticker_label = tk.Label(self.data_panel, text=my_string, bg="gray", width=15, anchor="w", pady=pad_y)

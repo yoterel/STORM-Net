@@ -197,10 +197,24 @@ def get_rmse(A, B):
     :param B: nx3 point cloud
     :return: rmse
     """
-    assert len(A.shape) == 2
-    assert len(B.shape) == 2
+    assert len(A.shape) == 2 and len(B.shape) == 2
     rmse = np.mean(np.linalg.norm((A - B).astype(np.float), axis=1))
     return rmse
+
+
+def batch_get_rmse(A, B):
+    """
+    gets rmse between a point cloud nx3 to a batch of point clouds b x n x 3
+    :param A:
+    :param B:
+    :return: b x 1 numpy array of rmse's
+    """
+    assert (len(A.shape) == 2 and len(B.shape) == 3) or (len(A.shape) == 3 and len(B.shape) == 2)
+    A = A.astype(np.float)
+    B = B.astype(np.float)
+    rmse = np.mean(np.linalg.norm(A - B, axis=-1), axis=-1)
+    return rmse
+
 
 
 def fix_yaw(names, data):
@@ -384,7 +398,7 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, 
     return projected_locations
 
 
-def sort_anchors(unsorted_anchors_names, unsorted_anchors_xyz):
+def sort_anchors(unsorted_anchors_names: np.ndarray, unsorted_anchors_xyz: np.ndarray):
     """
     sorts anchors according to expected order from MNi projection algorithm
     :param unsorted_anchors_names: names of anchors
@@ -401,7 +415,12 @@ def sort_anchors(unsorted_anchors_names, unsorted_anchors_xyz):
 
     # sort our anchors using the order above
     selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_anchors_names[None, :])
-    origin_xyz = unsorted_anchors_xyz[sorting_indices]
+    if unsorted_anchors_xyz.ndim == 2:
+        origin_xyz = unsorted_anchors_xyz[sorting_indices]
+    elif unsorted_anchors_xyz.ndim == 3:
+        origin_xyz = unsorted_anchors_xyz[:, sorting_indices, :]
+    else:
+        raise NotImplementedError
     return origin_xyz, selected_indices
 
 def clean_model(names, data, threshold=0.3):

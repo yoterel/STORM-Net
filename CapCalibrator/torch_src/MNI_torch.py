@@ -1,6 +1,7 @@
 import numpy as np
 from pathlib import Path
 import torch
+import logging
 
 
 def torch_find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN, resource_folder="resource"):
@@ -123,12 +124,12 @@ def torch_project(origin_xyz, others_xyz, selected_indices, resource_folder="res
                                                                  pointN,
                                                                  resource_folder)
         if torch.any(torch.isnan(others_transformed_to_ref)):
-            print("nans in torch affine !!")
+            logging.info("nans in torch affine !!")
         # XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
         # XYZ = torch.FloatTensor(XYZ, device=others_xyz.device)
         projected_sensors = torch_find_closest_on_surface(others_transformed_to_ref, refN, pointN, soft_dist_func="softkmin", resource_folder=resource_folder)
         if torch.any(torch.isnan(projected_sensors)):
-            print("nans in torch project !!")
+            logging.info("nans in torch project !!")
         others_xyz[i] = projected_sensors
     return others_xyz
 
@@ -298,15 +299,18 @@ def torch_project_non_differentiable(origin_xyz, others_xyz, selected_indices, o
                               "t6", "o1", "o2"]
     :param output_errors: whether to output error in estimation as well.
     :param resource_folder: relative path to the fodler with the raw template data
-    :return: otherC - others transformed to MNI of ideal head  (cortical surface)
-             otherCSD - transformation standard deviation per axis, point manner (for otherC).
+    :return: others_batched - others transformed to MNI of ideal head  (cortical surface)
+             others_sd_batched - standard deviation error per axis, point manner (for others_batched).
                         Last channel is SD across all axes (root sum of squares).
              ref - others projected onto cortical surface without nearest neighbor search on the average template
     """
     refN = 17  # number of reference brains
     batch_size = others_xyz.shape[0]  # number of sensors to project
     pointN = others_xyz.shape[1]  # number of sensors to project
+    others_batched = torch.empty((batch_size, pointN, 3))
+    others_sd_batched = torch.empty((batch_size, pointN, 4))
     for i in range(batch_size):
+        logging.info("projected {} / {} batches".format(i, batch_size))
         others_transformed_to_ref = torch_find_affine_transforms_non_diff(origin_xyz,
                                                            others_xyz[i],
                                                            selected_indices,
@@ -318,5 +322,6 @@ def torch_project_non_differentiable(origin_xyz, others_xyz, selected_indices, o
         XYZ = torch.FloatTensor(XYZ).to(others_xyz.device)
         # get closest points of projected sensors on average cortical surface
         otherC, otherCV, otherCSD = torch_find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN, output_errors)
-
-    return otherC, otherCSD, torch.mean(others_projected_to_ref, dim=0)
+        others_batched[i] = otherC
+        others_sd_batched[i] = otherCSD
+    return others_batched.squeeze(), others_sd_batched.squeeze(), torch.mean(others_projected_to_ref, dim=0)

@@ -3,7 +3,7 @@ import imageio
 from PIL import Image
 from pathlib import Path
 import utils
-
+import config
 import file_io
 import logging
 
@@ -144,12 +144,12 @@ def process_video(args):
     if Path.is_dir(vid_paths):
         vid_names = []
         vid_hashes = []
-        for file in sorted(vid_paths.glob("**/*.MP4")):
+        for file in sorted(vid_paths.glob("**/*.[mM][pP]4")):
             name = file.parent.name + "_" + file.name
             vid_names.append(name)
             vid_hashes.append(utils.md5_from_vid(file))
         logging.info("Found following video files: " + str(vid_names))
-        data = np.zeros((len(vid_names), 10, 14))
+        data = np.zeros((len(vid_names), config.number_of_frames_per_video, config.max_number_of_landmarks_per_frames * 2))
         for i, vid in enumerate(vid_hashes):
             try:
                 data[i] = new_db[vid][0]["data"]

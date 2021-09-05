@@ -1,5 +1,4 @@
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import utils
 import argparse
 from pathlib import Path
 import video
@@ -21,6 +20,11 @@ def parse_arguments():
     parser.add_argument("--mni", action="store_true",
                         help="If specified, output will be projected to (adult) MNI coordinates")
     parser.add_argument("-stormnet", "--storm_net", default="models/telaviv_model_b16.h5", help="A path to a trained storm net keras model")
+    parser.add_argument("--model_type",
+                        type=str,
+                        choices=["tf", "torch"],
+                        default="tf",
+                        help="type of network model file")
     parser.add_argument("-unet", "--u_net", default="models/unet_tel_aviv.h5",
                         help="A path to a trained segmentation network model")
     parser.add_argument("-s", "--session_file",
@@ -29,12 +33,15 @@ def parse_arguments():
     parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     parser.add_argument("-log", "--log", help="If specified, log will be output to this file")
     parser.add_argument("-gt", "--ground_truth", help="Use this in experimental mode only")
-    parser.add_argument("--gpu_id", type=str, default='-1', help="Which GPU to use (or -1 for cpu)")
+    parser.add_argument("--gpu_id", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
+    parser.add_argument("--headless", action="store_true",
+                        help="Force no gui")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
+
     args = parser.parse_args()
-    if args.mode == "gui":
+    if args.mode == "gui" and not args.headless:
         args.video = None
         args.template = None
         args.output_file = None
@@ -62,24 +69,6 @@ def parse_arguments():
     return args
 
 
-def configure_compute_environment(gpu_id):
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id  # set gpu visibility prior to importing tf and keras
-    global tf
-    import tensorflow as tf
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-        try:
-            # Currently, memory growth needs to be the same across GPUs
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-            logging.info("Physical GPUs: {}, Logical GPUs: {}".format(len(gpus), len(logical_gpus)))
-        except RuntimeError as e:
-            # Memory growth must be set before GPUs have been initialized
-            logging.info(e)
-
-
 if __name__ == "__main__":
     # parse command line
     args = parse_arguments()
@@ -89,7 +78,7 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=args.verbosity.upper())
     # configure computing environment
-    configure_compute_environment(args.gpu_id)
+    args.gpu_id = utils.configure_compute_environment(args.gpu_id)
     # run GUI / automatic annotation
     sticker_locations, video_names = video.process_video(args)
     if args.mode == "auto":

@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 import utils
 import file_io
-import tf_file_io
+import data_augmentations
 
 
 class Arrow3D(FancyArrowPatch):
@@ -134,7 +134,7 @@ def visualize_annotated_data(db_path, synth_data_path, filter=None):
     db = file_io.load_db(db_path, "pickle", filter)
     synth_db = file_io.load_raw_json_db(synth_data_path)
     synth_db = synth_db[0]  # selects data, discards label
-    utils.center_data(synth_db)
+    data_augmentations.center_data(synth_db)
     shift = 0
     for key in db.keys():
         data = db[key][shift]["data"][0]
@@ -142,7 +142,7 @@ def visualize_annotated_data(db_path, synth_data_path, filter=None):
             data = np.expand_dims(data, axis=0)
         data[:, :, 0::2] /= 960
         data[:, :, 1::2] /= 540
-        utils.center_data(data)
+        data_augmentations.center_data(data)
         data = np.squeeze(data)
         closest_synth_image = np.argmin(np.sum((synth_db - data)**2, axis=(1, 2)))
         selected_synth_data = synth_db[closest_synth_image]
@@ -329,6 +329,7 @@ def visualize_network_performance(model_name, root_dir):
     :return:
     """
     #############################################################
+    import tf_file_io
     db_path = Path("data", "full_db.pickle")
     gt = file_io.load_db(db_path)
     vid_name = "GX011578.MP4"
