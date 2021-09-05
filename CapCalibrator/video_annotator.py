@@ -31,10 +31,10 @@ def post_process_db(db):
         diff = config.max_number_of_landmarks_per_frames - landmarks_per_frame
         if diff != 0:
             if perform_pad:
-                temp = db[key][0]["data"][:, :, 6:].copy()
+                temp = db[key][0]["data"][:, :, 10:].copy()
                 db[key][0]["data"] = np.pad(db[key][0]["data"], ((0, 0), (0, 0), (0, 2*diff)), 'constant')
-                db[key][0]["data"][:, :, 6:10] = 0
-                db[key][0]["data"][:, :, 10:] = temp
+                db[key][0]["data"][:, :, 10:12] = 0
+                db[key][0]["data"][:, :, 12:] = temp
     return db
 
 
