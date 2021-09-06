@@ -196,7 +196,7 @@ class MyDataSet(torch.utils.data.Dataset):
         if self.opt.architecture == "2dconv":
             x_torch[:, 0::2] *= 256
             x_torch[:, 1::2] *= 256
-            x_torch = self.heat_mapper(x_torch.reshape(10, 7, 2))
+            x_torch = self.heat_mapper(x_torch.reshape(10, -1, 2))
         # if self.opt.is_train:
         #     self.mask_data(x)
         y1 = self.labels["rot_and_scale"][idx]
