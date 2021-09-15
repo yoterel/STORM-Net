@@ -30,7 +30,7 @@ public class textUpdater : MonoBehaviour
         {
             GameObject obj = GameObject.Find(names[i]);
             var direction = (Camera.main.transform.position - obj.transform.position).normalized;
-            if (Vector3.Dot(obj.transform.up, direction) >= 0)
+            if (Vector3.Dot(obj.transform.up, direction) >= Globals.getCosineThreshold())
             {
                 valid_stickers[i] = true;
             }

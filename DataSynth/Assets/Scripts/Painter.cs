@@ -131,7 +131,7 @@ public class Painter : MonoBehaviour
             for (int i = 0; i < landmarks.Count; i++)
             {
                 var direction = (Camera.main.transform.position - landmarks[i].transform.position).normalized;
-                if (Vector3.Dot(landmarks[i].transform.up, direction) >= 0)
+                if (Vector3.Dot(landmarks[i].transform.up, direction) >= Globals.getCosineThreshold())
                 {
                     valid_stickers[i] = true;
                 }
