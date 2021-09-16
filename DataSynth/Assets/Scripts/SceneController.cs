@@ -11,7 +11,9 @@ public class SceneController : MonoBehaviour
     private bool saveData;
     private bool shiftCamera;
     private bool rotateCamera;
-    private bool scaleFace;
+    private bool scaleFaceX;
+    private bool scaleFaceY;
+    private bool scaleFaceZ;
     private string inputFile;
     private string outputFolder;
     //private parameters
@@ -108,10 +110,24 @@ void Awake()
         {
             rotateCamera = true;
         }
+        scaleFaceX = false;
+        scaleFaceY = false;
+        scaleFaceZ = false;
         iterationsString = GetArg("-scale");
-        if (!bool.TryParse(iterationsString, out scaleFace))
+        if (!string.IsNullOrEmpty(iterationsString))
         {
-            scaleFace = false;
+            if (iterationsString.Contains("x") || iterationsString.Contains("X"))
+            {
+                scaleFaceX = true;
+            }
+            if (iterationsString.Contains("y") || iterationsString.Contains("Y"))
+            {
+                scaleFaceY = true;
+            }
+            if (iterationsString.Contains("z") || iterationsString.Contains("Z"))
+            {
+                scaleFaceZ = true;
+            }
         }
         iterationsString = GetArg("-input_file");
         if (string.IsNullOrEmpty(iterationsString))
@@ -136,7 +152,9 @@ void Awake()
         System.Console.WriteLine("Saving data to disk == {0}", saveData);
         System.Console.WriteLine("Camera shift enabled == {0}", shiftCamera);
         System.Console.WriteLine("Camera rotation enabled == {0}", rotateCamera);
-        System.Console.WriteLine("Scaling face enabled== {0}", scaleFace);
+        System.Console.WriteLine("Scaling face X enabled== {0}", scaleFaceX);
+        System.Console.WriteLine("Scaling face Y enabled== {0}", scaleFaceY);
+        System.Console.WriteLine("Scaling face Z enabled== {0}", scaleFaceZ);
         System.Console.WriteLine("Input file: " + inputFile);
         System.Console.WriteLine("Output folder: " + outputFolder);
     }
@@ -318,13 +336,22 @@ void Awake()
             nosetip.transform.position = temp;
         }
         //set face scale
-        if (scaleFace)
+        float randxscale = 1.0f;
+        float randyscale = 1.0f;
+        float randzscale = 1.0f;
+        if (scaleFaceX)
         {
-            float randxscale = Random.Range(0.7f, 1.3f);
-            float randyscale = Random.Range(0.7f, 1.3f);
-            float randzscale = Random.Range(0.7f, 1.3f);
-            face.transform.localScale = new Vector3(randxscale, randyscale, randzscale);
+            randxscale = Random.Range(0.7f, 1.3f);
         }
+        if (scaleFaceY)
+        {
+            randyscale = Random.Range(0.7f, 1.3f);
+        }
+        if (scaleFaceZ)
+        {
+            randzscale = Random.Range(0.7f, 1.3f);
+        }
+        face.transform.localScale = new Vector3(randxscale, randyscale, randzscale);
     }
     void setMaskProperties()
     {

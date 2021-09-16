@@ -54,7 +54,7 @@ def launch_renderer(exe_path, log_path, iterations, template, output, images, sc
           " -output_folder {}".format(str(output.resolve())) +\
           " -batchmode"
     if scale_faces:
-        cmd += " -scale True"
+        cmd += " -scale {}".format(scale_faces)
     if images:
         cmd += " -save_image True"
     try:
