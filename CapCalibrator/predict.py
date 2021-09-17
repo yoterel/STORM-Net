@@ -15,8 +15,8 @@ import torch_src.torch_data as torch_data
 
 class Options:
     def __init__(self, device):
-        self.network_input_size = 14
-        self.network_output_size = 3
+        self.network_input_size = 10
+        self.network_output_size = 6
         self.template = Path("../example_models/example_model.txt")
         self.architecture = "2dconv"
         self.loss = "l2"
@@ -49,23 +49,19 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     # else:
     model_full_path = Path(args.storm_net)
     if args.model_type == "torch":
-        if args.gpu_id == "-1":
-            device = "cpu"
-        else:
-            device = "cuda:{}".format(str(args.gpu_id))
-        opt = Options(device=device)
+        opt = Options(device=args.gpu_id)
         network = torch_model.MyNetwork(opt)
-        state_dict = torch.load(model_full_path, map_location=device)
+        state_dict = torch.load(model_full_path, map_location=args.gpu_id)
         if hasattr(state_dict, '_metadata'):
             del state_dict._metadata
         network.load_state_dict(state_dict)
-        heat_mapper = torch_data.HeatMap((256, 256), 16, False, device)
-        x = torch.from_numpy(sticker_locations).to(device).float()
+        heat_mapper = torch_data.HeatMap((256, 256), 16, False, args.gpu_id)
+        x = torch.from_numpy(sticker_locations).to(args.gpu_id).float()
         x[:, :, 0::2] *= 256
         x[:, :, 1::2] *= 256
-        y_predict = torch.empty((len(x), 3), dtype=torch.float, device=device)
+        y_predict = torch.empty((len(x), opt.network_output_size), dtype=torch.float, device=args.gpu_id)
         for i in range(len(x)):
-            heatmap = heat_mapper(x[i].reshape(10, 7, 2))
+            heatmap = heat_mapper(x[i].reshape(10, x[i].shape[-1] // 2, 2))
             with torch.no_grad():
                 _, pred = network(heatmap.unsqueeze(0))
                 y_predict[i] = pred
@@ -87,9 +83,9 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
         rot = R.from_euler('xyz', [y_predict[i][0], y_predict[i][1], y_predict[i][2]], degrees=True)
         scale_mat = np.identity(3)
         if y_predict.shape[-1] > 3:
-            scale_mat[0, 0] = y_predict[0][3]  # xscale
-            scale_mat[1, 1] = y_predict[0][4]  # yscale
-            scale_mat[2, 2] = y_predict[0][5]  # zscale
+            scale_mat[0, 0] = y_predict[i][3]  # xscale
+            scale_mat[1, 1] = y_predict[i][4]  # yscale
+            scale_mat[2, 2] = y_predict[i][5]  # zscale
         rotation_mat = rot.as_matrix()
         rs.append(rotation_mat)
         sc.append(scale_mat)

@@ -76,12 +76,12 @@ def train_loop(opt):
         model.scheduler.step(val_loss_total)
 
 
-
 def parse_arguments():
     parser = argparse.ArgumentParser(description='This script trains STORM-Net')
     parser.add_argument("experiment_name", help="The name to give the experiment")
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
     parser.add_argument("--architecture", type=str, choices=["fc", "1dconv", "2dconv"], default="fc", help="Selects architecture")
+    parser.add_argument("--force_load_data", action="store_true", help="Forces loading data from disk (recreates train/val/test splits)")
     parser.add_argument("--loss", type=str, choices=["l2", "l2+projection"], help="loss function to use")
     parser.add_argument("--use_scale", action="store_true", default=False, help="network must predict scale also")
     parser.add_argument("--dont_use_gmm", action="store_true", default=False, help="do not use gmm to create heatmaps")

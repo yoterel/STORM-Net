@@ -128,7 +128,7 @@ def do_opt2dig_experiment(digi_ses1, digi_ses2, grid_search, rots, scales, video
 
 def do_parameter_grid_search_experiment(opt):
     """
-    experiement to use an exhaustive search of paramter space to find optimal rotation and scale of template model
+    experiement to use an exhaustive search of parameter space to find optimal rotation and scale of template model
     applies transform from before MNI projection.
     :param opt command line options
     :return:
@@ -225,7 +225,7 @@ def reproduce_experiments(video_names, sticker_locations, args):
     :return: -
     """
     # do_network_robustness_test(sticker_locations, args)
-    # r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
+    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
     grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
     # do_MNI_sensitivity_experiment(args.template)
     do_digi_error_experiment()

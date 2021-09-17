@@ -11,7 +11,7 @@ import copy
 class Convd2d():
     def __init__(self, input_size, output_size):
         self.network = torch.nn.ModuleList([
-            nn.Conv2d(in_channels=10, out_channels=64, kernel_size=(3, 3), padding=1),
+            nn.Conv2d(in_channels=input_size, out_channels=64, kernel_size=(3, 3), padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
