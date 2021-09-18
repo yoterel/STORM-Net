@@ -81,7 +81,7 @@ def parse_arguments():
     parser.add_argument("experiment_name", help="The name to give the experiment")
     parser.add_argument("data_path", help="The path to the folder containing the synthetic data")
     parser.add_argument("--architecture", type=str, choices=["fc", "1dconv", "2dconv"], default="fc", help="Selects architecture")
-    parser.add_argument("--force_load_data", action="store_true", help="Forces loading data from disk (recreates train/val/test splits)")
+    parser.add_argument("--force_load_raw_data", action="store_true", help="Forces loading data from disk (recreates train/val/test splits)")
     parser.add_argument("--loss", type=str, choices=["l2", "l2+projection"], help="loss function to use")
     parser.add_argument("--scale_faces", type=str, choices=["x", "y", "z", "xy", "xz", "yz", "xyz"], help="Renderer will also apply different scales to the virtual head & mask")
     parser.add_argument("--dont_use_gmm", action="store_true", default=False, help="do not use gmm to create heatmaps")

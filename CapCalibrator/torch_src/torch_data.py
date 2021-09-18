@@ -149,8 +149,12 @@ class HeatMap(torch.nn.Module):
 class MyDataSet(torch.utils.data.Dataset):
     def __init__(self, opt):
         self.opt = copy.deepcopy(opt)
-        self.raw_data_file = opt.data_path / "data.pickle"
-        if not self.raw_data_file.is_file() or self.opt.force_load_data:
+        if self.opt.is_train:
+            my_str = "train"
+        else:
+            my_str = "val"
+        self.raw_data_file = opt.data_path / "data_{}.pickle".format(my_str)
+        if not self.raw_data_file.is_file() or self.opt.force_load_raw_data:
             logging.info("loading raw data")
             X, Y = file_io.load_raw_json_db(opt.data_path, opt.scale_faces, False)
             logging.info("creating train-validation split")
@@ -340,21 +344,12 @@ class MyDataLoader:
     def __init__(self, opt):
         self.opt = copy.deepcopy(opt)
         self.dataset = MyDataSet(opt)
-        if self.opt.is_train:
-            self.dataloader = torch.utils.data.DataLoader(
-                self.dataset,
-                batch_size=opt.batch_size,
-                shuffle=True,
-                num_workers=int(opt.num_threads)
-            )
-        else:
-            self.dataloader = torch.utils.data.DataLoader(
-                self.dataset,
-                batch_size=opt.batch_size,
-                shuffle=False,
-                num_workers=int(opt.num_threads)
-            )
-
+        self.dataloader = torch.utils.data.DataLoader(
+            self.dataset,
+            batch_size=opt.batch_size,
+            shuffle=self.opt.is_train,
+            num_workers=int(opt.num_threads)
+        )
     def __len__(self):
         return len(self.dataset)
 
