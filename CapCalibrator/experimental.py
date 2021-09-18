@@ -231,7 +231,7 @@ def reproduce_experiments(video_names, sticker_locations, args):
     do_digi_error_experiment()
     dig_ses1, dig_ses2, sessions = do_dig2dig_experiment(args.template, args.ground_truth)
     do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)
-    vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args.template, video_names, r_matrix, s_matrix)
+    vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args, video_names, r_matrix, s_matrix, force_project=True)
     # vid_ses1, vid_ses2 = do_vid2vid_project_afterMNI_experiment(args.template, video_names, r_matrix, s_matrix)
     do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
@@ -427,7 +427,7 @@ def do_vid2vid_project_afterMNI_experiment(template_path, video_names, r_matrice
            [output_others_names, vid_ses2_transformed[:, output_selector, :]]
 
 
-def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matrices, s_matrices, digi_sessions=None):
+def do_vid2vid_project_beforeMNI_experiment(opt, video_names, r_matrices, s_matrices, force_project=False):
     """
     experiement to compare intra-method error between video sessions
     applies transform from network before MNI projection
@@ -438,6 +438,7 @@ def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matric
     :param digi_sessions: pass this to use anchors from digitizer
     :return:
     """
+    template_path = opt.template
     names, data, format, _ = read_template_file(template_path)
     names = names[0]
     data = data[0]
@@ -446,48 +447,59 @@ def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matric
     others_names = output_others_names + names[names.index(0):]
     origin_names = ["leftear", "rightear", "nosebridge", "cz"]
     full_names = origin_names + others_names
-    sessions = [[], []]
-    for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrices, s_matrices, video_names)):
-        subject_name, session_name = vid.split("_")
-        session_number = int(re.findall(r'\d+', session_name)[0]) - 1
-        if session_number == 2:
-            continue
-        origin_selector = tuple([names.index(x) for x in origin_names])
-        origin = data[origin_selector, :]
-        others_selector = tuple([names.index(x) for x in others_names])
-        others = data[others_selector, :]
-        others = (rot_mat @ (scale_mat @ others.T)).T  # apply transform before MNI projection, but before digi transform if applicaple
-        if digi_sessions:
-            digi_origin_selector = tuple([digi_sessions[0][0][0].index(x) for x in origin_names])
-            digi_origin = digi_sessions[session_number][i//3][1][digi_origin_selector, :]
-            W = geometry.affine_transform_3d_nparray(origin, digi_origin)
-            # testing
-            # W_test = geometry.affine_transform_3d_nparray(digi_origin, origin)
-            # new_origin_affine = np.matmul(np.c_[digi_origin, np.ones(len(digi_origin))], W_test)[:, :-1]
-            # r, t = geometry.rigid_transform_3d_nparray(digi_origin, origin)
-            # new_origin_rigid = (r @ (digi_origin.T)).T + t
-            # import draw
-            # draw.visualize_2_pc(points_red=new_origin_affine, points_blue=origin)
-            # draw.visualize_2_pc(points_red=new_origin_rigid, points_blue=origin)
-            # logging.debug(W)
-            # testing
-            others = np.matmul(np.c_[others, np.ones(len(others))], W)[:, :-1]
-            origin = digi_origin
-        sessions[session_number].append([full_names, np.vstack((origin, others))])
     cached_result_ses1 = "cache/session1_vid_MNI_transb"
     cached_result_ses2 = "cache/session2_vid_MNI_transb"
-    if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
-        vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
-        vid_ss_data_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
-        np.save(cached_result_ses1, vid_ss_data_ses1)
-        vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
-        vid_ss_data_ses2 = np.array([x[1] for x in vid_projected_ses2], dtype=np.object)
-        np.save(cached_result_ses2, vid_ss_data_ses2)
+    if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file() or force_project:
+        if opt.gpu_id == "cpu":
+            sessions = [[], []]
+            for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrices, s_matrices, video_names)):
+                subject_name, session_name = vid.split("_")
+                session_number = int(re.findall(r'\d+', session_name)[0]) - 1
+                if session_number == 2:
+                    continue
+                origin_selector = tuple([names.index(x) for x in origin_names])
+                origin = data[origin_selector, :]
+                others_selector = tuple([names.index(x) for x in others_names])
+                others = data[others_selector, :]
+                others = (rot_mat @ (
+                            scale_mat @ others.T)).T  # apply transform before MNI projection, but before digi transform if applicaple
+                sessions[session_number].append([full_names, np.vstack((origin, others))])
+            vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
+            anchors_and_sensors_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.float)
+            vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
+            anchors_and_sensors_ses2 = np.array([x[1] for x in vid_projected_ses2], dtype=np.float)
+        else:
+            origin_selector = tuple([names.index(x) for x in origin_names])
+            others_selector = tuple([names.index(x) for x in others_names])
+            anchors = data[origin_selector, :]
+            sensors = data[others_selector, :]
+            transformed_sensors = (np.array(r_matrices) @ (np.array(s_matrices) @ sensors.T)).transpose(0, 2, 1)
+            sorted_anchors, indices = geometry.sort_anchors(np.array(origin_names), anchors)
+            device = opt.gpu_id
+            origin_xyz_torch = torch.from_numpy(sorted_anchors).float().to(device)
+            sensors_xyz_torch = torch.from_numpy(transformed_sensors).float().to(device)
+            selected_indices_torch = torch.from_numpy(indices).to(device)
+            ses1_torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                              sensors_xyz_torch[::3, :, :],
+                                                                              selected_indices_torch,
+                                                                              output_errors=False)
+            ses2_torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                              sensors_xyz_torch[1::3, :, :],
+                                                                              selected_indices_torch,
+                                                                              output_errors=False)
+            np_mni_ses1 = ses1_torch_mni.cpu().numpy()
+            np_mni_ses2 = ses2_torch_mni.cpu().numpy()
+
+            # stack anchors and projected sensors
+            anchors_and_sensors_ses1 = np.concatenate((np.tile(np.expand_dims(anchors, axis=0), (len(ses1_torch_mni), 1, 1)), np_mni_ses1), axis=1)
+            anchors_and_sensors_ses2 = np.concatenate((np.tile(np.expand_dims(anchors, axis=0), (len(ses2_torch_mni), 1, 1)), np_mni_ses2), axis=1)
+        np.save(cached_result_ses1, anchors_and_sensors_ses1)
+        np.save(cached_result_ses2, anchors_and_sensors_ses2)
     else:
-        vid_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
-        vid_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
-    vid_projected_ses1_others = vid_ss_data_ses1[:, full_names.index(output_others_names[0]):, :]
-    vid_projected_ses2_others = vid_ss_data_ses2[:, full_names.index(output_others_names[0]):, :]
+        anchors_and_sensors_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
+        anchors_and_sensors_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
+    vid_projected_ses1_others = anchors_and_sensors_ses1[:, full_names.index(output_others_names[0]):, :]
+    vid_projected_ses2_others = anchors_and_sensors_ses2[:, full_names.index(output_others_names[0]):, :]
     errors = []
     for i in range(len(sessions[0])):
         rmse_error = geometry.get_rmse(vid_projected_ses1_others[i], vid_projected_ses2_others[i])
@@ -497,8 +509,8 @@ def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matric
     logging.info("vid2vid mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(rmse_error_mean,
                                                                                         rmse_error_std))
     output_selector = tuple([full_names.index(x) for x in output_others_names])
-    return [output_others_names, vid_ss_data_ses1[:, output_selector, :]],\
-           [output_others_names, vid_ss_data_ses2[:, output_selector, :]]
+    return [output_others_names, anchors_and_sensors_ses1[:, output_selector, :]],\
+           [output_others_names, anchors_and_sensors_ses2[:, output_selector, :]]
 
 
 def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):

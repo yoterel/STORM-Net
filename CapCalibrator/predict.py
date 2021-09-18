@@ -16,11 +16,14 @@ import torch_src.torch_data as torch_data
 class Options:
     def __init__(self, device):
         self.network_input_size = 10
-        self.network_output_size = 6
         self.template = Path("../example_models/example_model.txt")
         self.architecture = "2dconv"
         self.loss = "l2"
         self.device = device
+        self.scale_faces = "xz"
+        self.network_output_size = 3
+        if self.scale_faces:
+            self.network_output_size += len(self.scale_faces)
 
 
 def is_using_gpu():
@@ -55,6 +58,7 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
         if hasattr(state_dict, '_metadata'):
             del state_dict._metadata
         network.load_state_dict(state_dict)
+        network.to(opt.device)
         heat_mapper = torch_data.HeatMap((256, 256), 16, False, args.gpu_id)
         x = torch.from_numpy(sticker_locations).to(args.gpu_id).float()
         x[:, :, 0::2] *= 256
@@ -73,7 +77,7 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     else:
         raise NotImplementedError
 
-
+    assert y_predict.shape[-1] == opt.network_output_size
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
     # notice x is not negated - the positive direction in simulation is flipped.
     rs = []
@@ -83,9 +87,24 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
         rot = R.from_euler('xyz', [y_predict[i][0], y_predict[i][1], y_predict[i][2]], degrees=True)
         scale_mat = np.identity(3)
         if y_predict.shape[-1] > 3:
-            scale_mat[0, 0] = y_predict[i][3]  # xscale
-            scale_mat[1, 1] = y_predict[i][4]  # yscale
-            scale_mat[2, 2] = y_predict[i][5]  # zscale
+            counter = 0
+            if "x" in opt.scale_faces:
+                xterm = y_predict[i][3 + counter]
+                counter += 1
+            else:
+                xterm = 1.0
+            if "y" in opt.scale_faces:
+                yterm = y_predict[i][3 + counter]
+                counter += 1
+            else:
+                yterm = 1.0
+            if "z" in opt.scale_faces:
+                zterm = y_predict[i][3 + counter]
+            else:
+                zterm = 1.0
+            scale_mat[0, 0] = xterm  # xscale
+            scale_mat[1, 1] = yterm  # yscale
+            scale_mat[2, 2] = zterm  # zscale
         rotation_mat = rot.as_matrix()
         rs.append(rotation_mat)
         sc.append(scale_mat)
