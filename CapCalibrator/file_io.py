@@ -152,7 +152,7 @@ def save_results(data, output_file):
             f.write(my_line)
 
 
-def extract_session_data(file, use_scale=True, scale_by_z=False):
+def extract_session_data(file, use_scale=None, scale_by_z=False):
     timesteps_per_sample = 0
     session = open(file, 'r')
     number_of_features = 0
@@ -190,17 +190,30 @@ def extract_session_data(file, use_scale=True, scale_by_z=False):
         if use_scale:
             # cap_scalex = (cap_scalex - cap_scale_min) / (cap_scale_max - cap_scale_min)
             # cap_scalez = (cap_scalez - cap_scale_min) / (cap_scale_max - cap_scale_min)
-            cap_scalex = my_dict["scalex"]
-            cap_scaley = my_dict["scaley"]
-            cap_scalez = my_dict["scalez"]
-            if scale_by_z:
-                cap_scalex /= cap_scalez
-                cap_scaley /= cap_scalez
-                cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley)
-            else:
-                cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley, cap_scalez)
+            cap_scale = []
+            if "x" in use_scale:
+                if scale_by_z:
+                    xterm = my_dict["scalex"] / my_dict["scalez"]
+                else:
+                    xterm = my_dict["scalex"]
+                cap_scale.append(xterm)
+            if "y" in use_scale:
+                if scale_by_z:
+                    yterm = my_dict["scaley"] / my_dict["scalez"]
+                else:
+                    yterm = my_dict["scaley"]
+                cap_scale.append(yterm)
+            if "z" in use_scale:
+                if scale_by_z:
+                    zterm = 1.0
+                else:
+                    zterm = my_dict["scalez"]
+                cap_scale.append(zterm)
+            cap_rots = [cap_rotation['x'], cap_rotation['y'], cap_rotation['z']]
+            for term in cap_scale:
+                cap_rots.append(term)
         else:
-            cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'])
+            cap_rots = [cap_rotation['x'], cap_rotation['y'], cap_rotation['z']]
         x_session.append(sticker_2d_locs)
     if sticker_count >= 20:  # remove datapoints with less than 20 sticker occurrences
         x_session = np.reshape(x_session, (timesteps_per_sample, number_of_features))
@@ -211,7 +224,7 @@ def extract_session_data(file, use_scale=True, scale_by_z=False):
     return x_session, y_session
 
 
-def load_raw_json_db(db_path, use_scale=False, scale_by_z=False):
+def load_raw_json_db(db_path, use_scale=None, scale_by_z=False):
     """
     loads data from folder containing json files in the format defined by synthetic data renderer
     :param db_path: path to folder

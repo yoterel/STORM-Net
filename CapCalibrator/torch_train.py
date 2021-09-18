@@ -83,7 +83,7 @@ def parse_arguments():
     parser.add_argument("--architecture", type=str, choices=["fc", "1dconv", "2dconv"], default="fc", help="Selects architecture")
     parser.add_argument("--force_load_data", action="store_true", help="Forces loading data from disk (recreates train/val/test splits)")
     parser.add_argument("--loss", type=str, choices=["l2", "l2+projection"], help="loss function to use")
-    parser.add_argument("--use_scale", action="store_true", default=False, help="network must predict scale also")
+    parser.add_argument("--scale_faces", type=str, choices=["x", "y", "z", "xy", "xz", "yz", "xyz"], help="Renderer will also apply different scales to the virtual head & mask")
     parser.add_argument("--dont_use_gmm", action="store_true", default=False, help="do not use gmm to create heatmaps")
     parser.add_argument('--loss_alpha', type=float, default=0.1, help='coefficient of projection loss if used')
     parser.add_argument("--gpu_ids", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
@@ -96,7 +96,6 @@ def parse_arguments():
     parser.add_argument("--template",
                         help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
     parser.add_argument("--network_input_size", type=int, default=14, help="Input layer size for STORM-Net")
-    parser.add_argument("--network_output_size", type=int, default=3, help="Output layer size for STORM-Net")
     parser.add_argument("--num_threads", type=int, default=0, help="Number of worker threads for dataloader")
     parser.add_argument("--log", action="store_true", help="If present, writes training log")
     parser.add_argument("--tensorboard",
@@ -107,14 +106,24 @@ def parse_arguments():
     #     sys.exit(1)
     # cmd = "test_torch ../../renders --template ../../example_models/example_model.txt".split()
     args = parser.parse_args()
+
     args.root = Path("runs", args.experiment_name)
     args.root.mkdir(parents=True, exist_ok=True)
+
     if args.log:
         args.log = Path(args.root, "log_{}".format(str(time.time())))
+
     if args.tensorboard:
         args.tensorboard = Path(args.tensorboard)
+
     args.data_path = Path(args.data_path)
+
     args.is_train = True
+
+    args.network_output_size = 3
+    if args.scale_faces:
+        args.network_output_size += len(args.scale_faces)
+
     if args.gpu_ids == -1:
         args.device = torch.device('cpu')
     else:

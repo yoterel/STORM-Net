@@ -152,7 +152,7 @@ class MyDataSet(torch.utils.data.Dataset):
         self.raw_data_file = opt.data_path / "data.pickle"
         if not self.raw_data_file.is_file() or self.opt.force_load_data:
             logging.info("loading raw data")
-            X, Y = file_io.load_raw_json_db(opt.data_path, opt.use_scale, False)
+            X, Y = file_io.load_raw_json_db(opt.data_path, opt.scale_faces, False)
             logging.info("creating train-validation split")
             x_train, x_val, y_train, y_val = utils.split_data(X, Y, with_test_set=False)
             # X_train = np.expand_dims(X_train, axis=0)
