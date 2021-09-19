@@ -265,7 +265,7 @@ def do_digi_error_experiment():
         logging.info("{}->{:.3f}".format(key, value[0]))
 
 
-def do_dig2dig_experiment(template_path, experiment_folder):
+def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=None, verbose=True):
     """
     tests how accurate is the digitizer between 2 sessions after MNI projection
     :param experiment_folder:
@@ -291,7 +291,8 @@ def do_dig2dig_experiment(template_path, experiment_folder):
     else:
         experiment_file_list.append(experiment_folder)
     for exp_file in experiment_file_list:
-        logging.info(exp_file.name)
+        if verbose:
+            logging.info(exp_file.name)
         file_names, file_data, file_format, skull = read_template_file(exp_file)
         for i, session in enumerate(zip(file_names[:2], file_data[:2])):
             names = session[0]
@@ -322,8 +323,13 @@ def do_dig2dig_experiment(template_path, experiment_folder):
     else:
         digi_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
         digi_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
-    digi_projected_ses1_others = digi_ss_data_ses1[:, full_names.index(others_names[0]):, :]
-    digi_projected_ses2_others = digi_ss_data_ses2[:, full_names.index(others_names[0]):, :]
+    if experiment_filter:
+        id = [i for (i, x) in enumerate(experiment_file_list) if experiment_filter in str(x)][0]
+        digi_projected_ses1_others = digi_ss_data_ses1[id:id+1, full_names.index(others_names[0]):, :]
+        digi_projected_ses2_others = digi_ss_data_ses2[id:id+1, full_names.index(others_names[0]):, :]
+    else:
+        digi_projected_ses1_others = digi_ss_data_ses1[:, full_names.index(others_names[0]):, :]
+        digi_projected_ses2_others = digi_ss_data_ses2[:, full_names.index(others_names[0]):, :]
 
     # selector_template = tuple([template_names.index(x) for x in others])
     # to_fill = np.empty((digi_projected_ses1_others.shape[0],
@@ -349,13 +355,14 @@ def do_dig2dig_experiment(template_path, experiment_folder):
     # # digi_projected_ses2_others = to_fill.copy()
 
     errors = []
-    for i in range(len(sessions[0])):
+    for i in range(len(digi_projected_ses2_others)):
         rmse_error = geometry.get_rmse(digi_projected_ses1_others[i], digi_projected_ses2_others[i])
         errors.append(rmse_error)
     rmse_error_mean = np.mean(np.array(errors))
     rmse_error_std = np.std(np.array(errors))
-    logging.info("dig2dig mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(rmse_error_mean,
-                                                                                        rmse_error_std))
+    if verbose:
+        logging.info("dig2dig mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(rmse_error_mean,
+                                                                                            rmse_error_std))
 
     # from draw import visualize_2_pc
     # visualize_2_pc(points_blue=digi_projected_ses1_others[0], points_red=digi_projected_ses2_others[0])
@@ -427,7 +434,7 @@ def do_vid2vid_project_afterMNI_experiment(template_path, video_names, r_matrice
            [output_others_names, vid_ses2_transformed[:, output_selector, :]]
 
 
-def do_vid2vid_project_beforeMNI_experiment(opt, video_names, r_matrices, s_matrices, force_project=False):
+def do_vid2vid_project_beforeMNI_experiment(opt, video_names, r_matrices, s_matrices, force_project=False, save_results=True):
     """
     experiement to compare intra-method error between video sessions
     applies transform from network before MNI projection
@@ -493,8 +500,9 @@ def do_vid2vid_project_beforeMNI_experiment(opt, video_names, r_matrices, s_matr
             # stack anchors and projected sensors
             anchors_and_sensors_ses1 = np.concatenate((np.tile(np.expand_dims(anchors, axis=0), (len(ses1_torch_mni), 1, 1)), np_mni_ses1), axis=1)
             anchors_and_sensors_ses2 = np.concatenate((np.tile(np.expand_dims(anchors, axis=0), (len(ses2_torch_mni), 1, 1)), np_mni_ses2), axis=1)
-        np.save(cached_result_ses1, anchors_and_sensors_ses1)
-        np.save(cached_result_ses2, anchors_and_sensors_ses2)
+        if save_results:
+            np.save(cached_result_ses1, anchors_and_sensors_ses1)
+            np.save(cached_result_ses2, anchors_and_sensors_ses2)
     else:
         anchors_and_sensors_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
         anchors_and_sensors_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)

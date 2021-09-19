@@ -204,7 +204,8 @@ class GUI(tk.Tk):
                     "shift_video": "Selecting different frame...",
                     "calibrate": "Calibrating...",
                     "render": "Creating synthetic data, This might take a while...",
-                    "finetune": "Fine-tunning STORM-Net. This might take a while..."}
+                    "finetune": "Fine-tunning STORM-Net. This might take a while...",
+                    "predict": "Predicting..."}
 
         if periodic:
             if msg[0] == "render_stop":
@@ -404,6 +405,19 @@ class GUI(tk.Tk):
                 self.storm_graph,
                 self.args]
 
+    def prep_predict_packet(self):
+        cur_path = self.paths[self.cur_video_index]
+        assert "session1" in str(cur_path)
+        next_path = self.paths[self.cur_video_index + 1]
+        cur_data = self.db[self.get_cur_video_hash()][self.shift]["data"].copy()
+        next_data = self.db[utils.md5_from_vid(next_path)][self.shift]["data"].copy()
+        video_names = [cur_path.parent.name + "_" + cur_path.name, next_path.parent.name + "_" + next_path.name]
+        return ["predict",
+                np.concatenate((cur_data, next_data)),
+                video_names,
+                self.args]
+
+
     def get_frame_size(self):
         """
         returns frame size
@@ -434,9 +448,9 @@ class GUI(tk.Tk):
 
     def get_cur_video_name(self):
         if self.paths:
-            parent = self.paths[self.cur_video_index].parent.name
+            # parent = self.paths[self.cur_video_index].parent.name
             name = self.paths[self.cur_video_index].name
-            my_str = "{}/{}".format(parent, name)
+            my_str = "{}".format(name)
         else:
             my_str = "Not Loaded"
         return my_str
@@ -449,9 +463,9 @@ class GUI(tk.Tk):
 
     def get_template_model_file_name(self):
         if self.template_file_name:
-            parent = self.template_file_name.parent.name
+            # parent = self.template_file_name.parent.name
             name = self.template_file_name.name
-            my_str = "{}/{}".format(parent, name)
+            my_str = "{}".format(name)
         else:
             my_str = "Not Set"
         return my_str
@@ -494,9 +508,9 @@ class GUI(tk.Tk):
 
     def get_pretrained_stormnet_path(self):
         if self.pretrained_stormnet_path:
-            parent = self.pretrained_stormnet_path.parent.name
+            # parent = self.pretrained_stormnet_path.parent.name
             name = self.pretrained_stormnet_path.name
-            my_str = "{}/{}".format(parent, name)
+            my_str = "{}".format(name)
         else:
             my_str = "Not Set"
         return my_str
@@ -588,6 +602,10 @@ class GUI(tk.Tk):
         else:
             self.args.mni = False
         self.take_async_action(self.prep_calibrate_packet())
+
+    def predict_x(self):
+        self.take_async_action(self.prep_predict_packet())
+
 
     def next_video(self):
         if self.cur_video_index < (len(self.paths)-1):
@@ -811,7 +829,7 @@ class GUI(tk.Tk):
                                   self.renderer_log_file,
                                   iterations,
                                   False,
-                                  True)
+                                  False)
         if status:
             if self.panels[self.cur_active_panel].render_monitor_progress.get():
                 self.take_async_action(["render_start", self.renderer_log_file.absolute()], periodic=True)
@@ -965,6 +983,21 @@ class ThreadedTask(threading.Thread):
             self.handle_load_template_model()
         elif self.msg[0] == "calibrate":
             self.handle_calibrate()
+        elif self.msg[0] == "predict":
+            self.handle_predict()
+
+    def handle_predict(self):
+        data, video_names, args = self.msg[1:]
+        subject_name, _ = video_names[0].split("_")
+        subject_name = subject_name + ".txt"
+        r, s = predict.predict_rigid_transform(data, None, None, args)
+        # from experimental import do_vid2vid_project_beforeMNI_experiment, do_dig2dig_experiment, do_vid2dig_experiment
+        # dig_ses1, dig_ses2, _ = do_dig2dig_experiment(args.template, args.ground_truth, experiment_filter=subject_name, verbose=False)
+        # vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args, video_names, r, s,
+        #                                                              force_project=True,
+        #                                                              save_results=False)
+        # do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+        self.queue.put(["predict"])
 
     def handle_calibrate(self):
         template_names, template_data, data, model, graph, args = self.msg[1:]
@@ -1084,6 +1117,9 @@ class CalibrationPage(tk.Frame):
                                    540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
                 self.canvas.create_line(int(db_to_show[i, 0]) + 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) - 5,
                                    540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
+
+        button = ttk.Button(self.data_panel, text="Predict", command=lambda: self.controller.predict_x())
+        button.pack(fill="x")
 
     def update_canvas(self):
         self.canvas.delete("image")
