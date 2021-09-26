@@ -272,22 +272,23 @@ def do_brain_error_visualization_experiment(vid_ses1, per_landmark):
     v.attributes(colors)
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=np.pi, theta=0, r=300, point_size=0.5)
-    v.capture('right_view.png')
+    v.capture('cache/right_view.png')
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=0, theta=0, r=300, point_size=0.5)
-    v.capture('left_view.png')
+    v.capture('cache/left_view.png')
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=0, theta=np.pi / 2, r=300, point_size=0.5)
-    v.capture('top_view.png')
+    v.capture('cache/top_view.png')
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=+np.pi / 2, theta=0, r=300, point_size=0.5)
-    v.capture('front_view.png')
+    v.capture('cache/front_view.png')
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=+np.pi / 4, theta=np.pi / 4, r=300, point_size=0.5)
-    v.capture('iso1.png')
+    v.capture('cache/iso1.png')
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=3 * np.pi / 4, theta=np.pi / 4, r=300, point_size=0.5)
-    v.capture('iso2.png')
+    v.capture('cache/iso2.png')
+    draw.plot_colorbar()
     v.close()
 
 
@@ -462,7 +463,7 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
         for i, session in enumerate(zip(file_names, file_data)):
             try:
                 names = session[0]
-                data = session[1][:, 0, :] #- session[1][:, 1, :]  # subtracts second sensor
+                data = session[1][:, 0, :] - session[1][:, 1, :]  # subtracts second sensor
                 data = geometry.to_standard_coordinate_system(names, data)
                 origin_selector = tuple([names.index(x) for x in origin_names])
                 origin = data[origin_selector, :]

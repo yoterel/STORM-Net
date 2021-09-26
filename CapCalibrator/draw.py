@@ -517,3 +517,16 @@ def plot_robustness(x, y):
     plt.ylabel("Average Error [Degrees]")
     plt.legend(["x", "y", "z"])
     plt.show()
+
+
+def plot_colorbar():
+    import pylab as pl
+    a = np.array([[0, 7.5]])
+    pl.figure(figsize=(9, 1.5))
+    img = pl.imshow(a, cmap="hot")
+    pl.gca().set_visible(False)
+    cax = pl.axes([0.1, 0.3, 0.8, 0.6])
+    pl.colorbar(orientation="horizontal", cax=cax)
+    pl.xticks(fontsize=20)
+    plt.tight_layout()
+    plt.savefig("colorbar.png")
