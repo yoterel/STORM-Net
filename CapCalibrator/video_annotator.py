@@ -42,7 +42,7 @@ def annotate_videos(args):  # contains GUI mainloop
     if args.mode == "experimental":
         special_db = Path.joinpath(Path("cache"), "telaviv_db.pickle")
         new_db = file_io.load_full_db(special_db)
-        new_db = post_process_db(new_db)
+        # new_db = post_process_db(new_db)
         paths = []
         if args.video:
             if Path.is_file(args.video):
@@ -84,7 +84,6 @@ class GUI(tk.Tk):
         self.unet_model = None
         self.storm_model = None
         self.unet_graph = None
-        self.storm_graph = None
         self.finetunning = False
         self.renderer_executable = None
         self.synth_output_dir = None
@@ -402,7 +401,6 @@ class GUI(tk.Tk):
                 self.template_data,
                 self.db[self.get_cur_video_hash()][self.shift]["data"].copy(),
                 self.storm_model,
-                self.storm_graph,
                 self.args]
 
     def prep_predict_packet(self):
@@ -990,7 +988,7 @@ class ThreadedTask(threading.Thread):
         data, video_names, args = self.msg[1:]
         subject_name, _ = video_names[0].split("_")
         subject_name = subject_name + ".txt"
-        r, s = predict.predict_rigid_transform(data, None, None, args)
+        r, s = predict.predict_rigid_transform(data, None, args)
         # from experimental import do_vid2vid_project_beforeMNI_experiment, do_dig2dig_experiment, do_vid2dig_experiment
         # dig_ses1, dig_ses2, _ = do_dig2dig_experiment(args.template, args.ground_truth, experiment_filter=subject_name, verbose=False)
         # vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args, video_names, r, s,
@@ -1000,8 +998,8 @@ class ThreadedTask(threading.Thread):
         self.queue.put(["predict"])
 
     def handle_calibrate(self):
-        template_names, template_data, data, model, graph, args = self.msg[1:]
-        r, s = predict.predict_rigid_transform(data, model, graph, args)
+        template_names, template_data, data, model, args = self.msg[1:]
+        r, s = predict.predict_rigid_transform(data, model, args)
         sensor_locations = geometry.apply_rigid_transform(r, s, template_names, template_data, None, args)
         if args.mni:
             projected_data = geometry.project_sensors_to_MNI(sensor_locations)

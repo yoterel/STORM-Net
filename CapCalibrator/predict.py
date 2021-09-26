@@ -1,5 +1,5 @@
 # import tensorflow as tf
-# import tf_file_io
+import tf_file_io
 import utils
 from pathlib import Path
 import cv2
@@ -30,12 +30,11 @@ def is_using_gpu():
     return torch.cuda.is_available()
 
 
-def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
+def predict_rigid_transform(sticker_locations, preloaded_model, args):
     """
     predicts rigid transformation of cap object using 2d sticker locations
     :param sticker_locations: a batch of 2d array of sticker locations
     :param preloaded_model: a pre loaded keras model
-    :param graph: the default tf graph
     :param args: command line arguments
     :return: rotation and scale matrices list
     """

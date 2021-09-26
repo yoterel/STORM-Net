@@ -1,0 +1,14 @@
+channels:
+  - pytorch
+  - defaults
+  - menpo
+dependencies:
+  - pytorch
+  - torchvision
+  - python=3.8
+  - pip
+  - pip:
+    - tensorflow
+    - opencv-python
+    - dlib
+    - pptk

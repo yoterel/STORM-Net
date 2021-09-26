@@ -24,7 +24,7 @@ def do_network_robustness_test(sticker_locations, args):
     if robustness_file.is_file():
         t_r_rmse = np.load(robustness_file)
     else:
-        orig_r_matrix, orig_s_matrix = predict.predict_rigid_transform(np.copy(sticker_locations), None, None, args)
+        orig_r_matrix, orig_s_matrix = predict.predict_rigid_transform(np.copy(sticker_locations), None, args)
         orig_euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in orig_r_matrix]
         t_r_rmse = []
         t_s_rmse = []
@@ -42,7 +42,7 @@ def do_network_robustness_test(sticker_locations, args):
                 noise = (np.random.random_sample(sticker_locations_copy.shape) * noise_mag) - noise_shift
                 sticker_locations_copy += noise
                 another_view[zero_locs] = 0
-                r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations_copy, None, None, args)
+                r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations_copy, None, args)
                 euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in r_matrix]
                 r_rmse.append(np.linalg.norm(np.array(orig_euler) - np.array(euler), axis=0))
                 s_rmse.append(np.linalg.norm(np.array(orig_s_matrix) - np.array(s_matrix)))
@@ -237,7 +237,7 @@ def reproduce_experiments(video_names, sticker_locations, args):
     :return: -
     """
     do_network_robustness_test(sticker_locations, args)
-    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
+    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, args)
     # grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
     # do_MNI_sensitivity_experiment(args.template)
     # do_digi_error_experiment()

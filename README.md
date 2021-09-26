@@ -14,8 +14,8 @@ The repository also contains:
 
 ### Application dependencies:
 - Python version >= 3.6, but <= 3.8 (x64)
-- [requirments.txt](requirements.txt) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
-      `pip install -r requirements.txt`
+- [environment.yml](environment.yml) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
+      `conda install -f environment.yml`
       
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
