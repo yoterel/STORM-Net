@@ -12,7 +12,6 @@ import torch
 import draw
 
 
-
 def do_network_robustness_test(sticker_locations, args):
     """
     reports results of network robustness to various noises introduced to annotation
@@ -240,17 +239,56 @@ def reproduce_experiments(video_names, sticker_locations, args):
     do_network_robustness_test(sticker_locations, args)
     r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
     # grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
-    do_MNI_sensitivity_experiment(args.template)
+    # do_MNI_sensitivity_experiment(args.template)
     # do_digi_error_experiment()
     dig_ses1, dig_ses2, all_digi_sessions = do_dig2dig_experiment(args.template, args.ground_truth)
     # do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)
     vid_ses1, vid_ses2 = do_vid2vid_experiment(args, video_names, r_matrix, s_matrix, force_project=False)
     # vid_ses1, vid_ses2 = do_vid2vid_project_afterMNI_experiment(args.template, video_names, r_matrix, s_matrix)
-    dig_intra, vid_intra, inter = do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+    dig_intra, vid_intra, inter, per_landmark = do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+    do_brain_error_visualization_experiment(vid_ses1, per_landmark)
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
     do_skull_size_experiment(dig_intra, vid_intra, inter, args)
     do_shift_experiment(r_matrix, all_digi_sessions, args)
     # do_old_experiment(r_matrix, s_matrix, video_names, args)
+
+
+def do_brain_error_visualization_experiment(vid_ses1, per_landmark):
+    XYZ = MNI_torch.load_raw_MNI_data("resource" + "/MNI_templates/xyzallBEM.npy", "brain", resource_folder="resource")
+    import pptk
+    v = pptk.viewer(XYZ)
+    v.color_map('hot', scale=[0, 1])
+    # color = (XYZ[:, 0] - np.min(XYZ[:, 0])) / (np.max(XYZ[:, 0]) - np.min(XYZ[:, 0]))
+    colors = np.empty((len(vid_ses1[1]), XYZ.shape[0]))
+    for i in range(len(vid_ses1[1])):
+        locs = vid_ses1[1][i]
+        weights = per_landmark[i]
+        distances = 1 / (np.linalg.norm(XYZ - np.expand_dims(locs, 1), axis=-1) + 1e-5)
+        distances /= np.sum(distances, axis=0)
+        non_normalized_colors = weights @ distances
+        colors[i] = non_normalized_colors
+    colors = np.sum(colors, axis=0)
+    colors = (colors - np.min(colors)) / (np.max(colors) - np.min(colors))
+    v.attributes(colors)
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=np.pi, theta=0, r=300, point_size=0.5)
+    v.capture('right_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=0, theta=0, r=300, point_size=0.5)
+    v.capture('left_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=0, theta=np.pi / 2, r=300, point_size=0.5)
+    v.capture('top_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=+np.pi / 2, theta=0, r=300, point_size=0.5)
+    v.capture('front_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=+np.pi / 4, theta=np.pi / 4, r=300, point_size=0.5)
+    v.capture('iso1.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=3 * np.pi / 4, theta=np.pi / 4, r=300, point_size=0.5)
+    v.capture('iso2.png')
+    v.close()
 
 
 def do_skull_size_experiment(dig_intra, vid_intra, inter, args):
@@ -424,7 +462,7 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
         for i, session in enumerate(zip(file_names, file_data)):
             try:
                 names = session[0]
-                data = session[1][:, 0, :] - session[1][:, 1, :]  # subtracts second sensor
+                data = session[1][:, 0, :] #- session[1][:, 1, :]  # subtracts second sensor
                 data = geometry.to_standard_coordinate_system(names, data)
                 origin_selector = tuple([names.index(x) for x in origin_names])
                 origin = data[origin_selector, :]
@@ -666,6 +704,12 @@ def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):
     inter_method_rmse4 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses2[1], vid_ses2[1])]
     inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
     inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+
+    # for visualization, find best error per landmark on video session1
+    vid_combine = vid_ses1[1]
+    dig_combine = (digi_ses1[1] + digi_ses2[1]) / 2
+    landmarks_errors = np.linalg.norm((dig_combine - vid_combine).astype(np.float), axis=-1)
+
     logging.info("dig2vid mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(inter_method_rmse_avg,
                                                                                         inter_method_rmse_std))
 
@@ -682,7 +726,7 @@ def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):
     # probably should be ttest_ind
     t2, p2 = ttest_rel(a_dig, a_inter)
     logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
-    return a_dig, a_vid, a_inter
+    return a_dig, a_vid, a_inter, landmarks_errors
 
 
 def do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2):
