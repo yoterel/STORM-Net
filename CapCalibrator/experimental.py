@@ -20,26 +20,38 @@ def do_network_robustness_test(sticker_locations, args):
     :param args: args
     :return:
     """
-    orig_r_matrix, orig_s_matrix = predict.predict_rigid_transform(np.copy(sticker_locations), None, None, args)
-    orig_euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in orig_r_matrix]
-    r_rmse = []
-    s_rmse = []
-    b_shape = sticker_locations.shape[0]
-    t_shape = sticker_locations.shape[1]
-    for i in range(100):
-        sticker_locations_copy = np.copy(sticker_locations)
-        another_view = np.reshape(sticker_locations_copy, (b_shape, t_shape, sticker_locations_copy.shape[-1] // 2, 2))
-        zero_locs = np.where(another_view == np.array([0, 0]))
-        noise_mag = 5
-        noise_shift = noise_mag / 2
-        noise = (np.random.random_sample(sticker_locations_copy.shape) * noise_mag) - noise_shift
-        sticker_locations_copy += noise
-        another_view[zero_locs] = 0
-        r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations_copy, None, None, args)
-        euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in r_matrix]
-        r_rmse.append(np.linalg.norm(np.array(orig_euler) - np.array(euler), axis=0))
-        s_rmse.append(np.linalg.norm(np.array(orig_s_matrix) - np.array(s_matrix)))
-    logging.info("r_rmse: {}, s_rmse: {}".format(np.mean(r_rmse), np.mean(s_rmse)))
+    robustness_file = Path("cache/robustness.npy")
+    noise_mag_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    if robustness_file.is_file():
+        t_r_rmse = np.load(robustness_file)
+    else:
+        orig_r_matrix, orig_s_matrix = predict.predict_rigid_transform(np.copy(sticker_locations), None, None, args)
+        orig_euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in orig_r_matrix]
+        t_r_rmse = []
+        t_s_rmse = []
+        b_shape = sticker_locations.shape[0]
+        t_shape = sticker_locations.shape[1]
+        for j in range(len(noise_mag_list)):
+            r_rmse = []
+            s_rmse = []
+            for i in range(10):
+                sticker_locations_copy = np.copy(sticker_locations)
+                another_view = np.reshape(sticker_locations_copy, (b_shape, t_shape, sticker_locations_copy.shape[-1] // 2, 2))
+                zero_locs = np.where(another_view == np.array([0, 0]))
+                noise_mag = noise_mag_list[j]
+                noise_shift = noise_mag / 2
+                noise = (np.random.random_sample(sticker_locations_copy.shape) * noise_mag) - noise_shift
+                sticker_locations_copy += noise
+                another_view[zero_locs] = 0
+                r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations_copy, None, None, args)
+                euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in r_matrix]
+                r_rmse.append(np.linalg.norm(np.array(orig_euler) - np.array(euler), axis=0))
+                s_rmse.append(np.linalg.norm(np.array(orig_s_matrix) - np.array(s_matrix)))
+            t_r_rmse.append(np.mean(r_rmse, axis=0))
+            t_s_rmse.append(np.mean(s_rmse))
+        t_r_rmse = np.array(t_r_rmse)
+        np.save(robustness_file, t_r_rmse)
+    draw.plot_robustness(np.array(noise_mag_list), t_r_rmse)
 
 
 def do_opt2dig_experiment(digi_ses1, digi_ses2, grid_search, rots, scales, video_names):
@@ -225,10 +237,10 @@ def reproduce_experiments(video_names, sticker_locations, args):
     :param args: see caller
     :return: -
     """
-    # do_network_robustness_test(sticker_locations, args)
+    do_network_robustness_test(sticker_locations, args)
     r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
     # grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
-    # do_MNI_sensitivity_experiment(args.template)
+    do_MNI_sensitivity_experiment(args.template)
     # do_digi_error_experiment()
     dig_ses1, dig_ses2, all_digi_sessions = do_dig2dig_experiment(args.template, args.ground_truth)
     # do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)

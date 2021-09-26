@@ -503,3 +503,17 @@ def plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI):
     plt.ylabel("Percent of Locations")
     # fig.suptitle('This is a somewhat long figure title', fontsize=16)
     plt.show()
+
+
+def plot_robustness(x, y):
+    """
+    plots robustness test results
+    :param x_list:
+    :param y_numpy:
+    :return:
+    """
+    plt.plot(x, y)
+    plt.xlabel("Noise Range [Pixels]")
+    plt.ylabel("Average Error [Degrees]")
+    plt.legend(["x", "y", "z"])
+    plt.show()
