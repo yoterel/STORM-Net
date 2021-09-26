@@ -20,7 +20,7 @@ class Options:
         self.architecture = "2dconv"
         self.loss = "l2"
         self.device = device
-        self.scale_faces = "xz"
+        self.scale_faces = None
         self.network_output_size = 3
         if self.scale_faces:
             self.network_output_size += len(self.scale_faces)
@@ -39,7 +39,6 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     :param args: command line arguments
     :return: rotation and scale matrices list
     """
-    logging.info("Predicting rotation from key points.")
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
@@ -83,7 +82,7 @@ def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
     rs = []
     sc = []
     for i in range(len(y_predict)):
-        # logging.info("Network Euler angels:" + str([y_predict[i][0], -y_predict[i][1], -y_predict[i][2]]))
+        logging.info("Network Prediction:" + str(y_predict[i].tolist()))
         rot = R.from_euler('xyz', [y_predict[i][0], y_predict[i][1], y_predict[i][2]], degrees=True)
         scale_mat = np.identity(3)
         if y_predict.shape[-1] > 3:

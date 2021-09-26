@@ -9,6 +9,7 @@ from scipy.spatial.transform import Rotation as R
 import predict
 import torch_src.MNI_torch as MNI_torch
 import torch
+import draw
 
 
 
@@ -226,16 +227,133 @@ def reproduce_experiments(video_names, sticker_locations, args):
     """
     # do_network_robustness_test(sticker_locations, args)
     r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
-    grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
+    # grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
     # do_MNI_sensitivity_experiment(args.template)
-    do_digi_error_experiment()
-    dig_ses1, dig_ses2, sessions = do_dig2dig_experiment(args.template, args.ground_truth)
-    do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)
-    vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args, video_names, r_matrix, s_matrix, force_project=True)
+    # do_digi_error_experiment()
+    dig_ses1, dig_ses2, all_digi_sessions = do_dig2dig_experiment(args.template, args.ground_truth)
+    # do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)
+    vid_ses1, vid_ses2 = do_vid2vid_experiment(args, video_names, r_matrix, s_matrix, force_project=False)
     # vid_ses1, vid_ses2 = do_vid2vid_project_afterMNI_experiment(args.template, video_names, r_matrix, s_matrix)
-    do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+    dig_intra, vid_intra, inter = do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+    do_skull_size_experiment(dig_intra, vid_intra, inter, args)
+    do_shift_experiment(r_matrix, all_digi_sessions, args)
     # do_old_experiment(r_matrix, s_matrix, video_names, args)
+
+
+def do_skull_size_experiment(dig_intra, vid_intra, inter, args):
+    """
+    plots the skull sizes for each subject against their intra & inter errors
+    :param dig_intra:
+    :param vid_intra:
+    :param inter:
+    :param args:
+    :return:
+    """
+    experiment_folder_path = args.ground_truth
+    experiment_file_list = []
+    skull_radii = []
+    for exp_file in sorted(experiment_folder_path.glob("*.txt")):
+        experiment_file_list.append(exp_file)
+    for exp_file in experiment_file_list:
+        logging.info(exp_file.name)
+        file_names, file_data, file_format, skull = read_template_file(exp_file)
+        skull_sizes = []
+        for i, session in enumerate(zip(file_names, file_data)):
+            if not session[0]:
+                continue
+            names = session[0]
+            data = session[1][:, 0, :] - session[1][:, 1, :]  # subtract second sensor
+            data = geometry.to_standard_coordinate_system(names, data)
+            skull_sizes.append([np.linalg.norm(data[(names.index('leftear'))] - data[(names.index('rightear'))]),
+                                np.linalg.norm(data[(names.index('fpz'))] - data[(names.index('o1'))])])
+        skull_radii.append(np.mean(np.array(skull_sizes), axis=0) / 2)
+    skull_radii = np.array(skull_radii)
+    circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
+    draw.plot_skull_vs_error(circumferences, dig_intra, vid_intra, inter)
+
+
+def do_shift_experiment(r_matrix, all_digi_sessions, args):
+    """
+    finds corrolation between rotational shifts as detected by the digitzier and our method
+    :param r_matrix:
+    :param all_digi_sessions:
+    :return:
+    """
+    # find video rotations
+    vid_rots = [[], [], []]
+    for i, r in enumerate(r_matrix):
+        vid_rot = R.from_matrix(r)
+        vid_rot_euler = vid_rot.as_euler('xyz', degrees=True)
+        vid_rots[i % 3].append(vid_rot_euler)
+    # find digitizer rotations
+    dig_rots = [[], [], []]
+    template_names, template_data, template_format, _ = read_template_file(args.template)
+    template_data = template_data[0]
+    template_names = template_names[0]
+    template_data = geometry.to_standard_coordinate_system(template_names, template_data)
+    template_mask_data = template_data[(template_names.index('fp1'),
+                                        template_names.index('fp2'),
+                                        template_names.index('fpz'),
+                                        template_names.index('cz'),
+                                        template_names.index('o1'),
+                                        template_names.index('o2'),
+                                        template_names.index('oz'),
+                                        template_names.index('f7'),
+                                        template_names.index('f8')), :]
+    template_face_data = template_data[(template_names.index('leftear'),
+                                        template_names.index('rightear'),
+                                        template_names.index('lefteye'),
+                                        template_names.index('righteye'),
+                                        template_names.index('nosebridge'),
+                                        template_names.index('nosetip')), :]
+    for i, session in enumerate(all_digi_sessions):
+        for j, subject in enumerate(session):
+            try:
+                names = subject[0]
+                data = subject[1]
+                file_mask_data = data[(names.index('fp1'),
+                                       names.index('fp2'),
+                                       names.index('fpz'),
+                                       names.index('cz'),
+                                       names.index('o1'),
+                                       names.index('o2'),
+                                       names.index('oz'),
+                                       names.index('f7'),
+                                       names.index('f8')), :]
+                file_face_data = data[(names.index('leftear'),
+                                       names.index('rightear'),
+                                       names.index('lefteye'),
+                                       names.index('righteye'),
+                                       names.index('nosebridge'),
+                                       names.index('nosetip')), :]
+                # align faces as intermediate step
+                ret_R, ret_t = geometry.rigid_transform_3d_nparray(template_face_data, file_face_data)
+                aligned_template_mask = (ret_R @ template_mask_data.T).T + ret_t
+                # find mask transform
+                ret_R, ret_t = geometry.rigid_transform_3d_nparray(aligned_template_mask, file_mask_data)
+                gt_rot_m = R.from_matrix(ret_R)
+                gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
+                logging.info("Digitizer Euler angels: " + str(gt_rot_e))
+                dig_rots[i].append(gt_rot_e)
+            except AttributeError:
+                dig_rots[i].append(None)
+    ########
+    dig_rots = [x[:-1] for x in dig_rots]
+    vid_rots = [x[:-1] for x in vid_rots]
+    digi2digi_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(dig_rots[0], dig_rots[1], dig_rots[2])])
+    vid2vid_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(vid_rots[0], vid_rots[1], vid_rots[2])])
+
+    # correlate the shifts
+    x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
+    y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
+    z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
+
+    logging.info(
+        "Shift correlation (x, px, y, py, z, pz):"
+        "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
 
 
 def do_digi_error_experiment():
@@ -277,14 +395,11 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
     template_data = geometry.to_standard_coordinate_system(template_names, template_data)
 
     experiment_file_list = []
-    sessions = [[], []]
+    sessions = [[], [], []]
 
-    origin_names = ["leftear", "rightear", "nosebridge", "cz"]
+    origin_names = ["leftear", "rightear", "nosebridge", "cz", "lefteye", "righteye", "nosetip"]
     others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
-    others_template = template_names[template_names.index(0):]
     full_names = origin_names + others_names
-    # combined_others = others + others_template
-    # full_names = origin + combined_others
     if experiment_folder.is_dir():
         for exp_file in sorted(experiment_folder.glob("*.txt")):
             experiment_file_list.append(exp_file)
@@ -294,23 +409,26 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
         if verbose:
             logging.info(exp_file.name)
         file_names, file_data, file_format, skull = read_template_file(exp_file)
-        for i, session in enumerate(zip(file_names[:2], file_data[:2])):
-            names = session[0]
-            data = session[1][:, 0, :] - session[1][:, 1, :]  # subtracts second sensor
-            data = geometry.to_standard_coordinate_system(names, data)
-            origin_selector = tuple([names.index(x) for x in origin_names])
-            origin = data[origin_selector, :]
-            others_selector = tuple([names.index(x) for x in others_names])
-            others = data[others_selector, :]
-            # others_selector_template = tuple([template_names.index(x) for x in others])
-            # W = geometry.affine_transform_3d_nparray(template_data[others_selector_template, :],
-            #                                                                  subject_secific_others)
-            # others_selector_template = tuple([template_names.index(x) for x in others_template])
-            # others_data = template_data[others_selector_template, :]
-            # new_others_data = np.c_[others_data, np.ones(len(others_data))]
-            # new_others_data_transformed = np.matmul(new_others_data, W)[:,:-1]
-            # subject_secific_others = np.vstack((subject_secific_others, new_others_data_transformed))
-            sessions[i].append([full_names, np.vstack((origin, others))])
+        for i, session in enumerate(zip(file_names, file_data)):
+            try:
+                names = session[0]
+                data = session[1][:, 0, :] - session[1][:, 1, :]  # subtracts second sensor
+                data = geometry.to_standard_coordinate_system(names, data)
+                origin_selector = tuple([names.index(x) for x in origin_names])
+                origin = data[origin_selector, :]
+                others_selector = tuple([names.index(x) for x in others_names])
+                others = data[others_selector, :]
+                # others_selector_template = tuple([template_names.index(x) for x in others])
+                # W = geometry.affine_transform_3d_nparray(template_data[others_selector_template, :],
+                #                                                                  subject_secific_others)
+                # others_selector_template = tuple([template_names.index(x) for x in others_template])
+                # others_data = template_data[others_selector_template, :]
+                # new_others_data = np.c_[others_data, np.ones(len(others_data))]
+                # new_others_data_transformed = np.matmul(new_others_data, W)[:,:-1]
+                # subject_secific_others = np.vstack((subject_secific_others, new_others_data_transformed))
+                sessions[i].append([full_names, np.vstack((origin, others))])
+            except IndexError:
+                sessions[i].append([None, None])
     cached_result_ses1 = "cache/session1_digi_MNI"
     cached_result_ses2 = "cache/session2_digi_MNI"
     if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
@@ -434,7 +552,7 @@ def do_vid2vid_project_afterMNI_experiment(template_path, video_names, r_matrice
            [output_others_names, vid_ses2_transformed[:, output_selector, :]]
 
 
-def do_vid2vid_project_beforeMNI_experiment(opt, video_names, r_matrices, s_matrices, force_project=False, save_results=True):
+def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, force_project=False, save_results=True):
     """
     experiement to compare intra-method error between video sessions
     applies transform from network before MNI projection
@@ -509,7 +627,7 @@ def do_vid2vid_project_beforeMNI_experiment(opt, video_names, r_matrices, s_matr
     vid_projected_ses1_others = anchors_and_sensors_ses1[:, full_names.index(output_others_names[0]):, :]
     vid_projected_ses2_others = anchors_and_sensors_ses2[:, full_names.index(output_others_names[0]):, :]
     errors = []
-    for i in range(len(sessions[0])):
+    for i in range(len(vid_projected_ses1_others)):
         rmse_error = geometry.get_rmse(vid_projected_ses1_others[i], vid_projected_ses2_others[i])
         errors.append(rmse_error)
     rmse_error_mean = np.mean(np.array(errors))
@@ -522,6 +640,14 @@ def do_vid2vid_project_beforeMNI_experiment(opt, video_names, r_matrices, s_matr
 
 
 def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):
+    """
+    reports inter method errors (and t-tests, which are not that relevant)
+    :param digi_ses1:
+    :param digi_ses2:
+    :param vid_ses1:
+    :param vid_ses2:
+    :return: intra method reliability for digitizer, for video, and inter method validity.
+    """
     inter_method_rmse1 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses1[1], vid_ses1[1])]
     inter_method_rmse2 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses1[1], vid_ses2[1])]
     inter_method_rmse3 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses2[1], vid_ses1[1])]
@@ -530,6 +656,21 @@ def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):
     inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
     logging.info("dig2vid mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(inter_method_rmse_avg,
                                                                                         inter_method_rmse_std))
+
+    digi_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in zip(digi_ses1[1], digi_ses2[1])]
+    vid_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in zip(vid_ses1[1], vid_ses2[1])]
+    # calc t-test statistics
+    a_vid = np.array(vid_intra_method_rmse)
+    a_dig = np.array(digi_intra_method_rmse)
+    a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
+                      axis=0)
+    # probably should be ttest_ind
+    t1, p1 = ttest_rel(a_vid, a_dig)
+    logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
+    # probably should be ttest_ind
+    t2, p2 = ttest_rel(a_dig, a_inter)
+    logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
+    return a_dig, a_vid, a_inter
 
 
 def do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2):
@@ -608,7 +749,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
                 rot_estimations.setdefault(exp_file.stem, []).append(None)
                 continue
             names = session[0]
-            data = session[1][:, 0, :] #- session[1][:, 1, :]  # subtract second sensor
+            data = session[1][:, 0, :] - session[1][:, 1, :]  # subtract second sensor
             data = geometry.to_standard_coordinate_system(names, data)
             # file_data = normalize_coordinates(file_names, file_data)  # normalize data
             file_mask_data = data[(names.index('fp1'),

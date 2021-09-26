@@ -499,7 +499,7 @@ def plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI):
     # hide tick and tick label of the big axes
     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
     plt.grid(False)
-    plt.xlabel("Channel Error [mm]")
-    plt.ylabel("Percent of Channels")
+    plt.xlabel("Location Error [mm]")
+    plt.ylabel("Percent of Locations")
     # fig.suptitle('This is a somewhat long figure title', fontsize=16)
     plt.show()
