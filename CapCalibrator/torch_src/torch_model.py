@@ -23,7 +23,7 @@ class Convd2d():
             nn.BatchNorm2d(256),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv1d(in_channels=256, out_channels=512, kernel_size=(3, 3), padding=1),
+            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
