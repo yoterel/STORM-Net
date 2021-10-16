@@ -253,7 +253,14 @@ def reproduce_experiments(video_names, sticker_locations, args):
     # do_old_experiment(r_matrix, s_matrix, video_names, args)
 
 
-def do_brain_error_visualization_experiment(vid_ses1, per_landmark):
+def do_brain_error_visualization_experiment(vid_ses1, per_patient_landmarks):
+    """
+    visualizes errors spatially on average MNI brain
+    :param vid_ses1: all first video sessions
+    :param per_landmark: np array: subjects x landmarks
+    landmark-per-patient inter-method error (vid session1 and digitizer sessions)
+    :return:
+    """
     XYZ = MNI_torch.load_raw_MNI_data("resource" + "/MNI_templates/xyzallBEM.npy", "brain", resource_folder="resource")
     import pptk
     v = pptk.viewer(XYZ)
@@ -262,14 +269,20 @@ def do_brain_error_visualization_experiment(vid_ses1, per_landmark):
     colors = np.empty((len(vid_ses1[1]), XYZ.shape[0]))
     for i in range(len(vid_ses1[1])):
         locs = vid_ses1[1][i]
-        weights = per_landmark[i]
+        weights = per_patient_landmarks[i]
         distances = 1 / (np.linalg.norm(XYZ - np.expand_dims(locs, 1), axis=-1) + 1e-5)
         distances /= np.sum(distances, axis=0)
         non_normalized_colors = weights @ distances
         colors[i] = non_normalized_colors
-    colors = np.sum(colors, axis=0)
+    colors = np.mean(colors, axis=0)
+    max_color = np.max(colors)
+    min_color = np.min(colors)
+    mean_color = np.mean(colors)
+    std_color = np.std(colors)
+    logging.info("spatial mean, std (video session): {}, {}".format(mean_color, std_color))
     colors = (colors - np.min(colors)) / (np.max(colors) - np.min(colors))
     v.attributes(colors)
+
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=np.pi, theta=0, r=300, point_size=0.5)
     v.capture('cache/right_view.png')
@@ -288,7 +301,7 @@ def do_brain_error_visualization_experiment(vid_ses1, per_landmark):
     v.set(show_grid=False, show_axis=False, show_info=False,
           lookat=(0, 0, 0), phi=3 * np.pi / 4, theta=np.pi / 4, r=300, point_size=0.5)
     v.capture('cache/iso2.png')
-    draw.plot_colorbar()
+    draw.plot_colorbar(min_color, max_color)
     v.close()
 
 

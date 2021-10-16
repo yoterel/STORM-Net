@@ -19,12 +19,7 @@ def parse_arguments():
     parser.add_argument("-t", "--template", help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
     parser.add_argument("--mni", action="store_true",
                         help="If specified, output will be projected to (adult) MNI coordinates")
-    parser.add_argument("-stormnet", "--storm_net", default="models/telaviv_model_b16.h5", help="A path to a trained storm net keras model")
-    parser.add_argument("--model_type",
-                        type=str,
-                        choices=["tf", "torch"],
-                        default="tf",
-                        help="type of network model file")
+    parser.add_argument("-stormnet", "--storm_net", default="models/torch_heatmap_manuscript.h5", help="A path to a trained storm net model")
     parser.add_argument("-unet", "--u_net", default="models/unet_tel_aviv.h5",
                         help="A path to a trained segmentation network model")
     parser.add_argument("-s", "--session_file",
@@ -82,7 +77,7 @@ if __name__ == "__main__":
     # run GUI / automatic annotation
     sticker_locations, video_names = video.process_video(args)
     if args.mode == "auto":
-        r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
+        r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, args)
         sensor_locations = geometry.apply_rigid_transform(r_matrix, s_matrix, None, None, video_names, args)
         if args.mni:
             projected_data = geometry.project_sensors_to_MNI(sensor_locations)

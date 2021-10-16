@@ -519,14 +519,21 @@ def plot_robustness(x, y):
     plt.show()
 
 
-def plot_colorbar():
+def plot_colorbar(min_value=0, max_value=7.5):
+    """
+    plots a trivial color bar for manuscript
+    :param min_value: minimum value for axis ticks
+    :param max_value: maximum value for axis ticks
+    :return:
+    """
     import pylab as pl
-    a = np.array([[0, 7.5]])
+    a = np.array([[min_value, max_value]])
     pl.figure(figsize=(9, 1.5))
     img = pl.imshow(a, cmap="hot")
     pl.gca().set_visible(False)
     cax = pl.axes([0.1, 0.3, 0.8, 0.6])
     pl.colorbar(orientation="horizontal", cax=cax)
     pl.xticks(fontsize=20)
-    plt.tight_layout()
-    plt.savefig("colorbar.png")
+    # pl.axis("off")
+    pl.tight_layout()
+    pl.show()
