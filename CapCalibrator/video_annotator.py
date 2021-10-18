@@ -317,7 +317,7 @@ class GUI(tk.Tk):
             menubar.add_cascade(label="File", menu=filemenu)
             optionsmenu = tk.Menu(menubar, tearoff=0)
             optionsmenu.add_command(label="Render Synthetic Data", command=self.render)
-            optionsmenu.add_command(label="Finetune STORM-net", command=self.finetune)
+            optionsmenu.add_command(label="Train STORM-net", command=self.finetune)
             menubar.add_cascade(label="Options", menu=optionsmenu)
             if self.template_file_name:
                 menubar.entryconfig("Options", state="normal")
@@ -325,10 +325,10 @@ class GUI(tk.Tk):
                 menubar.entryconfig("Options", state="disabled")
             if self.renderer_executable and self.synth_output_dir and self.template_file_name:
                 optionsmenu.entryconfig("Render Synthetic Data", state="normal")
-                optionsmenu.entryconfig("Finetune STORM-net", state="normal")
+                optionsmenu.entryconfig("Train STORM-net", state="normal")
             else:
                 optionsmenu.entryconfig("Render Synthetic Data", state="disabled")
-                optionsmenu.entryconfig("Finetune STORM-net", state="disabled")
+                optionsmenu.entryconfig("Train STORM-net", state="disabled")
         else:
             menubar = ""
         return menubar
@@ -1293,7 +1293,7 @@ class FinetunePage(tk.Frame):
         self.render_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
         self.finetune_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
         self.render_frame_title = tk.Label(self, text="Render Synthetic Data", pady=10)
-        self.finetune_frame_title = tk.Label(self, text="Finetune STORM-Net", pady=10)
+        self.finetune_frame_title = tk.Label(self, text="Train STORM-Net", pady=10)
         self.template_name_static = tk.Label(self.render_frame, text="", pady=10)
         self.template_name = tk.Label(self.render_frame, text="", bg=controller['bg'], pady=10)
         self.template_name_button = tk.Button(self.render_frame, text="...",
@@ -1338,11 +1338,11 @@ class FinetunePage(tk.Frame):
         self.output_log_name1 = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
         self.gpu_label = tk.Label(self.finetune_frame, text="", pady=10)
         self.gpu_static = tk.Label(self.finetune_frame, text="", bg=controller['bg'])
-        self.finetune_kill_button = tk.Button(self.finetune_frame, text="Kill Finetune Thread",
+        self.finetune_kill_button = tk.Button(self.finetune_frame, text="Kill Training Thread",
                                               command=self.controller.finetune_kill_thread)
         self.finetune_default_button = tk.Button(self.finetune_frame, text="Default Settings",
                                                  command=self.controller.set_default_finetune)
-        self.finetune_button = tk.Button(self.finetune_frame, text="Finetune", command=self.controller.finetune)
+        self.finetune_button = tk.Button(self.finetune_frame, text="Train", command=self.controller.finetune)
         self.finetune_log_text = tk.scrolledtext.ScrolledText(self.finetune_frame, wrap=tk.WORD, height=10, width=45)
         self.finetune_log_text.configure(state='disabled')
         self.finetune_progressbar = ttk.Progressbar(self.finetune_frame, orient=tk.HORIZONTAL, length=100,
@@ -1470,7 +1470,7 @@ class FinetunePage(tk.Frame):
         self.premodel_name.config(text=pretrained_model_str)
         self.output_folder_static1.config(text="Synthesized Data Output Folder: ")
         self.output_folder1.config(text=output_folder_str)
-        self.output_log_label1.config(text="Finetune Log File: ")
+        self.output_log_label1.config(text="Training Log File: ")
         self.output_log_name1.config(text=finetune_log_file_str)
 
         self.gpu_label.config(text="GPU ID to use (-1 for CPU): ")
