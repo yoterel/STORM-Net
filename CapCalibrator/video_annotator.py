@@ -20,6 +20,8 @@ import logging
 import webbrowser
 import render
 import config
+import torch
+from torch_src import torch_model
 # import train
 
 
@@ -52,7 +54,7 @@ def annotate_videos(args):  # contains GUI mainloop
                     paths.append(file)
         if args.headless:
             return new_db
-    else:
+    else:  # mode is gui
         new_db = file_io.load_full_db()
         paths = None
     logging.info("Launching GUI...")
@@ -83,6 +85,7 @@ class GUI(tk.Tk):
         self.finetune_thread = None
         self.unet_model = None
         self.storm_model = None
+        self.pretrained_stormnet_path = Path(self.args.storm_net)
         self.unet_graph = None
         self.finetunning = False
         self.renderer_executable = None
@@ -95,7 +98,6 @@ class GUI(tk.Tk):
         self.template_format = None
         self.projected_data = None
         self.cur_active_panel = None
-        self.pretrained_stormnet_path = Path(self.args.storm_net)
         self.render_thread_alive = False
         # if self.args.mode == "gui" or self.args.mode == "experimental":
         #     unet_model_full_path = Path(args.u_net)
@@ -163,11 +165,11 @@ class GUI(tk.Tk):
             msg = self.queue.get(False)
             if msg[0] == "calibrate":
                 self.projected_data = msg[1]
-                self.save_calibration()
+                self.save_registration()
             elif msg[0] == "video_to_frames":
                 self.frames, self.indices, my_hash = msg[1:]
                 if my_hash not in self.db.keys():
-                    data = np.zeros((1, config.number_of_frames_per_video, config.max_number_of_landmarks_per_frames))
+                    data = np.zeros((1, config.number_of_frames_per_video, 2*config.max_number_of_landmarks_per_frames))
                     my_dict = {"data": data,
                                "label": np.array([0, 0, 0]),
                                "frame_indices": self.indices}
@@ -183,6 +185,9 @@ class GUI(tk.Tk):
                 logging.info("new indices: " + str(self.indices))
             elif msg[0] == "load_template_model":
                 self.template_names, self.template_data, self.template_format, self.template_file_name = msg[1:]
+            elif msg[0] == "load_stormnet":
+                self.storm_model = msg[1]
+                self.pretrained_stormnet_path = msg[2]
                 # self.panels[self.cur_active_panel].update_labels()
             # Show result of the task if needed
             self.panels[ProgressBarPage].show_progress(False)
@@ -200,8 +205,9 @@ class GUI(tk.Tk):
         msg_dict = {"video_to_frames": "Selecting frames from video...",
                     "annotate_frames": "Predicting landmarks...This might take some time if GPU is not being used.\nUsing GPU: {}".format(predict.is_using_gpu()),
                     "load_template_model": "Loading template model...",
+                    "load_stormnet": "Loading Storm-Net model...",
                     "shift_video": "Selecting different frame...",
-                    "calibrate": "Calibrating...",
+                    "calibrate": "Performing Co-Registeration...",
                     "render": "Creating synthetic data, This might take a while...",
                     "finetune": "Fine-tunning STORM-Net. This might take a while...",
                     "predict": "Predicting..."}
@@ -239,11 +245,12 @@ class GUI(tk.Tk):
         menubar = tk.Menu(self)
         if page == "calib":
             filemenu = tk.Menu(menubar, tearoff=0)
+            filemenu.add_command(label="Load Storm-Net Model", command=self.load_stormnet)
             filemenu.add_command(label="Load Video", command=self.load_video)
             filemenu.add_command(label="Load Template Model", command=self.load_template_model)
             filemenu.add_command(label="Load Session", command=self.load_session)
             filemenu.add_command(label="Save Session", command=self.save_session)
-            filemenu.add_command(label="Save Calibration", command=self.save_calibration)
+            filemenu.add_command(label="Save Registration", command=self.save_registration)
             filemenu.add_separator()
             filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
             menubar.add_cascade(label="File", menu=filemenu)
@@ -259,7 +266,7 @@ class GUI(tk.Tk):
             videomenu.add_command(label="Previous Video", command=self.prev_video)
             videomenu.add_separator()
             videomenu.add_command(label="Auto Annotate", command=self.auto_annotate)
-            videomenu.add_command(label="Calibrate", command=self.calibrate)
+            videomenu.add_command(label="Co-Register", command=self.calibrate)
             menubar.add_cascade(label="Video", menu=videomenu)
             if self.paths:
                 # a video is loaded
@@ -273,20 +280,20 @@ class GUI(tk.Tk):
                 else:
                     videomenu.entryconfig("Next Video", state="normal")
                     videomenu.entryconfig("Previous Video", state="normal")
-                if self.template_file_name:
+                if self.template_file_name and self.storm_model:
                     # a template file was loaded
-                    videomenu.entryconfig("Calibrate", state="normal")
+                    videomenu.entryconfig("Co-Register", state="normal")
                 else:
-                    videomenu.entryconfig("Calibrate", state="disabled")
+                    videomenu.entryconfig("Co-Register", state="disabled")
             else:
                 filemenu.entryconfig("Load Session", state="disabled")
                 filemenu.entryconfig("Save Session", state="disabled")
                 menubar.entryconfig("Video", state="disabled")
             if self.projected_data:
                 # calibration was performed
-                filemenu.entryconfig("Save Calibration", state="normal")
+                filemenu.entryconfig("Save Registration", state="normal")
             else:
-                filemenu.entryconfig("Save Calibration", state="disabled")
+                filemenu.entryconfig("Save Registration", state="disabled")
         elif page == "exp":
             filemenu = tk.Menu(menubar, tearoff=0)
             filemenu.add_command(label="Load Template Model", command=self.load_template_model)
@@ -589,12 +596,12 @@ class GUI(tk.Tk):
         """
         if not np.any(self.db[self.get_cur_video_hash()][self.shift]["data"]):
             result = messagebox.askquestion("No Annotation Detected",
-                                            "Are you sure you want to calibrate? frames seem to be not annotated.",
+                                            "Are you sure you want to co-register? frames seem to be not annotated.",
                                             icon='warning')
             if result != 'yes':
                 return
         result = messagebox.askyesno("Project to MNI?",
-                                     "Would you like the calibrated data to be projected to MNI coordinates?")
+                                     "Would you like the registered data to be projected to MNI coordinates?")
         if result:
             self.args.mni = True
         else:
@@ -656,6 +663,11 @@ class GUI(tk.Tk):
                 self.paths = [obj]
                 self.take_async_action(self.prep_vid_to_frames_packet())
 
+    def load_stormnet(self):
+        obj = self.select_from_filesystem(False, True, ".", "Select Storm-Net Model File")
+        if obj:
+            self.take_async_action(["load_stormnet", obj, self.args.gpu_id])
+
     def load_template_model(self):
         obj = self.select_from_filesystem(False, True, ".", "Select Template Model File")
         if obj:
@@ -676,7 +688,7 @@ class GUI(tk.Tk):
             return
         file_io.dump_to_pickle(Path(f.name), self.db)
 
-    def save_calibration(self):
+    def save_registration(self):
         if self.projected_data:
             f = filedialog.asksaveasfile(initialdir=".", title="Select Output File", mode='w')
             if f is None:
@@ -979,6 +991,8 @@ class ThreadedTask(threading.Thread):
             self.handle_shift_video()
         elif self.msg[0] == "load_template_model":
             self.handle_load_template_model()
+        elif self.msg[0] == "load_stormnet":
+            self.handle_load_stormnet()
         elif self.msg[0] == "calibrate":
             self.handle_calibrate()
         elif self.msg[0] == "predict":
@@ -1014,6 +1028,30 @@ class ThreadedTask(threading.Thread):
         except (TypeError, IndexError) as e:
             template_names, template_data, template_format, path = [None], [None], None, None
         self.queue.put(["load_template_model", template_names[0], template_data[0], template_format, path])
+
+    def handle_load_stormnet(self):
+        path = Path(self.msg[1])
+        device = self.msg[2]
+        if path.suffix.lower() in [".pth", ".h5"]:
+            model_full_path = path
+            class MyOptions:
+                def __init__(self, device):
+                    self.network_input_size = 10
+                    self.architecture = "2dconv"
+                    self.loss = "l2"
+                    self.device = device
+                    self.scale_faces = None
+                    self.network_output_size = 3
+                    if self.scale_faces:
+                        self.network_output_size += len(self.scale_faces)
+            opt = MyOptions(device=device)
+            network = torch_model.MyNetwork(opt)
+            state_dict = torch.load(model_full_path, map_location=device)
+            if hasattr(state_dict, '_metadata'):
+                del state_dict._metadata
+            network.load_state_dict(state_dict)
+            network.to(opt.device)
+            self.queue.put(["load_stormnet", network, path])
 
     def handle_video_to_frames(self):
         path, indices = self.msg[1:]
@@ -1144,10 +1182,10 @@ class MainMenu(tk.Frame):
         self.tempalte_view_button = ttk.Button(self, text="View Template Model",
                                                command=lambda: controller.show_panel(ExperimentViewerPage))
 
-        self.finetune_button = ttk.Button(self, text="Fine-tune STORM-Net",
+        self.finetune_button = ttk.Button(self, text="Offline Step",
                                           command=lambda: controller.show_panel(FinetunePage))
 
-        self.calibration_button = ttk.Button(self, text="Calibrate",
+        self.calibration_button = ttk.Button(self, text="Online Step",
                                              command=lambda: controller.show_panel(CalibrationPage))
         self.about_button = ttk.Button(self, text="About",
                                              command=lambda: controller.show_panel(AboutPage))
@@ -1176,7 +1214,7 @@ class AboutPage(tk.Frame):
                                  relief="groove",
                                  anchor="w",
                                  justify="left")
-        self.subtitle = tk.Label(self, text="https://github.com/yoterel/STORM", fg="blue", cursor="hand2")
+        self.subtitle = tk.Label(self, text="https://github.com/yoterel/STORM-Net", fg="blue", cursor="hand2")
         self.button = ttk.Button(self, text="Back",
                                  command=lambda: controller.show_panel(MainMenu))
         self.title.grid(row=1, column=1)

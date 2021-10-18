@@ -61,6 +61,12 @@ def parse_arguments():
             args.ground_truth = Path(args.ground_truth)
         if args.output_file:
             args.output_file = Path(args.output_file)
+        if not Path(args.stormnet).is_file():
+            logging.error("Storm-Net model file not found (using: {})".format(args.stormnet))
+            exit(1)
+        if not Path(args.unet).is_file():
+            logging.error("Semantic segmentation model file not found (using: {})".format(args.unet))
+            exit(1)
     return args
 
 

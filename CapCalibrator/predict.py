@@ -45,50 +45,50 @@ def predict_rigid_transform(sticker_locations, preloaded_model, args):
     data_augmentations.mask_facial_landmarks(sticker_locations)
     # center the data
     data_augmentations.center_data(sticker_locations)
-    # if preloaded_model:
-    #     model = preloaded_model
-    # else:
-    model_full_path = Path(args.storm_net)
-    opt = Options(device=args.gpu_id)
-    network = torch_model.MyNetwork(opt)
-    state_dict = torch.load(model_full_path, map_location=args.gpu_id)
-    if hasattr(state_dict, '_metadata'):
-        del state_dict._metadata
-    network.load_state_dict(state_dict)
-    network.to(opt.device)
+    if preloaded_model:
+        network = preloaded_model
+    else:
+        model_full_path = Path(args.storm_net)
+        opt = Options(device=args.gpu_id)
+        network = torch_model.MyNetwork(opt)
+        state_dict = torch.load(model_full_path, map_location=args.gpu_id)
+        if hasattr(state_dict, '_metadata'):
+            del state_dict._metadata
+        network.load_state_dict(state_dict)
+        network.to(opt.device)
     heat_mapper = torch_data.HeatMap((256, 256), 16, False, args.gpu_id)
     x = torch.from_numpy(sticker_locations).to(args.gpu_id).float()
     x[:, :, 0::2] *= 256
     x[:, :, 1::2] *= 256
-    y_predict = torch.empty((len(x), opt.network_output_size), dtype=torch.float, device=args.gpu_id)
+    y_predict = torch.empty((len(x), network.opt.network_output_size), dtype=torch.float, device=args.gpu_id)
     for i in range(len(x)):
         heatmap = heat_mapper(x[i].reshape(10, x[i].shape[-1] // 2, 2))
         with torch.no_grad():
             _, pred = network(heatmap.unsqueeze(0))
             y_predict[i] = pred
     y_predict = y_predict.cpu().numpy()
-    assert y_predict.shape[-1] == opt.network_output_size
+    assert y_predict.shape[-1] == network.opt.network_output_size
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
     # notice x is not negated - the positive direction in simulation is flipped.
     rs = []
     sc = []
     for i in range(len(y_predict)):
-        logging.info("Network Prediction:" + str(y_predict[i].tolist()))
+        logging.info("Storm-Net Parameters Prediction:" + str(y_predict[i].tolist()))
         rot = R.from_euler('xyz', [y_predict[i][0], y_predict[i][1], y_predict[i][2]], degrees=True)
         scale_mat = np.identity(3)
         if y_predict.shape[-1] > 3:
             counter = 0
-            if "x" in opt.scale_faces:
+            if "x" in network.opt.scale_faces:
                 xterm = y_predict[i][3 + counter]
                 counter += 1
             else:
                 xterm = 1.0
-            if "y" in opt.scale_faces:
+            if "y" in network.opt.scale_faces:
                 yterm = y_predict[i][3 + counter]
                 counter += 1
             else:
                 yterm = 1.0
-            if "z" in opt.scale_faces:
+            if "z" in network.opt.scale_faces:
                 zterm = y_predict[i][3 + counter]
             else:
                 zterm = 1.0
