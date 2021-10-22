@@ -6,11 +6,12 @@ import os
 
 def configure_compute_environment(gpu_id):
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)  # set gpu visibility prior to importing tf and keras
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)  # set gpu visibility prior to importing tf or torch
     if gpu_id == -1:
         return "cpu"
     else:
         return "cuda:0"
+
 
 def shape_to_np(shape, dtype="int"):
     """

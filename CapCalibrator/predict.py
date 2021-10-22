@@ -49,18 +49,18 @@ def predict_rigid_transform(sticker_locations, preloaded_model, args):
         network = preloaded_model
     else:
         model_full_path = Path(args.storm_net)
-        opt = Options(device=args.gpu_id)
+        opt = Options(device=args.device)
         network = torch_model.MyNetwork(opt)
-        state_dict = torch.load(model_full_path, map_location=args.gpu_id)
+        state_dict = torch.load(model_full_path, map_location=args.device)
         if hasattr(state_dict, '_metadata'):
             del state_dict._metadata
         network.load_state_dict(state_dict)
         network.to(opt.device)
-    heat_mapper = torch_data.HeatMap((256, 256), 16, False, args.gpu_id)
-    x = torch.from_numpy(sticker_locations).to(args.gpu_id).float()
+    heat_mapper = torch_data.HeatMap((256, 256), 16, False, args.device)
+    x = torch.from_numpy(sticker_locations).to(args.device).float()
     x[:, :, 0::2] *= 256
     x[:, :, 1::2] *= 256
-    y_predict = torch.empty((len(x), network.opt.network_output_size), dtype=torch.float, device=args.gpu_id)
+    y_predict = torch.empty((len(x), network.opt.network_output_size), dtype=torch.float, device=args.device)
     for i in range(len(x)):
         heatmap = heat_mapper(x[i].reshape(10, x[i].shape[-1] // 2, 2))
         with torch.no_grad():

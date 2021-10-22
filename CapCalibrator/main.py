@@ -36,6 +36,8 @@ def parse_arguments():
         sys.exit(1)
 
     args = parser.parse_args()
+    # configure computing environment
+    args.device = utils.configure_compute_environment(args.gpu_id)
     if args.mode == "gui" and not args.headless:
         args.video = None
         args.template = None
@@ -78,8 +80,6 @@ if __name__ == "__main__":
         logging.basicConfig(filename=args.log, filemode='w', level=args.verbosity.upper())
     else:
         logging.basicConfig(level=args.verbosity.upper())
-    # configure computing environment
-    args.gpu_id = utils.configure_compute_environment(args.gpu_id)
     # run GUI / automatic annotation
     sticker_locations, video_names = video.process_video(args)
     if args.mode == "auto":

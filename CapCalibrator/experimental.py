@@ -202,7 +202,7 @@ def do_parameter_grid_search_experiment(opt):
             anchors = origin  # same anchors for all experiments...
             sensors = transformed_others[min_range:max_range, :, :]
             sorted_anchors, indices = geometry.sort_anchors(np.array(origin_names), anchors)
-            device = opt.gpu_id
+            device = opt.device
             origin_xyz_torch = torch.from_numpy(sorted_anchors).float().to(device)
             sensors_xyz_torch = torch.from_numpy(sensors).float().to(device)
             selected_indices_torch = torch.from_numpy(indices).to(device)

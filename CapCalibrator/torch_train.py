@@ -9,8 +9,14 @@ import torch_src.torch_writer as torch_writer
 import numpy as np
 
 
-def train_loop(opt):
-    writer = torch_writer.Writer(opt)
+def train_loop(opt, sync=None):
+    """
+    trains a neural network
+    :param opt: training options (from command line usually)
+    :param sync: list of synchronization objects: 0-event signaling to end training, 1-queue to report results
+    :return:
+    """
+    writer = torch_writer.Writer(opt, sync[1])
     opt.is_train = True
     train_dataset = torch_data.MyDataLoader(opt)
     opt.is_train = False
@@ -49,12 +55,25 @@ def train_loop(opt):
                                                                             len(train_dataset) // opt.batch_size,
                                                                             train_loss_np))
             train_loss_total.append(train_loss_np)
+            # stops training if signaled from different thread
+            if sync:
+                if sync[0].isSet():
+                    break
+        # stops training if signaled from different thread
+        if sync:
+            if sync[0].isSet():
+                break
         train_loss_total = np.mean(np.array(train_loss_total))
         writer.write_scaler("epoch", "train_loss_total", train_loss_total, epoch)
         logging.info("train: epoch: {}, training loss: {}".format(epoch,
                                                                   train_loss_total))
-        model.save_network(which_epoch=str(epoch))
-        model.save_network(which_epoch="latest")
+        if opt.create_new_checkpoints_per_epoch:
+            model.save_network(file_name=str(epoch))
+
+        if sync:
+            model.save_network(file_name=opt.experiment_name, use_models_folder=True)
+        else:
+            model.save_network(file_name="latest")
         with torch.no_grad():
             val_loss_total = []
             for input, target in val_dataset:
@@ -74,6 +93,7 @@ def train_loop(opt):
         writer.write_scaler("epoch", "learning rate", model.optimizer.param_groups[0]['lr'], epoch)
         logging.info("lr: {}".format(model.optimizer.param_groups[0]['lr']))
         model.scheduler.step(val_loss_total)
+    writer.close()
 
 
 def parse_arguments():
@@ -94,12 +114,15 @@ def parse_arguments():
     parser.add_argument("--lr", type=float, default=1e-5, help="learning rate for optimizer")
     parser.add_argument('--beta1', type=float, default=0.9, help='momentum term of adam')
     parser.add_argument("--template",
-                        help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
+                        help="The template file path (given in space delimited csv format of size nx3)."
+                             " Required if using projection loss")
     parser.add_argument("--network_input_size", type=int, default=14, help="Input layer size for STORM-Net")
     parser.add_argument("--num_threads", type=int, default=0, help="Number of worker threads for dataloader")
     parser.add_argument("--log", action="store_true", help="If present, writes training log")
     parser.add_argument("--tensorboard",
                         help="If present, writes training stats to this path (readable with tensorboard)")
+    parser.add_argument("--create_new_checkpoints_per_epoch", action="store_true",
+                        help="Creates checkpoints every epoch (besides latest version of model)")
     parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     # if len(sys.argv) == 1:
     #     parser.print_help(sys.stderr)
@@ -107,7 +130,7 @@ def parse_arguments():
     # cmd = "test_torch ../../renders --template ../../example_models/example_model.txt".split()
     args = parser.parse_args()
 
-    args.root = Path("runs", args.experiment_name)
+    args.root = Path("models", args.experiment_name)
     args.root.mkdir(parents=True, exist_ok=True)
 
     if args.log:

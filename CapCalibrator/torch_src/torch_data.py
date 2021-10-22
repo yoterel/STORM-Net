@@ -149,25 +149,26 @@ class HeatMap(torch.nn.Module):
 class MyDataSet(torch.utils.data.Dataset):
     def __init__(self, opt):
         self.opt = copy.deepcopy(opt)
+        self.raw_data_file = opt.data_path / "data_split.pickle"
         if self.opt.is_train:
-            my_str = "train"
+            if not self.raw_data_file.is_file() or self.opt.force_load_raw_data:
+                logging.info("loading raw data. this might take a while.")
+                X, Y = file_io.load_raw_json_db(opt.data_path, opt.scale_faces, False)
+                logging.info("creating train-validation split")
+                x_train, x_val, y_train, y_val = utils.split_data(X, Y, with_test_set=False)
+                # X_train = np.expand_dims(X_train, axis=0)
+                # X_val = np.expand_dims(X_val, axis=0)
+                # y_train = np.expand_dims(y_train, axis=0)
+                # y_val = np.expand_dims(y_val, axis=0)
+                logging.info("saving train-validation split to: " + str(self.raw_data_file))
+                file_io.serialize_data(self.raw_data_file, x_train, x_val, y_train, y_val)
+            else:
+                logging.info("(train data) loading train-validation split from: " + str(self.raw_data_file))
+                x_train, x_val, y_train, y_val = file_io.deserialize_data(self.raw_data_file, with_test_set=False)
         else:
-            my_str = "val"
-        self.raw_data_file = opt.data_path / "data_{}.pickle".format(my_str)
-        if not self.raw_data_file.is_file() or self.opt.force_load_raw_data:
-            logging.info("loading raw data")
-            X, Y = file_io.load_raw_json_db(opt.data_path, opt.scale_faces, False)
-            logging.info("creating train-validation split")
-            x_train, x_val, y_train, y_val = utils.split_data(X, Y, with_test_set=False)
-            # X_train = np.expand_dims(X_train, axis=0)
-            # X_val = np.expand_dims(X_val, axis=0)
-            # y_train = np.expand_dims(y_train, axis=0)
-            # y_val = np.expand_dims(y_val, axis=0)
-            logging.info("saving train-validation split to: " + str(self.raw_data_file))
-            file_io.serialize_data(self.raw_data_file, x_train, x_val, y_train, y_val)
-        else:
-            logging.info("loading train-validation split from: " + str(self.raw_data_file))
+            logging.info("(val data) loading train-validation split from: " + str(self.raw_data_file))
             x_train, x_val, y_train, y_val = file_io.deserialize_data(self.raw_data_file, with_test_set=False)
+
         if self.opt.is_train:
             self.data = x_train
             self.labels = y_train

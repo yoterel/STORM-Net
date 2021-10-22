@@ -22,7 +22,7 @@ import render
 import config
 import torch
 from torch_src import torch_model
-# import train
+import torch_train
 
 
 def post_process_db(db):
@@ -139,10 +139,10 @@ class GUI(tk.Tk):
                 self.render_thread_alive = False
                 self.render_thread = None
                 self.panels[FinetunePage].update_render_progress_bar(False)
-            elif msg[0] == "finetune_data":
-                epoch, loss = msg[1:]
-                self.panels[FinetunePage].set_finetune_log_text(epoch, loss)
-            elif msg[0] == "finetune_done":
+            elif msg[0] == "training_data":
+                name, value, iter = msg[1:]
+                self.panels[FinetunePage].set_finetune_log_text(name, value, iter)
+            elif msg[0] == "training_done":
                 self.finetunning = False
                 self.finetune_thread = None
                 self.panels[FinetunePage].update_finetune_progress_bar(False)
@@ -666,7 +666,7 @@ class GUI(tk.Tk):
     def load_stormnet(self):
         obj = self.select_from_filesystem(False, True, ".", "Select Storm-Net Model File")
         if obj:
-            self.take_async_action(["load_stormnet", obj, self.args.gpu_id])
+            self.take_async_action(["load_stormnet", obj, self.args.device])
 
     def load_template_model(self):
         obj = self.select_from_filesystem(False, True, ".", "Select Template Model File")
@@ -849,9 +849,6 @@ class GUI(tk.Tk):
         if model_name == "":
             logging.info("Missing new model name.")
             return
-        if self.pretrained_stormnet_path is None:
-            logging.info("Missing pre-trained model path.")
-            return
         elif self.synth_output_dir is None:
             logging.info("Missing synthetic data output folder")
             return
@@ -868,7 +865,7 @@ class GUI(tk.Tk):
             self.take_async_action(self.prep_fintune_packet(model_name), periodic=True)
 
     def prep_fintune_packet(self, model_name):
-        return ["finetune_start", model_name, self.pretrained_stormnet_path, self.synth_output_dir, self.finetune_log_file]
+        return ["finetune_start", model_name, self.synth_output_dir, self.args.device]
 
     ### ExperimentViewerPage ###
     def toggle_optodes(self, event=None):
@@ -941,10 +938,38 @@ class ThreadedPeriodicTask(threading.Thread):
             self.handle_render()
 
     def handle_finetune(self):
-        model_name, pretrained_stormnet_path, synth_output_dir, finetune_log_file = self.msg[1:]
+        model_name, synth_output_dir, device = self.msg[1:]
+
+        class Options:
+            def __init__(self):
+                self.experiment_name = model_name
+                self.data_path = synth_output_dir
+                self.architecture = "2dconv"
+                self.force_load_raw_data = False
+                self.loss = "l2"
+                self.scale_faces = None
+                self.dont_use_gmm = False
+                self.device = device
+                self.continue_train = False
+                self.batch_size = 16
+                self.number_of_epochs = 30
+                self.lr = 1e-4
+                self.beta1 = 0.9
+                # self.template = Path("../example_models/example_model.txt")
+                self.network_input_size = 10
+                self.num_threads = 0
+                self.log = False
+                self.tensorboard = None
+                self.create_new_checkpoints_per_epoch = False
+                self.verbosity = "info"
+                self.is_train = True
+                self.network_output_size = 3
+                self.root = Path("models", self.experiment_name)
+        opt = Options()
         try:
-            train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
-                        self.stoprequest)
+            torch_train.train_loop(opt, [self.stoprequest, self.queue])
+            # train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
+            #             self.stoprequest)
         except IndexError:
             logging.warning("Fine tunning STORM-Net failed. Maybe the synthetic data is incorrect / corrupted ?")
             self.queue.put(["finetune_done"])
@@ -1042,8 +1067,6 @@ class ThreadedTask(threading.Thread):
                     self.device = device
                     self.scale_faces = None
                     self.network_output_size = 3
-                    if self.scale_faces:
-                        self.network_output_size += len(self.scale_faces)
             opt = MyOptions(device=device)
             network = torch_model.MyNetwork(opt)
             state_dict = torch.load(model_full_path, map_location=device)
@@ -1154,8 +1177,8 @@ class CalibrationPage(tk.Frame):
                 self.canvas.create_line(int(db_to_show[i, 0]) + 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) - 5,
                                    540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
 
-        button = ttk.Button(self.data_panel, text="Predict", command=lambda: self.controller.predict_x())
-        button.pack(fill="x")
+        # button = ttk.Button(self.data_panel, text="Predict", command=lambda: self.controller.predict_x())
+        # button.pack(fill="x")
 
     def update_canvas(self):
         self.canvas.delete("image")
@@ -1324,10 +1347,10 @@ class FinetunePage(tk.Frame):
 
         self.model_name_label = tk.Label(self.finetune_frame, text="Model Name: ", pady=10)
         self.model_name = tk.Entry(self.finetune_frame)
-        self.premodel_name_static = tk.Label(self.finetune_frame, text="", pady=10)
-        self.premodel_name = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
-        self.premodel_button = tk.Button(self.finetune_frame, text="...",
-                                         command=self.controller.load_pretrained_model)
+        # self.premodel_name_static = tk.Label(self.finetune_frame, text="", pady=10)
+        # self.premodel_name = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
+        # self.premodel_button = tk.Button(self.finetune_frame, text="...",
+        #                                  command=self.controller.load_pretrained_model)
         self.output_folder_static1 = tk.Label(self.finetune_frame, text="", pady=10)
         self.output_folder1 = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
         self.output_folder_button1 = tk.Button(self.finetune_frame, text="...",
@@ -1385,9 +1408,9 @@ class FinetunePage(tk.Frame):
         self.model_name_label.grid(row=0, column=0, sticky='W')
         self.model_name.grid(row=0, column=2, sticky='W')
 
-        self.premodel_name_static.grid(row=2, column=0, sticky='W')
-        self.premodel_button.grid(row=2, column=1)
-        self.premodel_name.grid(row=2, column=2, sticky='W')
+        # self.premodel_name_static.grid(row=2, column=0, sticky='W')
+        # self.premodel_button.grid(row=2, column=1)
+        # self.premodel_name.grid(row=2, column=2, sticky='W')
 
         self.output_folder_static1.grid(row=3, column=0, sticky='W')
         self.output_folder_button1.grid(row=3, column=1)
@@ -1420,8 +1443,8 @@ class FinetunePage(tk.Frame):
         item.insert(0, text)
         return
 
-    def set_finetune_log_text(self, epoch, loss):
-        msg = "epoch: {}, val_loss: {}".format(epoch, loss)
+    def set_finetune_log_text(self, name, value, iter):
+        msg = "{}, {}: {}".format(name, iter, value)
         fully_scrolled_down = self.finetune_log_text.yview()[1] == 1.0
         self.finetune_log_text.configure(state='normal')
         self.finetune_log_text.insert(tk.END, msg + "\n")
@@ -1455,7 +1478,7 @@ class FinetunePage(tk.Frame):
         output_folder_str = self.controller.get_synth_output_folder_name()
         render_log_file_str = self.controller.get_renderer_log_file_name()
         finetune_log_file_str = self.controller.get_finetune_log_file_name()
-        pretrained_model_str = self.controller.get_pretrained_stormnet_path()
+        # pretrained_model_str = self.controller.get_pretrained_stormnet_path()
         gpu_id_str = str(self.controller.get_gpu_id())
 
         self.template_name_static.config(text="Template Model File: ")
@@ -1466,8 +1489,8 @@ class FinetunePage(tk.Frame):
         self.output_folder.config(text=output_folder_str)
         self.output_log_label.config(text="Renderer Log File: ")
         self.output_log_name.config(text=render_log_file_str)
-        self.premodel_name_static.config(text="Pretrained Model: ")
-        self.premodel_name.config(text=pretrained_model_str)
+        # self.premodel_name_static.config(text="Pretrained Model: ")
+        # self.premodel_name.config(text=pretrained_model_str)
         self.output_folder_static1.config(text="Synthesized Data Output Folder: ")
         self.output_folder1.config(text=output_folder_str)
         self.output_log_label1.config(text="Training Log File: ")

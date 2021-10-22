@@ -156,9 +156,9 @@ class MyModel:
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience=5)
         self.network.to(self.opt.device)
 
-    def load_network(self, which_epoch):
+    def load_network(self, file_name):
         """load model from disk"""
-        save_filename = '{}_net.pth'.format(str(which_epoch))
+        save_filename = '{}.pth'.format(str(file_name))
         load_path = Path.joinpath(self.opt.root, save_filename)
         net = self.network
         if isinstance(net, torch.nn.DataParallel):
@@ -171,10 +171,14 @@ class MyModel:
             del state_dict._metadata
         net.load_state_dict(state_dict)
 
-    def save_network(self, which_epoch):
+    def save_network(self, file_name, use_models_folder=False):
         """save model to disk"""
-        save_filename = '{}_net.pth'.format(str(which_epoch))
-        save_path = Path.joinpath(self.opt.root, save_filename)
+        if use_models_folder:
+            save_filename = '{}.pth'.format(str(file_name))
+            save_path = Path("models", save_filename)
+        else:
+            save_filename = '{}.pth'.format(str(file_name))
+            save_path = Path.joinpath(self.opt.root, save_filename)
         torch.save(self.network.cpu().state_dict(), save_path)
         self.network.to(self.opt.device)
 
