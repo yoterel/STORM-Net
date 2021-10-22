@@ -243,7 +243,7 @@ void Awake()
         }
         if (positions[1].y < positions[0].y || positions[1].y < positions[2].y)
         {
-            System.Console.WriteLine("Sanity check failed. Middle-Triangle sticker is inside of skull.");
+            System.Console.WriteLine("Sanity check failed. Nose-Tip sticker is inside of skull.");
             return false;
         }
         if (positions[6].z < positions[4].z)
