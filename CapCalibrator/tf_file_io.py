@@ -1,7 +1,10 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
 import models
 import logging
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
 
 
 def load_semantic_seg_model(weights_loc):

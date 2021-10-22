@@ -44,6 +44,7 @@ def parse_arguments():
         args.output_file = None
         args.session_file = None
         args.ground_truth = None
+        args.storm_net = None
     else:
         if args.video:
             args.video = Path(args.video)

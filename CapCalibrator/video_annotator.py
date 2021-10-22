@@ -85,7 +85,7 @@ class GUI(tk.Tk):
         self.finetune_thread = None
         self.unet_model = None
         self.storm_model = None
-        self.pretrained_stormnet_path = Path(self.args.storm_net)
+        self.pretrained_stormnet_path = None
         self.unet_graph = None
         self.finetunning = False
         self.renderer_executable = None
@@ -1232,7 +1232,8 @@ class AboutPage(tk.Frame):
                                  text="STORM-Net: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS).\n"
                                       "Research: Yotam Erel, Sagi Jaffe-Dax, Yaara Yeshurun-Dishon, Amit H. Bermano\n"
                                       "Implementation: Yotam Erel\n"
-                                      "This program is free for personal, non-profit or academic use.",
+                                      "This program is free for personal, non-profit or academic use.\n"
+                                      "All Rights Reserved.",
                                  font=("Verdana", 12),
                                  relief="groove",
                                  anchor="w",
@@ -1242,7 +1243,7 @@ class AboutPage(tk.Frame):
                                  command=lambda: controller.show_panel(MainMenu))
         self.title.grid(row=1, column=1)
         self.subtitle.grid(row=2, column=1)
-        self.subtitle.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/yoterel/STORM"))
+        self.subtitle.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/yoterel/STORM-Net"))
         self.button.grid(row=3, column=1)
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1)
