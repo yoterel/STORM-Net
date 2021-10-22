@@ -1,15 +1,15 @@
 # STORM-Net: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS)
 All files in the repository are an implementation of the original manuscript and research ([preprint](https://doi.org/10.1101/2020.12.29.424683)).
 ## Introduction
-This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordiantes of every optode position in MNI coordinates (or a standard cooridnate system that can be easly transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
+This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordinates of every point of interest on the cap in (a statistical) MNI coordinate system (or, if required, in the original coordinates system that can be later transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
 There are 3 modes of operation:
 1. A GUI that allows manual annotation of the data / supervising the automatic method - this is recommended for first time users.
 2. A command-line interface which is a ready-to-use end-to-end script that performs calibration given a video file - use this when you are comfortable with the GUI and its results.
-3. An experimental mode that allows reproducing all results from the original paper.
+3. An experimental mode that allows reproducing all results from the original manuscript.
 
 The repository also contains:
-- Python scripts for finetunning (or training from scratch) the neural networks discussed in the paper. Description of how to do this is down below. 
+- Python scripts for training the neural networks discussed in the paper. Description of how to do this is down below. 
 - A synthetic data generator implemented in [Unity](https://unity.com/).
 
 ### Application dependencies:
@@ -25,39 +25,38 @@ The repository also contains:
 Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
 
 ## Quick installation guide
+### Step 1: Clone this repository to get a copy of the code to run locally.
 
-0. Have [python 3.6](https://www.python.org/downloads/) or higher installed and ready to use.
-
-1. Clone the repository by downloading it [directly](https://github.com/yoterel/STORM-Net/archive/master.zip) or by using the git command line tool:\
+Clone the repository by downloading it [directly](https://github.com/yoterel/STORM-Net/archive/master.zip) or by using the git command line tool:\
 `git clone https://github.com/yoterel/STORM-Net.git`
 
-2. Download all neural network models from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip), and place them under the [models](CapCalibrator/models) folder (after extracting).
+### Step 2: Navigate to the STORM-Net directory, then create a virtual environment using conda.
 
-3. Download all precompiled binaries for the renderer from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip).
+We recommend installing [Miniconda](https://docs.conda.io/en/latest/miniconda.html) for this, but you can also [Install Anaconda](https://www.anaconda.com/products/individual/get-started) if needed, then create an environment using the environment.yml file in this repository:
 
-4. Setup a virtual environment:\
-`python -m venv my_venv_folder`
+`conda env create -n env -f environment.yml`
 
-5. Activate your new environment:\
-Linux:\
-`source my_venv_folder/bin/activate`\
-Windows:\
-`my_venv_folder/Scripts/activate.bat`
+Note: For dlib (part of the requirements in the environment file), you must have some modern C++ able compiler like [visual studio](https://visualstudio.microsoft.com/) or gcc installed on your computer.
 
-6. upgrade pip to latest version:\
-`pip install --upgrade pip`
+### Step 3: Download all pre-trained neural network models.
 
-7. install requirements:\
-`pip install -r requirements.txt`
-Note: For dlib (part of the requirements), you must have some modern C++ able compiler like [visual studio](https://visualstudio.microsoft.com/) or gcc installed on your computer.
+Download from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip), and place them under the [models](CapCalibrator/models) folder (after extracting).
 
-8. navigate to [main.py](CapCalibrator/main.py), and run:\
+### Step 4: Download all precompiled binaries for the renderer.
+Download from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip).
+
+### Step 5: Run STORM-Net in gui mode.
+First remember to activate the environment you created
+`conda activate env`
+Then navigate to [main.py](CapCalibrator/main.py), and run:\
 `python main.py --mode gui`
 
 Note: in Linux you might need to unset pythonpath (after step 7) before the application can be run successfully (step 8):\
 `unset PYTHONPATH`
 
-### For Windows 10 users only: full application executable available
+## For Windows 10 users only: full application executable available
+
+Note: this version is usually updated in low frequency and is behind the github source.
 
 Instead of launching the application using python as described above, use these steps instead (python not required):
 
@@ -99,9 +98,9 @@ The file is a csv space delimited file, where each row contains 4 values:
 2. 3 numerical values: X, Y, Z representing the location of this optode (note: values must be supplied in cm or inch).
 The coordinate system these values are supplied in are not improtant, as they are transformed internally to a standard right-handed system, and output coordinates are in this new cooridnate system (described below).
 
-## Using a new cap - how to improve accuracy
+## Using a new cap
 
-After creating a template model for a new cap, we strongly recommend fine-tunning our supplied neural network for best results.
+After creating a template model for a new cap, the offline step is required to be performed.
 To do this, follow the steps below:
 
 1. Create synthetic data using the GUI or the [render script](DataSynth/render.py) (notice this script requires the template model file path and the renderer executable path as input). We recommend usings a minimum of 100000 iterations:\
