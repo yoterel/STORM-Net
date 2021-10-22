@@ -19,7 +19,7 @@ The repository also contains:
       
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
-- Precompiled binaries for the renderer which can be downloaded from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip). Note these can also be compiled from source using [Unity](https://unity.com/) 2019.3 or higher.
+- Precompiled binaries for the renderer which can be downloaded from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), linux and mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
 - Hardware: Although not necessary, the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We recommend using a GPU if fast calibration times are needed.
 
 Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
@@ -43,7 +43,7 @@ Note: For dlib (part of the requirements in the environment file), you must have
 Download from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip), and place them under the [models](CapCalibrator/models) folder (after extracting).
 
 ### Step 4: Download all precompiled binaries for the renderer.
-Download from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip), [mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip).
+Download from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), linux and mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
 
 ### Step 5: Run STORM-Net in gui mode.
 First remember to activate the environment you created
@@ -53,19 +53,6 @@ Then navigate to [main.py](CapCalibrator/main.py), and run:\
 
 Note: in Linux you might need to unset pythonpath (after step 7) before the application can be run successfully (step 8):\
 `unset PYTHONPATH`
-
-## For Windows 10 users only: full application executable available
-
-Note: this version is usually updated in low frequency and is behind the github source.
-
-Instead of launching the application using python as described above, use these steps instead (python not required):
-
-1. Download & extract the full executable from [here](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/STORM-Net/STORM-Net.zip).
-
-2. Follow steps 2-3 in the section above to get the model files and precompiled renderer.
-
-3. run the application frrom the command line:\
-`main.exe --mode gui`
 
 ## How to use the different modes
 
