@@ -1,3 +1,4 @@
 *.spec
 *.idea
 CapCalibrator/STORM-Net/
+CapCalibrator/runs/

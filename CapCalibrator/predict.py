@@ -1,61 +1,100 @@
-import tensorflow as tf
+# import tensorflow as tf
+import tf_file_io
 import utils
-import file_io
 from pathlib import Path
 import cv2
 import pickle
-import dlib
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 import logging
-import data_generators
+import data_augmentations
+import torch
+import torch_src.torch_model as torch_model
+import torch_src.torch_data as torch_data
+
+
+class Options:
+    def __init__(self, device):
+        self.network_input_size = 10
+        self.template = Path("../example_models/example_model.txt")
+        self.architecture = "2dconv"
+        self.loss = "l2"
+        self.device = device
+        self.scale_faces = None
+        self.network_output_size = 3
+        if self.scale_faces:
+            self.network_output_size += len(self.scale_faces)
 
 
 def is_using_gpu():
-    num_of_gpu_availble = len(tf.config.experimental.list_physical_devices('GPU'))
-    if num_of_gpu_availble:
-        return True
-    else:
-        return False
+    return torch.cuda.is_available()
 
 
-def predict_rigid_transform(sticker_locations, preloaded_model, graph, args):
+def predict_rigid_transform(sticker_locations, preloaded_model, args):
     """
     predicts rigid transformation of cap object using 2d sticker locations
     :param sticker_locations: a batch of 2d array of sticker locations
     :param preloaded_model: a pre loaded keras model
-    :param graph: the default tf graph
     :param args: command line arguments
     :return: rotation and scale matrices list
     """
-    logging.info("Predicting rotation from key points.")
     # scale to 0-1 for network
     sticker_locations[:, :, 0::2] /= 960
     sticker_locations[:, :, 1::2] /= 540
     # mask facial landmarks for frames that have less than 3 of them
-    data_generators.mask_facial_landmarks(sticker_locations)
+    data_augmentations.mask_facial_landmarks(sticker_locations)
     # center the data
-    data_generators.center_data(sticker_locations)
-    # if preloaded_model:
-    #     model = preloaded_model
-    # else:
-    model_full_path = Path(args.storm_net)
-    model, graph = file_io.load_clean_keras_model(model_full_path)
-    with graph.as_default():
-        y_predict = model.predict(sticker_locations)
+    data_augmentations.center_data(sticker_locations)
+    if preloaded_model:
+        network = preloaded_model
+    else:
+        model_full_path = Path(args.storm_net)
+        opt = Options(device=args.device)
+        network = torch_model.MyNetwork(opt)
+        state_dict = torch.load(model_full_path, map_location=args.device)
+        if hasattr(state_dict, '_metadata'):
+            del state_dict._metadata
+        network.load_state_dict(state_dict)
+        network.to(opt.device)
+    heat_mapper = torch_data.HeatMap((256, 256), 16, False, args.device)
+    x = torch.from_numpy(sticker_locations).to(args.device).float()
+    x[:, :, 0::2] *= 256
+    x[:, :, 1::2] *= 256
+    y_predict = torch.empty((len(x), network.opt.network_output_size), dtype=torch.float, device=args.device)
+    for i in range(len(x)):
+        heatmap = heat_mapper(x[i].reshape(10, x[i].shape[-1] // 2, 2))
+        with torch.no_grad():
+            _, pred = network(heatmap.unsqueeze(0))
+            y_predict[i] = pred
+    y_predict = y_predict.cpu().numpy()
+    assert y_predict.shape[-1] == network.opt.network_output_size
     # simulation uses left hand rule (as opposed to scipy rotation that uses right hand rule)
     # notice x is not negated - the positive direction in simulation is flipped.
     rs = []
     sc = []
-
     for i in range(len(y_predict)):
-        # logging.info("Network Euler angels:" + str([y_predict[i][0], -y_predict[i][1], -y_predict[i][2]]))
-        rot = R.from_euler('xyz', [y_predict[i][0], -y_predict[i][1], -y_predict[i][2]], degrees=True)
+        logging.info("Storm-Net Parameters Prediction:" + str(y_predict[i].tolist()))
+        rot = R.from_euler('xyz', [y_predict[i][0], y_predict[i][1], y_predict[i][2]], degrees=True)
         scale_mat = np.identity(3)
         if y_predict.shape[-1] > 3:
-            scale_mat[0, 0] = y_predict[0][3]  # xscale
-            scale_mat[1, 1] = y_predict[0][4]  # yscale
-            scale_mat[2, 2] = y_predict[0][5]  # zscale
+            counter = 0
+            if "x" in network.opt.scale_faces:
+                xterm = y_predict[i][3 + counter]
+                counter += 1
+            else:
+                xterm = 1.0
+            if "y" in network.opt.scale_faces:
+                yterm = y_predict[i][3 + counter]
+                counter += 1
+            else:
+                yterm = 1.0
+            if "z" in network.opt.scale_faces:
+                zterm = y_predict[i][3 + counter]
+            else:
+                zterm = 1.0
+            scale_mat[0, 0] = xterm  # xscale
+            scale_mat[1, 1] = yterm  # yscale
+            scale_mat[2, 2] = zterm  # zscale
         rotation_mat = rot.as_matrix()
         rs.append(rotation_mat)
         sc.append(scale_mat)
@@ -68,6 +107,7 @@ def get_facial_landmarks(frames):
     :param frames: the images to predict the landmarks on
     :return: a 2d numpy array containing x, y coordinates of required landmarks for each frame
     """
+    import dlib
     model_path = Path("models", "shape_predictor_68_face_landmarks.dat")
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor(str(model_path))
@@ -146,7 +186,7 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     #     my_model = preloaded_model
     # else:
     model_full_path = Path(args.u_net)
-    my_model, graph = file_io.load_semantic_seg_model(str(model_full_path))
+    my_model, graph = tf_file_io.load_semantic_seg_model(str(model_full_path))
     imgs_list = []
     for image in frames:
         img_data = np.array(image.resize((1024, 512)))  # our unet only accepts powers of 2 image sizes

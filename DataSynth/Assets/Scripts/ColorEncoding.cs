@@ -59,15 +59,16 @@ public class ColorEncoding
 
 		// Lets create palette of unique 16 colors
 		var uniqueColors = new Color[] {
-			new Color(1,1,0,1), //sticker 1
-			new Color(1,0,1,1), //sticker 2
-            new Color(0,1,1,1), //sticker 3
-            new Color(0,0,1,1), //sticker 4
-			new Color(1,0,0,1), //sticker 5
-            new Color(0,1,0,1), //sticker 6
-            new Color(z,z,z,1), //sticker 7
-			new Color(1,z,z,1), //sticker 8
-            new Color(z,1,z,1), //sticker 9
+			new Color(1,1,0,1), //0
+			new Color(1,0,1,1), //1
+            new Color(0,1,1,1), //2
+            new Color(0,0,1,1), //3
+			new Color(1,0,0,1), //4
+            new Color(0,1,0,1), //5
+            new Color(z,z,z/2,1), //6
+			new Color(1,z,z,1), //7
+            new Color(z,1,z,1), //8
+			new Color(z/2,0,z/2,1), //9
             new Color(1,1,1,1), //cap
             new Color(1,1,1,1), //face
             new Color(0,0,0,0), //occlusion

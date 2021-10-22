@@ -12,13 +12,12 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Renders training images for fNIRS alighment')
     parser.add_argument("template", help="Path to raw template file. For exact format see documentation.")
     parser.add_argument("output", help="A path to a folder where rendered images / data will be created")
-    parser.add_argument("--iterations", type=int, default=20, help="Number of rendering iterations (10 images from each)")
+    parser.add_argument("--iterations", type=int, default=10, help="Number of rendering iterations (10 images from each)")
     parser.add_argument("--exe", default="renderer.exe", help="The path to the renderer executable.")
     parser.add_argument("--log", default="log.txt", help="The path to the output log file from renderer.")
     parser.add_argument("--no_transform", default=False, action='store_true', help="If specified, the data from the input template model will *NOT* be transformed to standard coordinate system before rendering. This is not recommended.")
     parser.add_argument("--save_images", default=False, action='store_true', help="Renderer will output images (in addition to formatted data)")
-    parser.add_argument("--scale_faces", default=False, action='store_true',
-                        help="Renderer will also apply different scales to the virtual head & mask")
+    parser.add_argument("--scale_faces", type=str, choices=["x", "y", "z", "xy", "xz", "yz", "xyz"], help="Renderer will also apply different scales to the virtual head & mask")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -54,7 +53,7 @@ def launch_renderer(exe_path, log_path, iterations, template, output, images, sc
           " -output_folder {}".format(str(output.resolve())) +\
           " -batchmode"
     if scale_faces:
-        cmd += " -scale True"
+        cmd += " -scale {}".format(scale_faces)
     if images:
         cmd += " -save_image True"
     try:

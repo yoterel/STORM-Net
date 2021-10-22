@@ -19,21 +19,42 @@ import draw
 import logging
 import webbrowser
 import render
-import train
+import config
+import torch
+from torch_src import torch_model
+import torch_train
+
+
+def post_process_db(db):
+    perform_pad = False
+    perform_type_conversion = False
+    for key in db:
+        landmarks_per_frame = db[key][0]["data"].shape[-1] // 2
+        diff = config.max_number_of_landmarks_per_frames - landmarks_per_frame
+        if diff != 0:
+            if perform_pad:
+                temp = db[key][0]["data"][:, :, 10:].copy()
+                db[key][0]["data"] = np.pad(db[key][0]["data"], ((0, 0), (0, 0), (0, 2*diff)), 'constant')
+                db[key][0]["data"][:, :, 10:12] = 0
+                db[key][0]["data"][:, :, 12:] = temp
+    return db
 
 
 def annotate_videos(args):  # contains GUI mainloop
     if args.mode == "experimental":
         special_db = Path.joinpath(Path("cache"), "telaviv_db.pickle")
         new_db = file_io.load_full_db(special_db)
+        # new_db = post_process_db(new_db)
         paths = []
         if args.video:
             if Path.is_file(args.video):
                 paths.append(args.video)
             else:
-                for file in args.video.glob("**/*.MP4"):
+                for file in args.video.glob("**/*.[mM][pP]4"):
                     paths.append(file)
-    else:
+        if args.headless:
+            return new_db
+    else:  # mode is gui
         new_db = file_io.load_full_db()
         paths = None
     logging.info("Launching GUI...")
@@ -64,8 +85,8 @@ class GUI(tk.Tk):
         self.finetune_thread = None
         self.unet_model = None
         self.storm_model = None
+        self.pretrained_stormnet_path = None
         self.unet_graph = None
-        self.storm_graph = None
         self.finetunning = False
         self.renderer_executable = None
         self.synth_output_dir = None
@@ -77,7 +98,6 @@ class GUI(tk.Tk):
         self.template_format = None
         self.projected_data = None
         self.cur_active_panel = None
-        self.pretrained_stormnet_path = Path(self.args.storm_net)
         self.render_thread_alive = False
         # if self.args.mode == "gui" or self.args.mode == "experimental":
         #     unet_model_full_path = Path(args.u_net)
@@ -119,10 +139,10 @@ class GUI(tk.Tk):
                 self.render_thread_alive = False
                 self.render_thread = None
                 self.panels[FinetunePage].update_render_progress_bar(False)
-            elif msg[0] == "finetune_data":
-                epoch, loss = msg[1:]
-                self.panels[FinetunePage].set_finetune_log_text(epoch, loss)
-            elif msg[0] == "finetune_done":
+            elif msg[0] == "training_data":
+                name, value, iter = msg[1:]
+                self.panels[FinetunePage].set_finetune_log_text(name, value, iter)
+            elif msg[0] == "training_done":
                 self.finetunning = False
                 self.finetune_thread = None
                 self.panels[FinetunePage].update_finetune_progress_bar(False)
@@ -145,11 +165,11 @@ class GUI(tk.Tk):
             msg = self.queue.get(False)
             if msg[0] == "calibrate":
                 self.projected_data = msg[1]
-                self.save_calibration()
+                self.save_registration()
             elif msg[0] == "video_to_frames":
                 self.frames, self.indices, my_hash = msg[1:]
                 if my_hash not in self.db.keys():
-                    data = np.zeros((1, 10, 14))
+                    data = np.zeros((1, config.number_of_frames_per_video, 2*config.max_number_of_landmarks_per_frames))
                     my_dict = {"data": data,
                                "label": np.array([0, 0, 0]),
                                "frame_indices": self.indices}
@@ -165,6 +185,9 @@ class GUI(tk.Tk):
                 logging.info("new indices: " + str(self.indices))
             elif msg[0] == "load_template_model":
                 self.template_names, self.template_data, self.template_format, self.template_file_name = msg[1:]
+            elif msg[0] == "load_stormnet":
+                self.storm_model = msg[1]
+                self.pretrained_stormnet_path = msg[2]
                 # self.panels[self.cur_active_panel].update_labels()
             # Show result of the task if needed
             self.panels[ProgressBarPage].show_progress(False)
@@ -182,10 +205,12 @@ class GUI(tk.Tk):
         msg_dict = {"video_to_frames": "Selecting frames from video...",
                     "annotate_frames": "Predicting landmarks...This might take some time if GPU is not being used.\nUsing GPU: {}".format(predict.is_using_gpu()),
                     "load_template_model": "Loading template model...",
+                    "load_stormnet": "Loading Storm-Net model...",
                     "shift_video": "Selecting different frame...",
-                    "calibrate": "Calibrating...",
+                    "calibrate": "Performing Co-Registeration...",
                     "render": "Creating synthetic data, This might take a while...",
-                    "finetune": "Fine-tunning STORM-Net. This might take a while..."}
+                    "finetune": "Fine-tunning STORM-Net. This might take a while...",
+                    "predict": "Predicting..."}
 
         if periodic:
             if msg[0] == "render_stop":
@@ -220,11 +245,12 @@ class GUI(tk.Tk):
         menubar = tk.Menu(self)
         if page == "calib":
             filemenu = tk.Menu(menubar, tearoff=0)
+            filemenu.add_command(label="Load Storm-Net Model", command=self.load_stormnet)
             filemenu.add_command(label="Load Video", command=self.load_video)
             filemenu.add_command(label="Load Template Model", command=self.load_template_model)
             filemenu.add_command(label="Load Session", command=self.load_session)
             filemenu.add_command(label="Save Session", command=self.save_session)
-            filemenu.add_command(label="Save Calibration", command=self.save_calibration)
+            filemenu.add_command(label="Save Registration", command=self.save_registration)
             filemenu.add_separator()
             filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
             menubar.add_cascade(label="File", menu=filemenu)
@@ -240,7 +266,7 @@ class GUI(tk.Tk):
             videomenu.add_command(label="Previous Video", command=self.prev_video)
             videomenu.add_separator()
             videomenu.add_command(label="Auto Annotate", command=self.auto_annotate)
-            videomenu.add_command(label="Calibrate", command=self.calibrate)
+            videomenu.add_command(label="Co-Register", command=self.calibrate)
             menubar.add_cascade(label="Video", menu=videomenu)
             if self.paths:
                 # a video is loaded
@@ -254,20 +280,20 @@ class GUI(tk.Tk):
                 else:
                     videomenu.entryconfig("Next Video", state="normal")
                     videomenu.entryconfig("Previous Video", state="normal")
-                if self.template_file_name:
+                if self.template_file_name and self.storm_model:
                     # a template file was loaded
-                    videomenu.entryconfig("Calibrate", state="normal")
+                    videomenu.entryconfig("Co-Register", state="normal")
                 else:
-                    videomenu.entryconfig("Calibrate", state="disabled")
+                    videomenu.entryconfig("Co-Register", state="disabled")
             else:
                 filemenu.entryconfig("Load Session", state="disabled")
                 filemenu.entryconfig("Save Session", state="disabled")
                 menubar.entryconfig("Video", state="disabled")
             if self.projected_data:
                 # calibration was performed
-                filemenu.entryconfig("Save Calibration", state="normal")
+                filemenu.entryconfig("Save Registration", state="normal")
             else:
-                filemenu.entryconfig("Save Calibration", state="disabled")
+                filemenu.entryconfig("Save Registration", state="disabled")
         elif page == "exp":
             filemenu = tk.Menu(menubar, tearoff=0)
             filemenu.add_command(label="Load Template Model", command=self.load_template_model)
@@ -291,7 +317,7 @@ class GUI(tk.Tk):
             menubar.add_cascade(label="File", menu=filemenu)
             optionsmenu = tk.Menu(menubar, tearoff=0)
             optionsmenu.add_command(label="Render Synthetic Data", command=self.render)
-            optionsmenu.add_command(label="Finetune STORM-net", command=self.finetune)
+            optionsmenu.add_command(label="Train STORM-net", command=self.finetune)
             menubar.add_cascade(label="Options", menu=optionsmenu)
             if self.template_file_name:
                 menubar.entryconfig("Options", state="normal")
@@ -299,10 +325,10 @@ class GUI(tk.Tk):
                 menubar.entryconfig("Options", state="disabled")
             if self.renderer_executable and self.synth_output_dir and self.template_file_name:
                 optionsmenu.entryconfig("Render Synthetic Data", state="normal")
-                optionsmenu.entryconfig("Finetune STORM-net", state="normal")
+                optionsmenu.entryconfig("Train STORM-net", state="normal")
             else:
                 optionsmenu.entryconfig("Render Synthetic Data", state="disabled")
-                optionsmenu.entryconfig("Finetune STORM-net", state="disabled")
+                optionsmenu.entryconfig("Train STORM-net", state="disabled")
         else:
             menubar = ""
         return menubar
@@ -382,8 +408,20 @@ class GUI(tk.Tk):
                 self.template_data,
                 self.db[self.get_cur_video_hash()][self.shift]["data"].copy(),
                 self.storm_model,
-                self.storm_graph,
                 self.args]
+
+    def prep_predict_packet(self):
+        cur_path = self.paths[self.cur_video_index]
+        assert "session1" in str(cur_path)
+        next_path = self.paths[self.cur_video_index + 1]
+        cur_data = self.db[self.get_cur_video_hash()][self.shift]["data"].copy()
+        next_data = self.db[utils.md5_from_vid(next_path)][self.shift]["data"].copy()
+        video_names = [cur_path.parent.name + "_" + cur_path.name, next_path.parent.name + "_" + next_path.name]
+        return ["predict",
+                np.concatenate((cur_data, next_data)),
+                video_names,
+                self.args]
+
 
     def get_frame_size(self):
         """
@@ -415,9 +453,9 @@ class GUI(tk.Tk):
 
     def get_cur_video_name(self):
         if self.paths:
-            parent = self.paths[self.cur_video_index].parent.name
+            # parent = self.paths[self.cur_video_index].parent.name
             name = self.paths[self.cur_video_index].name
-            my_str = "{}/{}".format(parent, name)
+            my_str = "{}".format(name)
         else:
             my_str = "Not Loaded"
         return my_str
@@ -430,9 +468,9 @@ class GUI(tk.Tk):
 
     def get_template_model_file_name(self):
         if self.template_file_name:
-            parent = self.template_file_name.parent.name
+            # parent = self.template_file_name.parent.name
             name = self.template_file_name.name
-            my_str = "{}/{}".format(parent, name)
+            my_str = "{}".format(name)
         else:
             my_str = "Not Set"
         return my_str
@@ -475,9 +513,9 @@ class GUI(tk.Tk):
 
     def get_pretrained_stormnet_path(self):
         if self.pretrained_stormnet_path:
-            parent = self.pretrained_stormnet_path.parent.name
+            # parent = self.pretrained_stormnet_path.parent.name
             name = self.pretrained_stormnet_path.name
-            my_str = "{}/{}".format(parent, name)
+            my_str = "{}".format(name)
         else:
             my_str = "Not Set"
         return my_str
@@ -494,7 +532,7 @@ class GUI(tk.Tk):
         moves to next sticker and updates display of calibration page
         :return:
         """
-        if self.cur_sticker_index >= 12:
+        if self.cur_sticker_index >= 2*(config.max_number_of_landmarks_per_frames - 1):
             self.cur_sticker_index = 0
         else:
             self.cur_sticker_index += 2
@@ -543,7 +581,7 @@ class GUI(tk.Tk):
         auto annotates a video (in a different thread)
         :return:
         """
-        if not np.array_equal(self.db[self.get_cur_video_hash()][self.shift]["data"], np.zeros((1, 10, 14))):
+        if np.any(self.db[self.get_cur_video_hash()][self.shift]["data"]):
             result = messagebox.askquestion("Manual Annotation Detected",
                                             "Are you sure you want to automaticaly annotate the frames? current manual annotations will be lost.",
                                             icon='warning')
@@ -556,19 +594,23 @@ class GUI(tk.Tk):
         calculates calibration from a video (in a different thread)
         :return:
         """
-        if np.array_equal(self.db[self.get_cur_video_hash()][self.shift]["data"], np.zeros((1, 10, 14))):
+        if not np.any(self.db[self.get_cur_video_hash()][self.shift]["data"]):
             result = messagebox.askquestion("No Annotation Detected",
-                                            "Are you sure you want to calibrate? frames seem to be not annotated.",
+                                            "Are you sure you want to co-register? frames seem to be not annotated.",
                                             icon='warning')
             if result != 'yes':
                 return
         result = messagebox.askyesno("Project to MNI?",
-                                     "Would you like the calibrated data to be projected to MNI coordinates?")
+                                     "Would you like the registered data to be projected to MNI coordinates?")
         if result:
             self.args.mni = True
         else:
             self.args.mni = False
         self.take_async_action(self.prep_calibrate_packet())
+
+    def predict_x(self):
+        self.take_async_action(self.prep_predict_packet())
+
 
     def next_video(self):
         if self.cur_video_index < (len(self.paths)-1):
@@ -601,7 +643,7 @@ class GUI(tk.Tk):
         self.take_async_action(["shift_video", self.paths[self.cur_video_index], new_indices])
 
     def next_frame(self, event=None):
-        if self.cur_frame_index < 9:
+        if self.cur_frame_index < config.number_of_frames_per_video - 1:
             self.cur_frame_index += 1
             self.cur_sticker_index = 0
             self.panels[CalibrationPage].update_canvas()
@@ -620,6 +662,11 @@ class GUI(tk.Tk):
             if obj.suffix.lower() in [".mp4", ".avi"]:
                 self.paths = [obj]
                 self.take_async_action(self.prep_vid_to_frames_packet())
+
+    def load_stormnet(self):
+        obj = self.select_from_filesystem(False, True, ".", "Select Storm-Net Model File")
+        if obj:
+            self.take_async_action(["load_stormnet", obj, self.args.device])
 
     def load_template_model(self):
         obj = self.select_from_filesystem(False, True, ".", "Select Template Model File")
@@ -641,7 +688,7 @@ class GUI(tk.Tk):
             return
         file_io.dump_to_pickle(Path(f.name), self.db)
 
-    def save_calibration(self):
+    def save_registration(self):
         if self.projected_data:
             f = filedialog.asksaveasfile(initialdir=".", title="Select Output File", mode='w')
             if f is None:
@@ -802,9 +849,6 @@ class GUI(tk.Tk):
         if model_name == "":
             logging.info("Missing new model name.")
             return
-        if self.pretrained_stormnet_path is None:
-            logging.info("Missing pre-trained model path.")
-            return
         elif self.synth_output_dir is None:
             logging.info("Missing synthetic data output folder")
             return
@@ -821,7 +865,7 @@ class GUI(tk.Tk):
             self.take_async_action(self.prep_fintune_packet(model_name), periodic=True)
 
     def prep_fintune_packet(self, model_name):
-        return ["finetune_start", model_name, self.pretrained_stormnet_path, self.synth_output_dir, self.finetune_log_file]
+        return ["finetune_start", model_name, self.synth_output_dir, self.args.device]
 
     ### ExperimentViewerPage ###
     def toggle_optodes(self, event=None):
@@ -894,10 +938,38 @@ class ThreadedPeriodicTask(threading.Thread):
             self.handle_render()
 
     def handle_finetune(self):
-        model_name, pretrained_stormnet_path, synth_output_dir, finetune_log_file = self.msg[1:]
+        model_name, synth_output_dir, device = self.msg[1:]
+
+        class Options:
+            def __init__(self):
+                self.experiment_name = model_name
+                self.data_path = synth_output_dir
+                self.architecture = "2dconv"
+                self.force_load_raw_data = False
+                self.loss = "l2"
+                self.scale_faces = None
+                self.dont_use_gmm = False
+                self.device = device
+                self.continue_train = False
+                self.batch_size = 16
+                self.number_of_epochs = 30
+                self.lr = 1e-4
+                self.beta1 = 0.9
+                # self.template = Path("../example_models/example_model.txt")
+                self.network_input_size = 10
+                self.num_threads = 0
+                self.log = False
+                self.tensorboard = None
+                self.create_new_checkpoints_per_epoch = False
+                self.verbosity = "info"
+                self.is_train = True
+                self.network_output_size = 3
+                self.root = Path("models", self.experiment_name)
+        opt = Options()
         try:
-            train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
-                        self.stoprequest)
+            torch_train.train_loop(opt, [self.stoprequest, self.queue])
+            # train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
+            #             self.stoprequest)
         except IndexError:
             logging.warning("Fine tunning STORM-Net failed. Maybe the synthetic data is incorrect / corrupted ?")
             self.queue.put(["finetune_done"])
@@ -944,12 +1016,29 @@ class ThreadedTask(threading.Thread):
             self.handle_shift_video()
         elif self.msg[0] == "load_template_model":
             self.handle_load_template_model()
+        elif self.msg[0] == "load_stormnet":
+            self.handle_load_stormnet()
         elif self.msg[0] == "calibrate":
             self.handle_calibrate()
+        elif self.msg[0] == "predict":
+            self.handle_predict()
+
+    def handle_predict(self):
+        data, video_names, args = self.msg[1:]
+        subject_name, _ = video_names[0].split("_")
+        subject_name = subject_name + ".txt"
+        r, s = predict.predict_rigid_transform(data, None, args)
+        # from experimental import do_vid2vid_project_beforeMNI_experiment, do_dig2dig_experiment, do_vid2dig_experiment
+        # dig_ses1, dig_ses2, _ = do_dig2dig_experiment(args.template, args.ground_truth, experiment_filter=subject_name, verbose=False)
+        # vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args, video_names, r, s,
+        #                                                              force_project=True,
+        #                                                              save_results=False)
+        # do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+        self.queue.put(["predict"])
 
     def handle_calibrate(self):
-        template_names, template_data, data, model, graph, args = self.msg[1:]
-        r, s = predict.predict_rigid_transform(data, model, graph, args)
+        template_names, template_data, data, model, args = self.msg[1:]
+        r, s = predict.predict_rigid_transform(data, model, args)
         sensor_locations = geometry.apply_rigid_transform(r, s, template_names, template_data, None, args)
         if args.mni:
             projected_data = geometry.project_sensors_to_MNI(sensor_locations)
@@ -964,6 +1053,28 @@ class ThreadedTask(threading.Thread):
         except (TypeError, IndexError) as e:
             template_names, template_data, template_format, path = [None], [None], None, None
         self.queue.put(["load_template_model", template_names[0], template_data[0], template_format, path])
+
+    def handle_load_stormnet(self):
+        path = Path(self.msg[1])
+        device = self.msg[2]
+        if path.suffix.lower() in [".pth", ".h5"]:
+            model_full_path = path
+            class MyOptions:
+                def __init__(self, device):
+                    self.network_input_size = 10
+                    self.architecture = "2dconv"
+                    self.loss = "l2"
+                    self.device = device
+                    self.scale_faces = None
+                    self.network_output_size = 3
+            opt = MyOptions(device=device)
+            network = torch_model.MyNetwork(opt)
+            state_dict = torch.load(model_full_path, map_location=device)
+            if hasattr(state_dict, '_metadata'):
+                del state_dict._metadata
+            network.load_state_dict(state_dict)
+            network.to(opt.device)
+            self.queue.put(["load_stormnet", network, path])
 
     def handle_video_to_frames(self):
         path, indices = self.msg[1:]
@@ -1030,11 +1141,12 @@ class CalibrationPage(tk.Frame):
         cur_video_hash = self.controller.get_cur_video_hash()
         template_name = self.controller.get_template_model_file_name()
         storm_net_name = self.controller.get_pretrained_stormnet_path()
-        db_to_show = np.zeros((7, 2))
+        sticker_names = config.gui_sticker_names
+        num_of_stickers = len(sticker_names)
+        db_to_show = np.zeros((num_of_stickers, 2))
         if db:
             if cur_video_hash in db.keys():
-                db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :], (7, 2))
-        sticker_names = ["Left Eye", "Nose Tip", "Right Eye", "CAP1", "CAP2", "CAP3", "CAP4"]
+                db_to_show = np.reshape(db[cur_video_hash][shift]["data"][0, cur_frame_index, :2*num_of_stickers], (num_of_stickers, 2))
 
         my_string = "Template Model File: \n{}".format(template_name)
         label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
@@ -1052,7 +1164,7 @@ class CalibrationPage(tk.Frame):
         label = tk.Label(self.data_panel, text=my_string, width=30, bg="white", anchor="center", pady=pad_y)
         label.pack(fill="x")
 
-        for i in range(7):
+        for i in range(len(sticker_names)):
             my_string = "{}: {},{}".format(sticker_names[i], int(db_to_show[i, 0]), int(db_to_show[i, 1]))
             if i == cur_sticker_index // 2:
                 sticker_label = tk.Label(self.data_panel, text=my_string, bg="gray", width=15, anchor="w", pady=pad_y)
@@ -1064,6 +1176,9 @@ class CalibrationPage(tk.Frame):
                                    540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
                 self.canvas.create_line(int(db_to_show[i, 0]) + 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) - 5,
                                    540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
+
+        # button = ttk.Button(self.data_panel, text="Predict", command=lambda: self.controller.predict_x())
+        # button.pack(fill="x")
 
     def update_canvas(self):
         self.canvas.delete("image")
@@ -1090,10 +1205,10 @@ class MainMenu(tk.Frame):
         self.tempalte_view_button = ttk.Button(self, text="View Template Model",
                                                command=lambda: controller.show_panel(ExperimentViewerPage))
 
-        self.finetune_button = ttk.Button(self, text="Fine-tune STORM-Net",
+        self.finetune_button = ttk.Button(self, text="Offline Step",
                                           command=lambda: controller.show_panel(FinetunePage))
 
-        self.calibration_button = ttk.Button(self, text="Calibrate",
+        self.calibration_button = ttk.Button(self, text="Online Step",
                                              command=lambda: controller.show_panel(CalibrationPage))
         self.about_button = ttk.Button(self, text="About",
                                              command=lambda: controller.show_panel(AboutPage))
@@ -1117,17 +1232,18 @@ class AboutPage(tk.Frame):
                                  text="STORM-Net: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS).\n"
                                       "Research: Yotam Erel, Sagi Jaffe-Dax, Yaara Yeshurun-Dishon, Amit H. Bermano\n"
                                       "Implementation: Yotam Erel\n"
-                                      "This program is free for personal, non-profit or academic use.",
+                                      "This program is free for personal, non-profit or academic use.\n"
+                                      "All Rights Reserved.",
                                  font=("Verdana", 12),
                                  relief="groove",
                                  anchor="w",
                                  justify="left")
-        self.subtitle = tk.Label(self, text="https://github.com/yoterel/STORM", fg="blue", cursor="hand2")
+        self.subtitle = tk.Label(self, text="https://github.com/yoterel/STORM-Net", fg="blue", cursor="hand2")
         self.button = ttk.Button(self, text="Back",
                                  command=lambda: controller.show_panel(MainMenu))
         self.title.grid(row=1, column=1)
         self.subtitle.grid(row=2, column=1)
-        self.subtitle.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/yoterel/STORM"))
+        self.subtitle.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/yoterel/STORM-Net"))
         self.button.grid(row=3, column=1)
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1)
@@ -1201,7 +1317,7 @@ class FinetunePage(tk.Frame):
         self.render_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
         self.finetune_frame = tk.Frame(self, borderwidth=1, relief=tk.GROOVE)
         self.render_frame_title = tk.Label(self, text="Render Synthetic Data", pady=10)
-        self.finetune_frame_title = tk.Label(self, text="Finetune STORM-Net", pady=10)
+        self.finetune_frame_title = tk.Label(self, text="Train STORM-Net", pady=10)
         self.template_name_static = tk.Label(self.render_frame, text="", pady=10)
         self.template_name = tk.Label(self.render_frame, text="", bg=controller['bg'], pady=10)
         self.template_name_button = tk.Button(self.render_frame, text="...",
@@ -1232,10 +1348,10 @@ class FinetunePage(tk.Frame):
 
         self.model_name_label = tk.Label(self.finetune_frame, text="Model Name: ", pady=10)
         self.model_name = tk.Entry(self.finetune_frame)
-        self.premodel_name_static = tk.Label(self.finetune_frame, text="", pady=10)
-        self.premodel_name = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
-        self.premodel_button = tk.Button(self.finetune_frame, text="...",
-                                         command=self.controller.load_pretrained_model)
+        # self.premodel_name_static = tk.Label(self.finetune_frame, text="", pady=10)
+        # self.premodel_name = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
+        # self.premodel_button = tk.Button(self.finetune_frame, text="...",
+        #                                  command=self.controller.load_pretrained_model)
         self.output_folder_static1 = tk.Label(self.finetune_frame, text="", pady=10)
         self.output_folder1 = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
         self.output_folder_button1 = tk.Button(self.finetune_frame, text="...",
@@ -1246,11 +1362,11 @@ class FinetunePage(tk.Frame):
         self.output_log_name1 = tk.Label(self.finetune_frame, text="", bg=controller['bg'], pady=10)
         self.gpu_label = tk.Label(self.finetune_frame, text="", pady=10)
         self.gpu_static = tk.Label(self.finetune_frame, text="", bg=controller['bg'])
-        self.finetune_kill_button = tk.Button(self.finetune_frame, text="Kill Finetune Thread",
+        self.finetune_kill_button = tk.Button(self.finetune_frame, text="Kill Training Thread",
                                               command=self.controller.finetune_kill_thread)
         self.finetune_default_button = tk.Button(self.finetune_frame, text="Default Settings",
                                                  command=self.controller.set_default_finetune)
-        self.finetune_button = tk.Button(self.finetune_frame, text="Finetune", command=self.controller.finetune)
+        self.finetune_button = tk.Button(self.finetune_frame, text="Train", command=self.controller.finetune)
         self.finetune_log_text = tk.scrolledtext.ScrolledText(self.finetune_frame, wrap=tk.WORD, height=10, width=45)
         self.finetune_log_text.configure(state='disabled')
         self.finetune_progressbar = ttk.Progressbar(self.finetune_frame, orient=tk.HORIZONTAL, length=100,
@@ -1293,9 +1409,9 @@ class FinetunePage(tk.Frame):
         self.model_name_label.grid(row=0, column=0, sticky='W')
         self.model_name.grid(row=0, column=2, sticky='W')
 
-        self.premodel_name_static.grid(row=2, column=0, sticky='W')
-        self.premodel_button.grid(row=2, column=1)
-        self.premodel_name.grid(row=2, column=2, sticky='W')
+        # self.premodel_name_static.grid(row=2, column=0, sticky='W')
+        # self.premodel_button.grid(row=2, column=1)
+        # self.premodel_name.grid(row=2, column=2, sticky='W')
 
         self.output_folder_static1.grid(row=3, column=0, sticky='W')
         self.output_folder_button1.grid(row=3, column=1)
@@ -1328,8 +1444,8 @@ class FinetunePage(tk.Frame):
         item.insert(0, text)
         return
 
-    def set_finetune_log_text(self, epoch, loss):
-        msg = "epoch: {}, val_loss: {}".format(epoch, loss)
+    def set_finetune_log_text(self, name, value, iter):
+        msg = "{}, {}: {}".format(name, iter, value)
         fully_scrolled_down = self.finetune_log_text.yview()[1] == 1.0
         self.finetune_log_text.configure(state='normal')
         self.finetune_log_text.insert(tk.END, msg + "\n")
@@ -1363,7 +1479,7 @@ class FinetunePage(tk.Frame):
         output_folder_str = self.controller.get_synth_output_folder_name()
         render_log_file_str = self.controller.get_renderer_log_file_name()
         finetune_log_file_str = self.controller.get_finetune_log_file_name()
-        pretrained_model_str = self.controller.get_pretrained_stormnet_path()
+        # pretrained_model_str = self.controller.get_pretrained_stormnet_path()
         gpu_id_str = str(self.controller.get_gpu_id())
 
         self.template_name_static.config(text="Template Model File: ")
@@ -1374,11 +1490,11 @@ class FinetunePage(tk.Frame):
         self.output_folder.config(text=output_folder_str)
         self.output_log_label.config(text="Renderer Log File: ")
         self.output_log_name.config(text=render_log_file_str)
-        self.premodel_name_static.config(text="Pretrained Model: ")
-        self.premodel_name.config(text=pretrained_model_str)
+        # self.premodel_name_static.config(text="Pretrained Model: ")
+        # self.premodel_name.config(text=pretrained_model_str)
         self.output_folder_static1.config(text="Synthesized Data Output Folder: ")
         self.output_folder1.config(text=output_folder_str)
-        self.output_log_label1.config(text="Finetune Log File: ")
+        self.output_log_label1.config(text="Training Log File: ")
         self.output_log_name1.config(text=finetune_log_file_str)
 
         self.gpu_label.config(text="GPU ID to use (-1 for CPU): ")

@@ -4,7 +4,6 @@ import math
 from file_io import read_template_file
 import logging
 import MNI
-from experimental import reproduce_experiments
 
 
 def align_centroids(a, b):
@@ -198,10 +197,24 @@ def get_rmse(A, B):
     :param B: nx3 point cloud
     :return: rmse
     """
-    assert len(A.shape) == 2
-    assert len(B.shape) == 2
+    assert len(A.shape) == 2 and len(B.shape) == 2
     rmse = np.mean(np.linalg.norm((A - B).astype(np.float), axis=1))
     return rmse
+
+
+def batch_get_rmse(A, B):
+    """
+    gets rmse between a point cloud nx3 to a batch of point clouds b x n x 3
+    :param A:
+    :param B:
+    :return: b x 1 numpy array of rmse's
+    """
+    assert (len(A.shape) == 2 and len(B.shape) == 3) or (len(A.shape) == 3 and len(B.shape) == 2)
+    A = A.astype(np.float)
+    B = B.astype(np.float)
+    rmse = np.mean(np.linalg.norm(A - B, axis=-1), axis=-1)
+    return rmse
+
 
 
 def fix_yaw(names, data):
@@ -350,7 +363,7 @@ def normalize_coordinates(names, data):
     # zscale = new_data[names.index('cz'), 1] - np.min(data[:, 2])
 
 
-def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
+def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, resource_folder="resource"):
     """
     project new sensor locations to MNI
     :param list_of_sensor_locations: a list of lists of [names ,data (nx3)] of all sensor locations
@@ -374,18 +387,9 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
             others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
         else:  # someone forgot to pass data for projection...
             assert False, "can't resolve origin & others from sensors."
-        # these names are written in an order the algorithm expects (and MNI template data was written in)
-        target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
-                                        "fp1", "fp2", "fz", "f3",
-                                        "f4", "f7", "f8", "cz",
-                                        "c3", "c4", "t3", "t4",
-                                        "pz", "p3", "p4", "t5",
-                                        "t6", "o1", "o2"])
 
-        # sort our anchors using the order above
-        selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
-        origin_xyz = unsorted_origin_xyz[sorting_indices]
-        otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices)
+        origin_xyz, selected_indices = sort_anchors(unsorted_origin_names, unsorted_origin_xyz)
+        otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
         # todo: should we report anything but cortex locations to caller?
         if origin_optodes_names:
             sensor_locations[1][others_selector, :] = otherC
@@ -393,6 +397,31 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None):
             sensor_locations[1][names.index(0):, :] = otherC
     return projected_locations
 
+
+def sort_anchors(unsorted_anchors_names: np.ndarray, unsorted_anchors_xyz: np.ndarray):
+    """
+    sorts anchors according to expected order from MNi projection algorithm
+    :param unsorted_anchors_names: names of anchors
+    :param unsorted_anchors_xyz: location of anchors
+    :return: the new location of anchors and the selected indices from the possible target anchors
+    """
+    # these names are written in an order the algorithm expects (and MNI template data was written in)
+    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
+                                    "fp1", "fp2", "fz", "f3",
+                                    "f4", "f7", "f8", "cz",
+                                    "c3", "c4", "t3", "t4",
+                                    "pz", "p3", "p4", "t5",
+                                    "t6", "o1", "o2"])
+
+    # sort our anchors using the order above
+    selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_anchors_names[None, :])
+    if unsorted_anchors_xyz.ndim == 2:
+        origin_xyz = unsorted_anchors_xyz[sorting_indices]
+    elif unsorted_anchors_xyz.ndim == 3:
+        origin_xyz = unsorted_anchors_xyz[:, sorting_indices, :]
+    else:
+        raise NotImplementedError
+    return origin_xyz, selected_indices
 
 def clean_model(names, data, threshold=0.3):
     """

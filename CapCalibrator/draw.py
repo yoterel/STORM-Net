@@ -7,6 +7,7 @@ import numpy as np
 from pathlib import Path
 import utils
 import file_io
+import data_augmentations
 
 
 class Arrow3D(FancyArrowPatch):
@@ -133,7 +134,7 @@ def visualize_annotated_data(db_path, synth_data_path, filter=None):
     db = file_io.load_db(db_path, "pickle", filter)
     synth_db = file_io.load_raw_json_db(synth_data_path)
     synth_db = synth_db[0]  # selects data, discards label
-    utils.center_data(synth_db)
+    data_augmentations.center_data(synth_db)
     shift = 0
     for key in db.keys():
         data = db[key][shift]["data"][0]
@@ -141,7 +142,7 @@ def visualize_annotated_data(db_path, synth_data_path, filter=None):
             data = np.expand_dims(data, axis=0)
         data[:, :, 0::2] /= 960
         data[:, :, 1::2] /= 540
-        utils.center_data(data)
+        data_augmentations.center_data(data)
         data = np.squeeze(data)
         closest_synth_image = np.argmin(np.sum((synth_db - data)**2, axis=(1, 2)))
         selected_synth_data = synth_db[closest_synth_image]
@@ -328,6 +329,7 @@ def visualize_network_performance(model_name, root_dir):
     :return:
     """
     #############################################################
+    import tf_file_io
     db_path = Path("data", "full_db.pickle")
     gt = file_io.load_db(db_path)
     vid_name = "GX011578.MP4"
@@ -356,7 +358,7 @@ def visualize_network_performance(model_name, root_dir):
     data_dir = Path.joinpath(root_dir, "scene3_100k")
     model_dir = Path.joinpath(root_dir, "models")
     best_weight_location = Path.joinpath(model_dir, model_name)
-    model, _ = file_io.load_clean_keras_model(best_weight_location)
+    model, _ = tf_file_io.load_clean_keras_model(best_weight_location)
     gt_pred = model.predict(np.expand_dims(A, axis=0))
     y_predict_special = model.predict(np.expand_dims(x_train[min_index], axis=0))
     print("gt pred: ", gt_pred, gt[vid_name]["label"])
@@ -497,7 +499,41 @@ def plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI):
     # hide tick and tick label of the big axes
     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
     plt.grid(False)
-    plt.xlabel("Channel Error [mm]")
-    plt.ylabel("Percent of Channels")
+    plt.xlabel("Location Error [mm]")
+    plt.ylabel("Percent of Locations")
     # fig.suptitle('This is a somewhat long figure title', fontsize=16)
     plt.show()
+
+
+def plot_robustness(x, y):
+    """
+    plots robustness test results
+    :param x_list:
+    :param y_numpy:
+    :return:
+    """
+    plt.plot(x, y)
+    plt.xlabel("Noise Range [Pixels]")
+    plt.ylabel("Average Error [Degrees]")
+    plt.legend(["x", "y", "z"])
+    plt.show()
+
+
+def plot_colorbar(min_value=0, max_value=7.5):
+    """
+    plots a trivial color bar for manuscript
+    :param min_value: minimum value for axis ticks
+    :param max_value: maximum value for axis ticks
+    :return:
+    """
+    import pylab as pl
+    a = np.array([[min_value, max_value]])
+    pl.figure(figsize=(9, 1.5))
+    img = pl.imshow(a, cmap="hot")
+    pl.gca().set_visible(False)
+    cax = pl.axes([0.1, 0.3, 0.8, 0.6])
+    pl.colorbar(orientation="horizontal", cax=cax)
+    pl.xticks(fontsize=20)
+    # pl.axis("off")
+    pl.tight_layout()
+    pl.show()

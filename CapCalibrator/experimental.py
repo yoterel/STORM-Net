@@ -7,6 +7,9 @@ from pathlib import Path
 from scipy.stats import pearsonr, ttest_rel
 from scipy.spatial.transform import Rotation as R
 import predict
+import torch_src.MNI_torch as MNI_torch
+import torch
+import draw
 
 
 def do_network_robustness_test(sticker_locations, args):
@@ -16,106 +19,135 @@ def do_network_robustness_test(sticker_locations, args):
     :param args: args
     :return:
     """
-    orig_r_matrix, orig_s_matrix = predict.predict_rigid_transform(np.copy(sticker_locations), None, None, args)
-    orig_euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in orig_r_matrix]
-    r_rmse = []
-    s_rmse = []
-    b_shape = sticker_locations.shape[0]
-    t_shape = sticker_locations.shape[1]
-    for i in range(100):
-        sticker_locations_copy = np.copy(sticker_locations)
-        another_view = np.reshape(sticker_locations_copy, (b_shape, t_shape, sticker_locations_copy.shape[-1] // 2, 2))
-        zero_locs = np.where(another_view == np.array([0, 0]))
-        noise_mag = 5
-        noise_shift = noise_mag / 2
-        noise = (np.random.random_sample(sticker_locations_copy.shape) * noise_mag) - noise_shift
-        sticker_locations_copy += noise
-        another_view[zero_locs] = 0
-        r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations_copy, None, None, args)
-        euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in r_matrix]
-        r_rmse.append(np.linalg.norm(np.array(orig_euler) - np.array(euler), axis=0))
-        s_rmse.append(np.linalg.norm(np.array(orig_s_matrix) - np.array(s_matrix)))
-    logging.info("r_rmse: {}, s_rmse: {}".format(np.mean(r_rmse), np.mean(s_rmse)))
+    robustness_file = Path("cache/robustness.npy")
+    noise_mag_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    if robustness_file.is_file():
+        t_r_rmse = np.load(robustness_file)
+    else:
+        orig_r_matrix, orig_s_matrix = predict.predict_rigid_transform(np.copy(sticker_locations), None, args)
+        orig_euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in orig_r_matrix]
+        t_r_rmse = []
+        t_s_rmse = []
+        b_shape = sticker_locations.shape[0]
+        t_shape = sticker_locations.shape[1]
+        for j in range(len(noise_mag_list)):
+            r_rmse = []
+            s_rmse = []
+            for i in range(10):
+                sticker_locations_copy = np.copy(sticker_locations)
+                another_view = np.reshape(sticker_locations_copy, (b_shape, t_shape, sticker_locations_copy.shape[-1] // 2, 2))
+                zero_locs = np.where(another_view == np.array([0, 0]))
+                noise_mag = noise_mag_list[j]
+                noise_shift = noise_mag / 2
+                noise = (np.random.random_sample(sticker_locations_copy.shape) * noise_mag) - noise_shift
+                sticker_locations_copy += noise
+                another_view[zero_locs] = 0
+                r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations_copy, None, args)
+                euler = [R.from_matrix(x).as_euler('xyz', degrees=True) for x in r_matrix]
+                r_rmse.append(np.linalg.norm(np.array(orig_euler) - np.array(euler), axis=0))
+                s_rmse.append(np.linalg.norm(np.array(orig_s_matrix) - np.array(s_matrix)))
+            t_r_rmse.append(np.mean(r_rmse, axis=0))
+            t_s_rmse.append(np.mean(s_rmse))
+        t_r_rmse = np.array(t_r_rmse)
+        np.save(robustness_file, t_r_rmse)
+    draw.plot_robustness(np.array(noise_mag_list), t_r_rmse)
 
 
-def do_opt2dig_experiment(digi_ses1, digi_ses2, opt_ses1, opt_ses2, net_rots, rots, scales, video_names):
+def do_opt2dig_experiment(digi_ses1, digi_ses2, grid_search, rots, scales, video_names):
     """
-    reports results given optimal sessions and digitizer sessions
+    reports results given grid search on parameter space and digitizer sessions
     (and rots / scales usedto achieve optimum)
     :param digi_ses1: digitizer session1
     :param digi_ses2: digitizer session2
-    :param opt_ses1: template model with many experiments where optodes were rotated and scaled
-    :param opt_ses2: template model with many experiments where optodes were rotated and scaled
-    :param net_rots: the rotations predicted by a network
-    :param rots: the rots used for opt_ses1 and opt_ses2
-    :param scales: the scales used for opt_ses1 and opt_ses2
+    :param grid_search: template model with many experiments where optodes were rotated and scaled
+    :param rots: the rots used for grid_search
+    :param scales: the scales used grid_search
     :param video_names: names of videos for printing
     :return:
     """
     subject_names = [x.split("_")[0] for x in video_names[::3]]
-    net_rots_ses1 = [x for x in net_rots[::3]]
-    net_rots_ses2 = [x for x in net_rots[1::3]]
+    # net_rots_ses1 = [x for x in net_rots[::3]]
+    # net_rots_ses2 = [x for x in net_rots[1::3]]
     errors_ses1 = []
     errors_ses2 = []
     real_errors_ses1 = []
     real_errors_ses2 = []
-    ses1 = opt_ses1.copy()
-    ses2 = opt_ses2.copy()
-    output_scales = []
+    cross_error_12 = []
+    cross_error_21 = []
+    # ses1 = opt_ses1.copy()
+    # ses2 = opt_ses1.copy()
+    # output_scales = []
     for i in range(len(digi_ses1[1])):
-        inter_method_rmse1 = [geometry.get_rmse(x, digi_ses1[1][i]) for x in opt_ses1[1]]
-        inter_method_rmse2 = [geometry.get_rmse(x, digi_ses2[1][i]) for x in opt_ses2[1]]
+        inter_method_rmse1 = geometry.batch_get_rmse(digi_ses1[1][i], grid_search)
+        inter_method_rmse2 = geometry.batch_get_rmse(digi_ses2[1][i], grid_search)
+        # inter_method_rmse1 = [geometry.get_rmse(x, digi_ses1[1][i]) for x in opt_ses1[1]]
+        # inter_method_rmse2 = [geometry.get_rmse(x, digi_ses2[1][i]) for x in opt_ses2[1]]
         errors_ses1.append(inter_method_rmse1)
         errors_ses2.append(inter_method_rmse2)
     for i, (error1, error2) in enumerate(zip(errors_ses1, errors_ses2)):
-        min_error_index = np.argmin(error1)
-        min_error = error1[min_error_index.astype(np.int)]
+        min_error_index1 = np.argmin(error1).astype(np.int)
+        min_error1 = error1[min_error_index1]
         logging.info("session: {}, subject: {}, min error: {}, rot: {}, scale: {}".format(1,
                                                                                           subject_names[i],
-                                                                                          min_error,
-                                                                                          rots[min_error_index],
-                                                                                          scales[min_error_index]
+                                                                                          min_error1,
+                                                                                          rots[min_error_index1],
+                                                                                          scales[min_error_index1]
                                                                                           ))
-        logging.info("network rot: {}".format(R.from_matrix(net_rots_ses1[i]).as_euler('xyz', degrees=True)))
-        real_errors_ses1.append(min_error)
-        ses1[1][i] = opt_ses1[1][min_error_index]
-        output_scales.append(scales[min_error_index])
-        min_error_index = np.argmin(error2)
-        min_error = error2[min_error_index.astype(np.int)]
+        # logging.info("network rot: {}".format(R.from_matrix(net_rots_ses1[i]).as_euler('xyz', degrees=True)))
+        real_errors_ses1.append([min_error_index1, min_error1])
+        # ses1[1][i] = opt_ses1[1][min_error_index]
+        # output_scales.append(scales[min_error_index])
+        min_error_index2 = np.argmin(error2).astype(np.int)
+        min_error2 = error2[min_error_index2]
         logging.info("session: {}, subject: {}, min error: {}, rot: {}, scale: {}".format(2,
                                                                                           subject_names[i],
-                                                                                          min_error,
-                                                                                          rots[min_error_index],
-                                                                                          scales[min_error_index]
+                                                                                          min_error2,
+                                                                                          rots[min_error_index2],
+                                                                                          scales[min_error_index2]
                                                                                           ))
-        logging.info("network rot: {}".format(R.from_matrix(net_rots_ses2[i]).as_euler('xyz', degrees=True)))
-        real_errors_ses2.append(min_error)
-        ses2[1][i] = opt_ses2[1][min_error_index]
-        output_scales.append(scales[min_error_index])
-        output_scales.append(np.ones(3))
-    ses1[1] = ses1[1][:10]
-    ses2[1] = ses2[1][:10]
-    logging.info("ses1 optimal inter-validation error: {}".format(np.mean(real_errors_ses1)))
-    logging.info("ses2 optimal inter-validation error: {}".format(np.mean(real_errors_ses2)))
+        # logging.info("network rot: {}".format(R.from_matrix(net_rots_ses2[i]).as_euler('xyz', degrees=True)))
+        real_errors_ses2.append([min_error_index2, min_error2])
+
+        rmse12 = geometry.get_rmse(grid_search[min_error_index1], digi_ses2[1][i])
+        logging.info("session: {}, subject: {}, min error: {}, rot: {}, scale: {}".format("1->2",
+                                                                                          subject_names[i],
+                                                                                          rmse12,
+                                                                                          rots[min_error_index1],
+                                                                                          scales[min_error_index1]
+                                                                                          ))
+        cross_error_12.append(rmse12)
+        rmse21 = geometry.get_rmse(grid_search[min_error_index2], digi_ses1[1][i])
+        logging.info("session: {}, subject: {}, min error: {}, rot: {}, scale: {}".format("2->1",
+                                                                                          subject_names[i],
+                                                                                          rmse21,
+                                                                                          rots[min_error_index2],
+                                                                                          scales[min_error_index2]
+                                                                                          ))
+        cross_error_21.append(rmse21)
+        # ses2[1][i] = opt_ses2[1][min_error_index]
+        # output_scales.append(scales[min_error_index])
+        # output_scales.append(np.ones(3))
+    # ses1[1] = ses1[1][:10]
+    # ses2[1] = ses2[1][:10]
+    logging.info("ses1 optimal inter-validation error: {}".format(np.mean([x[1] for x in real_errors_ses1])))
+    logging.info("ses2 optimal inter-validation error: {}".format(np.mean([x[1] for x in real_errors_ses2])))
+    logging.info("ses2 optimal error with ses1 parameters: {}".format(np.mean(cross_error_12)))
+    logging.info("ses1 optimal error with ses2 parameters: {}".format(np.mean(cross_error_21)))
     # return sessions incase caller wants to plot / visualize
-    output_scales = [np.diag(x) for x in output_scales]
-    return ses1, ses2, output_scales
+    # output_scales = [np.diag(x) for x in output_scales]
+    # return ses1, ses2, output_scales
 
 
-def do_find_optimal_rotation_experiment(template_path):
+def do_parameter_grid_search_experiment(opt):
     """
-    experiement to use an exhaustive search of paramter space to find optimal rotation and scale of template model
+    experiement to use an exhaustive search of parameter space to find optimal rotation and scale of template model
     applies transform from before MNI projection.
-    :param template_path:
-    :param video_names:
-    :param r_matrices:
-    :param s_matrices:
-    :param digi_sessions: pass this to use anchors from digitizer
+    :param opt command line options
     :return:
     """
-    random_grid_space_size = 50000
+    random_grid_space_size = 500000
     splits = 5
-    names, data, format, _ = read_template_file(template_path)
+    names, data, format, _ = read_template_file(opt.template)
     names = names[0]
     data = data[0]
     data = geometry.to_standard_coordinate_system(names, data)
@@ -124,69 +156,75 @@ def do_find_optimal_rotation_experiment(template_path):
     origin_names = ["leftear", "rightear", "nosebridge", "cz"]
     full_names = origin_names + others_names
     cached_result_ses1 = "cache/session1_opt_MNI"
-    cached_result_ses2 = "cache/session2_opt_MNI"
     recreate_files = False
     for i in range(splits):
         name1 = cached_result_ses1 + str(i)
-        name2 = cached_result_ses1 + str(i)
-        if not Path(name1 + ".npy").is_file() or not Path(name2 + ".npy").is_file():
+        if not Path(name1 + ".npy").is_file():
             recreate_files = True
     ses1_list = []
-    ses2_list = []
     if recreate_files:
         # perform random grid search
-        sessions = [[], []]
+        sessions = []
         np.random.seed(42)
-        rx = np.random.rand(random_grid_space_size) * 14 - 7
-        ry = np.random.rand(random_grid_space_size) * 14 - 7
-        rz = np.random.rand(random_grid_space_size) * 14 - 7
-        sx = np.random.rand(random_grid_space_size) * 0.6 + 0.7
-        sy = np.random.rand(random_grid_space_size) * 0.6 + 0.7
-        sz = np.random.rand(random_grid_space_size) * 0.6 + 0.7
-        scales = np.array([sx, sy, sz]).T
-        rots = np.array([rx, ry, rz]).T
+        if Path("cache/rots").is_file() and Path("cache/scales").is_file():
+            rots = np.load("cache/rots.npy", allow_pickle=True)
+            scales = np.load("cache/scales.npy", allow_pickle=True)
+        else:
+            rx = np.random.rand(random_grid_space_size) * 14 - 7
+            ry = np.random.rand(random_grid_space_size) * 14 - 7
+            rz = np.random.rand(random_grid_space_size) * 14 - 7
+            sx = np.random.rand(random_grid_space_size) * 0.6 + 0.7
+            sy = np.random.rand(random_grid_space_size) * 0.6 + 0.7
+            sz = np.random.rand(random_grid_space_size) * 0.6 + 0.7
+            scales = np.array([sx, sy, sz]).T
+            rots = np.array([rx, ry, rz]).T
+            # save grid search parameters
+            np.save("cache/rots", rots)
+            np.save("cache/scales", scales)
         from scipy.spatial.transform import Rotation as R
         rot_grid_search = [R.from_euler('xyz', rots[i], degrees=True).as_matrix() for i in range(len(rots))]
         scale_grid_search = [np.diag(scales[i]) for i in range(len(scales))]
-        for rot, scale in zip(rot_grid_search, scale_grid_search):
-            origin_selector = tuple([names.index(x) for x in origin_names])
-            origin = data[origin_selector, :]
-            others_selector = tuple([names.index(x) for x in others_names])
-            others = data[others_selector, :]
-            others = (rot @ (scale @ others.T)).T  # apply transform before MNI projection
-            sessions[0].append([full_names, np.vstack((origin, others))])
-        sessions[1] = sessions[0]
-        # save grid search parameters
-        np.save("cache/rots", rots)
-        np.save("cache/scales", scales)
+        origin_selector = tuple([names.index(x) for x in origin_names])
+        others_selector = tuple([names.index(x) for x in others_names])
+        origin = data[origin_selector, :]
+        others = data[others_selector, :]
+        # apply rotation and scale (batched version)
+        transformed_others = (np.array(rot_grid_search) @ (np.array(scale_grid_search) @ others.T)).transpose(0, 2, 1)
+        # for rot, scale in zip(rot_grid_search, scale_grid_search):
+        #
+        #     others = (rot @ (scale @ others.T)).T  # apply transform before MNI projection
+        #     sessions.append([full_names, np.vstack((origin, others))])
         for split in range(splits):
             min_range = (random_grid_space_size // splits)*(split)
             max_range = (random_grid_space_size // splits)*(split+1)
             # project to MNI every split
-            vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0][min_range:max_range], origin_names)
-            vid_ss_data_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
-            np.save(cached_result_ses1+str(split), vid_ss_data_ses1)
-            ses1_list.append(vid_ss_data_ses1)
-            # session2 is just a copy of session1 in this case
-            vid_ss_data_ses2 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
-            np.save(cached_result_ses2+str(split), vid_ss_data_ses2)
-            ses2_list.append(vid_ss_data_ses2)
+            # all_sensors = np.array([sessions[i][1] for i in range(min_range, max_range)])
+            anchors = origin  # same anchors for all experiments...
+            sensors = transformed_others[min_range:max_range, :, :]
+            sorted_anchors, indices = geometry.sort_anchors(np.array(origin_names), anchors)
+            device = opt.device
+            origin_xyz_torch = torch.from_numpy(sorted_anchors).float().to(device)
+            sensors_xyz_torch = torch.from_numpy(sensors).float().to(device)
+            selected_indices_torch = torch.from_numpy(indices).to(device)
+            torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                         sensors_xyz_torch,
+                                                                         selected_indices_torch,
+                                                                         output_errors=False)
+
+            # vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0][min_range:max_range], origin_names)
+            # vid_ss_data_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
+            np_mni = torch_mni.cpu().numpy()
+            np.save(cached_result_ses1+str(split), np_mni)
+            ses1_list.append(np_mni)
     else:
         rots = np.load("cache/rots.npy", allow_pickle=True)
         scales = np.load("cache/scales.npy", allow_pickle=True)
         for i in range(splits):
             name1 = cached_result_ses1 + str(i)
-            name2 = cached_result_ses1 + str(i)
             ses1_list.append(np.load(name1 + ".npy", allow_pickle=True))
-            ses2_list.append(np.load(name2 + ".npy", allow_pickle=True))
     vid_ss_data_ses1 = np.vstack(ses1_list).astype(np.float)
-    vid_ss_data_ses2 = np.vstack(ses2_list).astype(np.float)
-
-
-    output_selector = tuple([full_names.index(x) for x in output_others_names])
-    return [output_others_names, vid_ss_data_ses1[:, output_selector, :]],\
-           [output_others_names, vid_ss_data_ses2[:, output_selector, :]], \
-           rots, scales
+    # output_selector = tuple([full_names.index(x) for x in output_others_names])
+    return output_others_names, vid_ss_data_ses1, rots, scales
 
 
 def reproduce_experiments(video_names, sticker_locations, args):
@@ -199,34 +237,187 @@ def reproduce_experiments(video_names, sticker_locations, args):
     :return: -
     """
     do_network_robustness_test(sticker_locations, args)
-
-    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, None, args)
-
-    opt_ses1, opt_ses2, rots, scales = do_find_optimal_rotation_experiment(args.template)
-
-    do_MNI_sensitivity_experiment(args.template)
-
-    do_digi_error_experiment()
-
-    dig_ses1, dig_ses2, sessions = do_dig2dig_experiment(args.template, args.ground_truth)
-
-    true_opt1, true_opt2, output_scales = do_opt2dig_experiment(dig_ses1,
-                                                                dig_ses2,
-                                                                opt_ses1,
-                                                                opt_ses2,
-                                                                r_matrix,
-                                                                rots,
-                                                                scales,
-                                                                video_names)
-
-    vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args.template, video_names, r_matrix, s_matrix)
+    r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, args)
+    # grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
+    # do_MNI_sensitivity_experiment(args.template)
+    # do_digi_error_experiment()
+    dig_ses1, dig_ses2, all_digi_sessions = do_dig2dig_experiment(args.template, args.ground_truth)
+    # do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)
     # vid_ses1, vid_ses2 = do_vid2vid_project_afterMNI_experiment(args.template, video_names, r_matrix, s_matrix)
-
-    do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
-
+    vid_ses1, vid_ses2 = do_vid2vid_experiment(args, video_names, r_matrix, s_matrix, force_project=False)
+    dig_intra, vid_intra, inter, per_landmark = do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+    do_brain_error_visualization_experiment(vid_ses1, per_landmark)
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
-
+    do_skull_size_experiment(dig_intra, vid_intra, inter, args)
+    do_shift_experiment(r_matrix, all_digi_sessions, args)
     # do_old_experiment(r_matrix, s_matrix, video_names, args)
+
+
+def do_brain_error_visualization_experiment(vid_ses1, per_patient_landmarks):
+    """
+    visualizes errors spatially on average MNI brain
+    :param vid_ses1: all first video sessions
+    :param per_landmark: np array: subjects x landmarks
+    landmark-per-patient inter-method error (vid session1 and digitizer sessions)
+    :return:
+    """
+    XYZ = MNI_torch.load_raw_MNI_data("resource" + "/MNI_templates/xyzallBEM.npy", "brain", resource_folder="resource")
+    import pptk
+    v = pptk.viewer(XYZ)
+    v.color_map('hot', scale=[0, 1])
+    # color = (XYZ[:, 0] - np.min(XYZ[:, 0])) / (np.max(XYZ[:, 0]) - np.min(XYZ[:, 0]))
+    colors = np.empty((len(vid_ses1[1]), XYZ.shape[0]))
+    for i in range(len(vid_ses1[1])):
+        locs = vid_ses1[1][i]
+        weights = per_patient_landmarks[i]
+        distances = 1 / (np.linalg.norm(XYZ - np.expand_dims(locs, 1), axis=-1) + 1e-5)
+        distances /= np.sum(distances, axis=0)
+        non_normalized_colors = weights @ distances
+        colors[i] = non_normalized_colors
+    colors = np.mean(colors, axis=0)
+    max_color = np.max(colors)
+    min_color = np.min(colors)
+    mean_color = np.mean(colors)
+    std_color = np.std(colors)
+    logging.info("spatial mean, std (video session): {}, {}".format(mean_color, std_color))
+    colors = (colors - np.min(colors)) / (np.max(colors) - np.min(colors))
+    v.attributes(colors)
+
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=np.pi, theta=0, r=300, point_size=0.5)
+    v.capture('cache/right_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=0, theta=0, r=300, point_size=0.5)
+    v.capture('cache/left_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=0, theta=np.pi / 2, r=300, point_size=0.5)
+    v.capture('cache/top_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=+np.pi / 2, theta=0, r=300, point_size=0.5)
+    v.capture('cache/front_view.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=+np.pi / 4, theta=np.pi / 4, r=300, point_size=0.5)
+    v.capture('cache/iso1.png')
+    v.set(show_grid=False, show_axis=False, show_info=False,
+          lookat=(0, 0, 0), phi=3 * np.pi / 4, theta=np.pi / 4, r=300, point_size=0.5)
+    v.capture('cache/iso2.png')
+    draw.plot_colorbar(min_color, max_color)
+    v.close()
+
+
+def do_skull_size_experiment(dig_intra, vid_intra, inter, args):
+    """
+    plots the skull sizes for each subject against their intra & inter errors
+    :param dig_intra:
+    :param vid_intra:
+    :param inter:
+    :param args:
+    :return:
+    """
+    experiment_folder_path = args.ground_truth
+    experiment_file_list = []
+    skull_radii = []
+    for exp_file in sorted(experiment_folder_path.glob("*.txt")):
+        experiment_file_list.append(exp_file)
+    for exp_file in experiment_file_list:
+        logging.info(exp_file.name)
+        file_names, file_data, file_format, skull = read_template_file(exp_file)
+        skull_sizes = []
+        for i, session in enumerate(zip(file_names, file_data)):
+            if not session[0]:
+                continue
+            names = session[0]
+            data = session[1][:, 0, :] - session[1][:, 1, :]  # subtract second sensor
+            data = geometry.to_standard_coordinate_system(names, data)
+            skull_sizes.append([np.linalg.norm(data[(names.index('leftear'))] - data[(names.index('rightear'))]),
+                                np.linalg.norm(data[(names.index('fpz'))] - data[(names.index('o1'))])])
+        skull_radii.append(np.mean(np.array(skull_sizes), axis=0) / 2)
+    skull_radii = np.array(skull_radii)
+    circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
+    draw.plot_skull_vs_error(circumferences, dig_intra, vid_intra, inter)
+
+
+def do_shift_experiment(r_matrix, all_digi_sessions, args):
+    """
+    finds corrolation between rotational shifts as detected by the digitzier and our method
+    :param r_matrix:
+    :param all_digi_sessions:
+    :return:
+    """
+    # find video rotations
+    vid_rots = [[], [], []]
+    for i, r in enumerate(r_matrix):
+        vid_rot = R.from_matrix(r)
+        vid_rot_euler = vid_rot.as_euler('xyz', degrees=True)
+        vid_rots[i % 3].append(vid_rot_euler)
+    # find digitizer rotations
+    dig_rots = [[], [], []]
+    template_names, template_data, template_format, _ = read_template_file(args.template)
+    template_data = template_data[0]
+    template_names = template_names[0]
+    template_data = geometry.to_standard_coordinate_system(template_names, template_data)
+    template_mask_data = template_data[(template_names.index('fp1'),
+                                        template_names.index('fp2'),
+                                        template_names.index('fpz'),
+                                        template_names.index('cz'),
+                                        template_names.index('o1'),
+                                        template_names.index('o2'),
+                                        template_names.index('oz'),
+                                        template_names.index('f7'),
+                                        template_names.index('f8')), :]
+    template_face_data = template_data[(template_names.index('leftear'),
+                                        template_names.index('rightear'),
+                                        template_names.index('lefteye'),
+                                        template_names.index('righteye'),
+                                        template_names.index('nosebridge'),
+                                        template_names.index('nosetip')), :]
+    for i, session in enumerate(all_digi_sessions):
+        for j, subject in enumerate(session):
+            try:
+                names = subject[0]
+                data = subject[1]
+                file_mask_data = data[(names.index('fp1'),
+                                       names.index('fp2'),
+                                       names.index('fpz'),
+                                       names.index('cz'),
+                                       names.index('o1'),
+                                       names.index('o2'),
+                                       names.index('oz'),
+                                       names.index('f7'),
+                                       names.index('f8')), :]
+                file_face_data = data[(names.index('leftear'),
+                                       names.index('rightear'),
+                                       names.index('lefteye'),
+                                       names.index('righteye'),
+                                       names.index('nosebridge'),
+                                       names.index('nosetip')), :]
+                # align faces as intermediate step
+                ret_R, ret_t = geometry.rigid_transform_3d_nparray(template_face_data, file_face_data)
+                aligned_template_mask = (ret_R @ template_mask_data.T).T + ret_t
+                # find mask transform
+                ret_R, ret_t = geometry.rigid_transform_3d_nparray(aligned_template_mask, file_mask_data)
+                gt_rot_m = R.from_matrix(ret_R)
+                gt_rot_e = gt_rot_m.as_euler('xyz', degrees=True)
+                logging.info("Digitizer Euler angels: " + str(gt_rot_e))
+                dig_rots[i].append(gt_rot_e)
+            except AttributeError:
+                dig_rots[i].append(None)
+    ########
+    dig_rots = [x[:-1] for x in dig_rots]
+    vid_rots = [x[:-1] for x in vid_rots]
+    digi2digi_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(dig_rots[0], dig_rots[1], dig_rots[2])])
+    vid2vid_shift = np.array(
+        [z - (x + y) / 2 for x, y, z in zip(vid_rots[0], vid_rots[1], vid_rots[2])])
+
+    # correlate the shifts
+    x_corr_new, px = pearsonr(digi2digi_shift[:, 0], vid2vid_shift[:, 0])
+    y_corr_new, py = pearsonr(digi2digi_shift[:, 1], vid2vid_shift[:, 1])
+    z_corr_new, pz = pearsonr(digi2digi_shift[:, 2], vid2vid_shift[:, 2])
+
+    logging.info(
+        "Shift correlation (x, px, y, py, z, pz):"
+        "{:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}".format(x_corr_new, px, y_corr_new, py, z_corr_new, pz))
 
 
 def do_digi_error_experiment():
@@ -256,7 +447,7 @@ def do_digi_error_experiment():
         logging.info("{}->{:.3f}".format(key, value[0]))
 
 
-def do_dig2dig_experiment(template_path, experiment_folder):
+def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=None, verbose=True):
     """
     tests how accurate is the digitizer between 2 sessions after MNI projection
     :param experiment_folder:
@@ -268,39 +459,40 @@ def do_dig2dig_experiment(template_path, experiment_folder):
     template_data = geometry.to_standard_coordinate_system(template_names, template_data)
 
     experiment_file_list = []
-    sessions = [[], []]
+    sessions = [[], [], []]
 
-    origin_names = ["leftear", "rightear", "nosebridge", "cz"]
+    origin_names = ["leftear", "rightear", "nosebridge", "cz", "lefteye", "righteye", "nosetip"]
     others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
-    others_template = template_names[template_names.index(0):]
     full_names = origin_names + others_names
-    # combined_others = others + others_template
-    # full_names = origin + combined_others
     if experiment_folder.is_dir():
         for exp_file in sorted(experiment_folder.glob("*.txt")):
             experiment_file_list.append(exp_file)
     else:
         experiment_file_list.append(experiment_folder)
     for exp_file in experiment_file_list:
-        logging.info(exp_file.name)
+        if verbose:
+            logging.info(exp_file.name)
         file_names, file_data, file_format, skull = read_template_file(exp_file)
-        for i, session in enumerate(zip(file_names[:2], file_data[:2])):
-            names = session[0]
-            data = session[1][:, 0, :] - session[1][:, 1, :]  # subtracts second sensor
-            data = geometry.to_standard_coordinate_system(names, data)
-            origin_selector = tuple([names.index(x) for x in origin_names])
-            origin = data[origin_selector, :]
-            others_selector = tuple([names.index(x) for x in others_names])
-            others = data[others_selector, :]
-            # others_selector_template = tuple([template_names.index(x) for x in others])
-            # W = geometry.affine_transform_3d_nparray(template_data[others_selector_template, :],
-            #                                                                  subject_secific_others)
-            # others_selector_template = tuple([template_names.index(x) for x in others_template])
-            # others_data = template_data[others_selector_template, :]
-            # new_others_data = np.c_[others_data, np.ones(len(others_data))]
-            # new_others_data_transformed = np.matmul(new_others_data, W)[:,:-1]
-            # subject_secific_others = np.vstack((subject_secific_others, new_others_data_transformed))
-            sessions[i].append([full_names, np.vstack((origin, others))])
+        for i, session in enumerate(zip(file_names, file_data)):
+            try:
+                names = session[0]
+                data = session[1][:, 0, :] - session[1][:, 1, :]  # subtracts second sensor
+                data = geometry.to_standard_coordinate_system(names, data)
+                origin_selector = tuple([names.index(x) for x in origin_names])
+                origin = data[origin_selector, :]
+                others_selector = tuple([names.index(x) for x in others_names])
+                others = data[others_selector, :]
+                # others_selector_template = tuple([template_names.index(x) for x in others])
+                # W = geometry.affine_transform_3d_nparray(template_data[others_selector_template, :],
+                #                                                                  subject_secific_others)
+                # others_selector_template = tuple([template_names.index(x) for x in others_template])
+                # others_data = template_data[others_selector_template, :]
+                # new_others_data = np.c_[others_data, np.ones(len(others_data))]
+                # new_others_data_transformed = np.matmul(new_others_data, W)[:,:-1]
+                # subject_secific_others = np.vstack((subject_secific_others, new_others_data_transformed))
+                sessions[i].append([full_names, np.vstack((origin, others))])
+            except IndexError:
+                sessions[i].append([None, None])
     cached_result_ses1 = "cache/session1_digi_MNI"
     cached_result_ses2 = "cache/session2_digi_MNI"
     if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
@@ -313,8 +505,13 @@ def do_dig2dig_experiment(template_path, experiment_folder):
     else:
         digi_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
         digi_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
-    digi_projected_ses1_others = digi_ss_data_ses1[:, full_names.index(others_names[0]):, :]
-    digi_projected_ses2_others = digi_ss_data_ses2[:, full_names.index(others_names[0]):, :]
+    if experiment_filter:
+        id = [i for (i, x) in enumerate(experiment_file_list) if experiment_filter in str(x)][0]
+        digi_projected_ses1_others = digi_ss_data_ses1[id:id+1, full_names.index(others_names[0]):, :]
+        digi_projected_ses2_others = digi_ss_data_ses2[id:id+1, full_names.index(others_names[0]):, :]
+    else:
+        digi_projected_ses1_others = digi_ss_data_ses1[:, full_names.index(others_names[0]):, :]
+        digi_projected_ses2_others = digi_ss_data_ses2[:, full_names.index(others_names[0]):, :]
 
     # selector_template = tuple([template_names.index(x) for x in others])
     # to_fill = np.empty((digi_projected_ses1_others.shape[0],
@@ -340,13 +537,14 @@ def do_dig2dig_experiment(template_path, experiment_folder):
     # # digi_projected_ses2_others = to_fill.copy()
 
     errors = []
-    for i in range(len(sessions[0])):
+    for i in range(len(digi_projected_ses2_others)):
         rmse_error = geometry.get_rmse(digi_projected_ses1_others[i], digi_projected_ses2_others[i])
         errors.append(rmse_error)
     rmse_error_mean = np.mean(np.array(errors))
     rmse_error_std = np.std(np.array(errors))
-    logging.info("dig2dig mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(rmse_error_mean,
-                                                                                        rmse_error_std))
+    if verbose:
+        logging.info("dig2dig mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(rmse_error_mean,
+                                                                                            rmse_error_std))
 
     # from draw import visualize_2_pc
     # visualize_2_pc(points_blue=digi_projected_ses1_others[0], points_red=digi_projected_ses2_others[0])
@@ -418,7 +616,7 @@ def do_vid2vid_project_afterMNI_experiment(template_path, video_names, r_matrice
            [output_others_names, vid_ses2_transformed[:, output_selector, :]]
 
 
-def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matrices, s_matrices, digi_sessions=None):
+def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, force_project=False, save_results=True):
     """
     experiement to compare intra-method error between video sessions
     applies transform from network before MNI projection
@@ -429,6 +627,7 @@ def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matric
     :param digi_sessions: pass this to use anchors from digitizer
     :return:
     """
+    template_path = opt.template
     names, data, format, _ = read_template_file(template_path)
     names = names[0]
     data = data[0]
@@ -437,50 +636,62 @@ def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matric
     others_names = output_others_names + names[names.index(0):]
     origin_names = ["leftear", "rightear", "nosebridge", "cz"]
     full_names = origin_names + others_names
-    sessions = [[], []]
-    for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrices, s_matrices, video_names)):
-        subject_name, session_name = vid.split("_")
-        session_number = int(re.findall(r'\d+', session_name)[0]) - 1
-        if session_number == 2:
-            continue
-        origin_selector = tuple([names.index(x) for x in origin_names])
-        origin = data[origin_selector, :]
-        others_selector = tuple([names.index(x) for x in others_names])
-        others = data[others_selector, :]
-        others = (rot_mat @ (scale_mat @ others.T)).T  # apply transform before MNI projection, but before digi transform if applicaple
-        if digi_sessions:
-            digi_origin_selector = tuple([digi_sessions[0][0][0].index(x) for x in origin_names])
-            digi_origin = digi_sessions[session_number][i//3][1][digi_origin_selector, :]
-            W = geometry.affine_transform_3d_nparray(origin, digi_origin)
-            # testing
-            # W_test = geometry.affine_transform_3d_nparray(digi_origin, origin)
-            # new_origin_affine = np.matmul(np.c_[digi_origin, np.ones(len(digi_origin))], W_test)[:, :-1]
-            # r, t = geometry.rigid_transform_3d_nparray(digi_origin, origin)
-            # new_origin_rigid = (r @ (digi_origin.T)).T + t
-            # import draw
-            # draw.visualize_2_pc(points_red=new_origin_affine, points_blue=origin)
-            # draw.visualize_2_pc(points_red=new_origin_rigid, points_blue=origin)
-            # logging.debug(W)
-            # testing
-            others = np.matmul(np.c_[others, np.ones(len(others))], W)[:, :-1]
-            origin = digi_origin
-        sessions[session_number].append([full_names, np.vstack((origin, others))])
     cached_result_ses1 = "cache/session1_vid_MNI_transb"
     cached_result_ses2 = "cache/session2_vid_MNI_transb"
-    if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
-        vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
-        vid_ss_data_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.object)
-        np.save(cached_result_ses1, vid_ss_data_ses1)
-        vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
-        vid_ss_data_ses2 = np.array([x[1] for x in vid_projected_ses2], dtype=np.object)
-        np.save(cached_result_ses2, vid_ss_data_ses2)
+    if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file() or force_project:
+        if opt.gpu_id == "cpu":
+            sessions = [[], []]
+            for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrices, s_matrices, video_names)):
+                subject_name, session_name = vid.split("_")
+                session_number = int(re.findall(r'\d+', session_name)[0]) - 1
+                if session_number == 2:
+                    continue
+                origin_selector = tuple([names.index(x) for x in origin_names])
+                origin = data[origin_selector, :]
+                others_selector = tuple([names.index(x) for x in others_names])
+                others = data[others_selector, :]
+                others = (rot_mat @ (
+                            scale_mat @ others.T)).T  # apply transform before MNI projection, but before digi transform if applicaple
+                sessions[session_number].append([full_names, np.vstack((origin, others))])
+            vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
+            anchors_and_sensors_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.float)
+            vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
+            anchors_and_sensors_ses2 = np.array([x[1] for x in vid_projected_ses2], dtype=np.float)
+        else:
+            origin_selector = tuple([names.index(x) for x in origin_names])
+            others_selector = tuple([names.index(x) for x in others_names])
+            anchors = data[origin_selector, :]
+            sensors = data[others_selector, :]
+            transformed_sensors = (np.array(r_matrices) @ (np.array(s_matrices) @ sensors.T)).transpose(0, 2, 1)
+            sorted_anchors, indices = geometry.sort_anchors(np.array(origin_names), anchors)
+            device = opt.gpu_id
+            origin_xyz_torch = torch.from_numpy(sorted_anchors).float().to(device)
+            sensors_xyz_torch = torch.from_numpy(transformed_sensors).float().to(device)
+            selected_indices_torch = torch.from_numpy(indices).to(device)
+            ses1_torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                              sensors_xyz_torch[::3, :, :],
+                                                                              selected_indices_torch,
+                                                                              output_errors=False)
+            ses2_torch_mni, _, _ = MNI_torch.torch_project_non_differentiable(origin_xyz_torch,
+                                                                              sensors_xyz_torch[1::3, :, :],
+                                                                              selected_indices_torch,
+                                                                              output_errors=False)
+            np_mni_ses1 = ses1_torch_mni.cpu().numpy()
+            np_mni_ses2 = ses2_torch_mni.cpu().numpy()
+
+            # stack anchors and projected sensors
+            anchors_and_sensors_ses1 = np.concatenate((np.tile(np.expand_dims(anchors, axis=0), (len(ses1_torch_mni), 1, 1)), np_mni_ses1), axis=1)
+            anchors_and_sensors_ses2 = np.concatenate((np.tile(np.expand_dims(anchors, axis=0), (len(ses2_torch_mni), 1, 1)), np_mni_ses2), axis=1)
+        if save_results:
+            np.save(cached_result_ses1, anchors_and_sensors_ses1)
+            np.save(cached_result_ses2, anchors_and_sensors_ses2)
     else:
-        vid_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
-        vid_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
-    vid_projected_ses1_others = vid_ss_data_ses1[:, full_names.index(output_others_names[0]):, :]
-    vid_projected_ses2_others = vid_ss_data_ses2[:, full_names.index(output_others_names[0]):, :]
+        anchors_and_sensors_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
+        anchors_and_sensors_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
+    vid_projected_ses1_others = anchors_and_sensors_ses1[:, full_names.index(output_others_names[0]):, :]
+    vid_projected_ses2_others = anchors_and_sensors_ses2[:, full_names.index(output_others_names[0]):, :]
     errors = []
-    for i in range(len(sessions[0])):
+    for i in range(len(vid_projected_ses1_others)):
         rmse_error = geometry.get_rmse(vid_projected_ses1_others[i], vid_projected_ses2_others[i])
         errors.append(rmse_error)
     rmse_error_mean = np.mean(np.array(errors))
@@ -488,19 +699,48 @@ def do_vid2vid_project_beforeMNI_experiment(template_path, video_names, r_matric
     logging.info("vid2vid mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(rmse_error_mean,
                                                                                         rmse_error_std))
     output_selector = tuple([full_names.index(x) for x in output_others_names])
-    return [output_others_names, vid_ss_data_ses1[:, output_selector, :]],\
-           [output_others_names, vid_ss_data_ses2[:, output_selector, :]]
+    return [output_others_names, anchors_and_sensors_ses1[:, output_selector, :]],\
+           [output_others_names, anchors_and_sensors_ses2[:, output_selector, :]]
 
 
 def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):
+    """
+    reports inter method errors (and t-tests, which are not that relevant)
+    :param digi_ses1:
+    :param digi_ses2:
+    :param vid_ses1:
+    :param vid_ses2:
+    :return: intra method reliability for digitizer, for video, and inter method validity.
+    """
     inter_method_rmse1 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses1[1], vid_ses1[1])]
     inter_method_rmse2 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses1[1], vid_ses2[1])]
     inter_method_rmse3 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses2[1], vid_ses1[1])]
     inter_method_rmse4 = [geometry.get_rmse(x, y) for x, y in zip(digi_ses2[1], vid_ses2[1])]
     inter_method_rmse_avg = np.mean([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
     inter_method_rmse_std = np.std([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4])
+
+    # for visualization, find best error per landmark on video session1
+    vid_combine = vid_ses1[1]
+    dig_combine = (digi_ses1[1] + digi_ses2[1]) / 2
+    landmarks_errors = np.linalg.norm((dig_combine - vid_combine).astype(np.float), axis=-1)
+
     logging.info("dig2vid mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(inter_method_rmse_avg,
                                                                                         inter_method_rmse_std))
+
+    digi_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in zip(digi_ses1[1], digi_ses2[1])]
+    vid_intra_method_rmse = [geometry.get_rmse(x, y) for x, y in zip(vid_ses1[1], vid_ses2[1])]
+    # calc t-test statistics
+    a_vid = np.array(vid_intra_method_rmse)
+    a_dig = np.array(digi_intra_method_rmse)
+    a_inter = np.mean(np.array([inter_method_rmse1, inter_method_rmse2, inter_method_rmse3, inter_method_rmse4]),
+                      axis=0)
+    # probably should be ttest_ind
+    t1, p1 = ttest_rel(a_vid, a_dig)
+    logging.info("t-test results intra (t, p): {:.3f}, {:.3f}".format(t1, p1))
+    # probably should be ttest_ind
+    t2, p2 = ttest_rel(a_dig, a_inter)
+    logging.info("t-test results inter (t, p): {:.3f}, {:.3f}".format(t2, p2))
+    return a_dig, a_vid, a_inter, landmarks_errors
 
 
 def do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2):
@@ -579,7 +819,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
                 rot_estimations.setdefault(exp_file.stem, []).append(None)
                 continue
             names = session[0]
-            data = session[1][:, 0, :] #- session[1][:, 1, :]  # subtract second sensor
+            data = session[1][:, 0, :] - session[1][:, 1, :]  # subtract second sensor
             data = geometry.to_standard_coordinate_system(names, data)
             # file_data = normalize_coordinates(file_names, file_data)  # normalize data
             file_mask_data = data[(names.index('fp1'),

@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 
 
-def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN):
+def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, refN, pointN, resource_folder="resource"):
     """
     finds refN affine transforms between our anchors and anchors from all reference template brains
     :param our_anchors_xyz: our anchors
@@ -39,7 +39,7 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
     # load 17 brain templates from disk
     DMS = []
     for i in range(1, refN+1):
-        path_wo_ext = "resource/MNI_templates/DMNI{:0>4d}".format(i)
+        path_wo_ext = resource_folder + "/MNI_templates/DMNI{:0>4d}".format(i)
         if Path(path_wo_ext+".npy").is_file():
             DMS.append(np.load(path_wo_ext+".npy", allow_pickle=True))
         else:
@@ -67,7 +67,7 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
     return othersRefList[:, :, :3]
 
 
-def find_closest_on_surface_naive(othersRefList, XYZ, pointN):
+def find_closest_on_surface_naive(othersRefList, XYZ, pointN, calc_sd_and_var=False):
     """
     finds closest point on cortical surface for every (transformed) sensor location
     by averaging over 3 closest points on cortical surface
@@ -98,29 +98,29 @@ def find_closest_on_surface_naive(othersRefList, XYZ, pointN):
         other[i, :] = closest
 
         # ---- Variance calculation ---- (line 739)
+        if calc_sd_and_var:
+            AAA = othersRefList[:, i]
+            AV = closest
+            N = AAA.shape[0]
+            subMat = np.ones(AAA.shape)
+            for j in range(N):
+                subMat[j, :] = AV
 
-        AAA = othersRefList[:, i]
-        AV = closest
-        N = AAA.shape[0]
-        subMat = np.ones(AAA.shape)
-        for j in range(N):
-            subMat[j, :] = AV
+            dispEach = AAA - subMat
+            dispEachSq = dispEach * dispEach
+            XYZSS = np.sum(dispEachSq, axis=0)
+            RSS = np.sum(XYZSS)
 
-        dispEach = AAA - subMat
-        dispEachSq = dispEach * dispEach
-        XYZSS = np.sum(dispEachSq, axis=0)
-        RSS = np.sum(XYZSS)
+            XYZVar = XYZSS / (N - 1)
+            RSSVar = RSS / (N - 1)
 
-        XYZVar = XYZSS / (N - 1)
-        RSSVar = RSS / (N - 1)
-
-        VV = np.append(XYZVar, RSSVar)
-        otherVar[i, :] = VV
-        otherSD[i, :] = np.sqrt(VV)
+            VV = np.append(XYZVar, RSSVar)
+            otherVar[i, :] = VV
+            otherSD[i, :] = np.sqrt(VV)
     return other, otherVar, otherSD
 
 
-def find_closest_on_surface_full(othersRefList, refN, pointN):
+def find_closest_on_surface_full(othersRefList, refN, pointN, resource_folder):
     """
     full implementation of cortical projection using the balloon inflation algorithm described in
     https://doi.org/10.1016/j.neuroimage.2005.01.018
@@ -132,10 +132,9 @@ def find_closest_on_surface_full(othersRefList, refN, pointN):
     otherRefCList = np.empty((refN, pointN, 3), dtype=np.float)
     # otherRefCList = np.empty((1, refN), dtype=object)
     for i in range(refN):
+        my_str = resource_folder+"/MNI_templates/xyzall{}.npy".format(str(i + 1))
+        XYZ = load_raw_MNI_data(my_str, i, resource_folder=resource_folder)
         projectionListC = np.ones((pointN, 3))
-        my_str = "resource/MNI_templates/xyzall{}.npy".format(str(i + 1))
-        XYZ = load_raw_MNI_data(my_str, i)
-
         for j in range(pointN):
             P = othersRefList[i, j, :3]
             PP = np.broadcast_to(P, XYZ.shape)
@@ -187,12 +186,11 @@ def find_closest_on_surface_full(othersRefList, refN, pointN):
             CP = np.mean(Vic, axis=0)
             # --- End of projection BS -----
             projectionListC[j, :] = CP
-
         otherRefCList[i] = projectionListC
     return otherRefCList
 
 
-def load_raw_MNI_data(location, type):
+def load_raw_MNI_data(location, type, resource_folder):
     """
     loads raw MNi data from disk
     :param location: where is the data located
@@ -212,9 +210,9 @@ def load_raw_MNI_data(location, type):
     if Path(my_str).is_file():
         XYZ = np.load(my_str, allow_pickle=True)
     else:
-        xallbemPath = Path("resource/MNI_templates/xall"+shortcut+".csv")
-        yallbemPath = Path("resource/MNI_templates/yall"+shortcut+".csv")
-        zallbemPath = Path("resource/MNI_templates/zall"+shortcut+".csv")
+        xallbemPath = Path(resource_folder+"/MNI_templates/xall"+shortcut+".csv")
+        yallbemPath = Path(resource_folder+"/MNI_templates/yall"+shortcut+".csv")
+        zallbemPath = Path(resource_folder+"/MNI_templates/zall"+shortcut+".csv")
         xallBEM = np.genfromtxt(xallbemPath, delimiter=',')
         yallBEM = np.genfromtxt(yallbemPath, delimiter=',')
         zallBEM = np.genfromtxt(zallbemPath, delimiter=',')
@@ -223,7 +221,7 @@ def load_raw_MNI_data(location, type):
     return XYZ
 
 
-def project(origin_xyz, others_xyz, selected_indices):
+def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resource_folder="resource"):
     """
     projects others_xyz to MNI coordiantes given anchors in origin_xyz
     :param origin_xyz: anchors given as nx3 np array (n >= 4)
@@ -236,6 +234,8 @@ def project(origin_xyz, others_xyz, selected_indices):
                               "c3", "c4", "t3", "t4",
                               "pz", "p3", "p4", "t5",
                               "t6", "o1", "o2"]
+    :param output_errors: whether to output error in estimation as well.
+    :param resource_folder: relative path to the fodler with the raw template data
     :return: otherH - others transformed to MNI of ideal head (head surface)
              otherC - others transformed to MNI of ideal head  (cortical surface)
              otherHSD - transformation standard deviation per axis, point manner (for otherH).
@@ -250,17 +250,18 @@ def project(origin_xyz, others_xyz, selected_indices):
                                                        others_xyz,
                                                        selected_indices,
                                                        refN,
-                                                       pointN)
+                                                       pointN,
+                                                       resource_folder)
     # load head surface raw data
-    XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallHEM", "head")
+    XYZ = load_raw_MNI_data(resource_folder+"/MNI_templates/xyzallHEM", "head", resource_folder=resource_folder)
     # get closest location of sensors on average head surface
-    otherH, otherHVar, otherHSD = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN)
+    otherH, otherHVar, otherHSD = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN, output_errors)
     # get location of sensors projected onto reference cortical surface by inflating a rod
-    others_projected_to_ref = find_closest_on_surface_full(others_transformed_to_ref, refN, pointN)
-    XYZ = load_raw_MNI_data("resource/MNI_templates/xyzallBEM.npy", "brain")
+    others_projected_to_ref = find_closest_on_surface_full(others_transformed_to_ref, refN, pointN, resource_folder=resource_folder)
+    XYZ = load_raw_MNI_data(resource_folder+"/MNI_templates/xyzallBEM.npy", "brain", resource_folder=resource_folder)
     # get closest points of projected sensors on average cortical surface
-    otherC, otherCVar, otherCSD = find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN)
-
+    otherC, otherCVar, otherCSD = find_closest_on_surface_naive(others_projected_to_ref, XYZ, pointN, output_errors)
+    # test, _, _ = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN)
     # SSwsH = otherHVar * (refN - 1)
     # SSwsC = otherCVar * (refN - 1)
 
@@ -271,3 +272,47 @@ def project(origin_xyz, others_xyz, selected_indices):
     # SSwsH, SSwsC - transformation SD for given cortical surface points, point manner
     # ----------------------
     return otherH, otherC, otherHSD, otherCSD
+
+
+def vectorized_loop(XYZ, othersRefList, i, pointN):
+    projectionListC = np.ones((pointN, 3))
+    P = np.expand_dims(othersRefList[i, :, :3], axis=1)
+    PP = np.broadcast_to(P, (pointN, XYZ.shape[0], 3))
+    D = np.linalg.norm(XYZ - PP, axis=2)
+    top = round(XYZ.shape[0] * 0.05)  # select 5% of data (original paper selects 1000 points)
+    IDtop = np.argpartition(D, top, axis=1)[:, :top]  # sort by lowest norm
+    XYZtop = XYZ[IDtop, :]
+
+    Nclose = 200
+    IDclose = np.argpartition(D, Nclose, axis=1)[:, :Nclose]  # sort by lowest norm
+    XYZclose = XYZ[IDclose, :]
+    PNear = np.mean(XYZclose, axis=1)  # select mean of closest 200 points
+    # Line between P and PNear
+    p1 = P
+    p2 = np.expand_dims(PNear, axis=1)
+    p3 = XYZtop
+    # cross product the line with the point and normalize gives exactly distance from line
+    distance_from_line = np.linalg.norm(np.cross(p2 - p1, p3 - p1) / np.linalg.norm(p2 - p1, axis=2, keepdims=True), axis=2)
+    condition = True
+    rod_radius = 0
+    while rod_radius < 100 and condition:
+        rod_radius += 1
+        test_rod_rad = np.where(distance_from_line <= rod_radius)
+        diff = np.setdiff1d(np.arange(pointN), np.unique(test_rod_rad[0]))
+        condition = len(diff) != 0
+        # assert len(diff) == 0, "no point were found on cortex with a rod radius of <= 1 mm for sensor index {}".format(diff)
+    for j in range(pointN):
+        indices = np.where(test_rod_rad[0] == 0)[0]
+        rod = XYZtop[j, test_rod_rad[1][indices]]
+        # Find brain surface points on the vicinity of P (l 862)
+        PPB = np.broadcast_to(P[j], rod.shape)
+        VicD = np.linalg.norm(rod - PPB, axis=1)
+        NVic = 3
+        if rod.shape[0] < NVic:
+            NVic = rod.shape[0]
+        IVicD = np.argsort(VicD)
+        NIVicD = IVicD[0:NVic]
+        Vic = rod[NIVicD, :]
+        CP = np.mean(Vic, axis=0)
+        projectionListC[j, :] = CP
+    return projectionListC

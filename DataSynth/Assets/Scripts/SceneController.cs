@@ -4,30 +4,32 @@ using UnityEngine;
 
 public class SceneController : MonoBehaviour
 {
-    public ImageSynthesis synth;
+    public Painter painter;
     //cmd line arguments
     private int numberOfIterations;
     private bool saveImage;
     private bool saveData;
     private bool shiftCamera;
     private bool rotateCamera;
-    private bool scaleFace;
+    private bool scaleFaceX;
+    private bool scaleFaceY;
+    private bool scaleFaceZ;
     private string inputFile;
     private string outputFolder;
     //private parameters
     private Camera cam;
     private GameObject camHolder;
-    private string[] stickerNames;
-    private Dictionary<string, Vector3> stickerDictionary;
+    private string[] landmarkNames;
     private Vector3 camHolderInitialPosition;
     private Vector3 targetCamHolderPosition;
     private Vector3 camHolderInitialRotation;
-    private Vector3 faceInitialPosition;
-    private Vector3 faceInitialRotation;
+    private Vector3 headInitialPosition;
+    private Vector3 headInitialRotation;
     private Vector3 maskInitialPosition;
     private Vector3[] initial_sticker_positions;
     private int frameCounter;
     private int iterationCount;
+    private GameObject head;
     private GameObject face;
     private GameObject mask;
     private RotationPaths stage;
@@ -41,21 +43,15 @@ public class SceneController : MonoBehaviour
     private bool doingRotation;
     private bool iterationComplete;
     private int magicNumber;
-
-    void Awake()
+void Awake()
     {
-        stickerNames = new string[] { "lefteye", "nosetip", "righteye", "left_triangle", "middle_triangle", "right_triangle", "top" };
-        Dictionary<string, Vector3> stickerDictionary = new Dictionary<string, Vector3>();
-        foreach (string sticker in stickerNames)
-        {
-            stickerDictionary.Add(sticker, Vector3.zero);
-        }
+        landmarkNames = Globals.getLandmarkNames();
         camHolderInitialPosition = new Vector3(0f, 25f, 0);
         camHolderInitialRotation = new Vector3(90f, 0f, 0f);
-        faceInitialPosition = new Vector3(0f, 0f, 0f);
-        faceInitialRotation = new Vector3(0f, 0f, 0f);
+        headInitialPosition = new Vector3(0f, 0f, 0f);
+        headInitialRotation = new Vector3(0f, 0f, 0f);
         maskInitialPosition = new Vector3(0f, 0f, 0f);
-        initial_sticker_positions = new Vector3[7];
+        initial_sticker_positions = new Vector3[landmarkNames.Length];
         frameCounter = 0;
         iterationCount = 0;
         stage = RotationPaths.front_to_up;
@@ -67,10 +63,12 @@ public class SceneController : MonoBehaviour
         img_width = 960;
         img_height = 540;
         magicNumber = 5;
+        head = GameObject.Find("head");
         face = GameObject.Find("face");
         mask = GameObject.Find("mask");
         camHolder = GameObject.Find("CameraHolder");
         cam = Camera.main;
+        painter.Initialize();
     }
     private string GetArg(string name)
     {
@@ -112,10 +110,24 @@ public class SceneController : MonoBehaviour
         {
             rotateCamera = true;
         }
+        scaleFaceX = false;
+        scaleFaceY = false;
+        scaleFaceZ = false;
         iterationsString = GetArg("-scale");
-        if (!bool.TryParse(iterationsString, out scaleFace))
+        if (!string.IsNullOrEmpty(iterationsString))
         {
-            scaleFace = false;
+            if (iterationsString.Contains("x") || iterationsString.Contains("X"))
+            {
+                scaleFaceX = true;
+            }
+            if (iterationsString.Contains("y") || iterationsString.Contains("Y"))
+            {
+                scaleFaceY = true;
+            }
+            if (iterationsString.Contains("z") || iterationsString.Contains("Z"))
+            {
+                scaleFaceZ = true;
+            }
         }
         iterationsString = GetArg("-input_file");
         if (string.IsNullOrEmpty(iterationsString))
@@ -140,15 +152,21 @@ public class SceneController : MonoBehaviour
         System.Console.WriteLine("Saving data to disk == {0}", saveData);
         System.Console.WriteLine("Camera shift enabled == {0}", shiftCamera);
         System.Console.WriteLine("Camera rotation enabled == {0}", rotateCamera);
-        System.Console.WriteLine("Scaling face enabled== {0}", scaleFace);
+        System.Console.WriteLine("Scaling face X enabled== {0}", scaleFaceX);
+        System.Console.WriteLine("Scaling face Y enabled== {0}", scaleFaceY);
+        System.Console.WriteLine("Scaling face Z enabled== {0}", scaleFaceZ);
         System.Console.WriteLine("Input file: " + inputFile);
         System.Console.WriteLine("Output folder: " + outputFolder);
     }
 
-    private Vector3[] readStickerLocations()
+    private Vector3[] readLandmarkLocations()
     {
-        Vector3[] positions = new Vector3[7];
-        bool[] filled = new bool[7] { false, false, false, false, false, false, false };
+        Vector3[] positions = new Vector3[landmarkNames.Length];
+        List<bool> filled = new List<bool>();
+        for (int i = 0; i < landmarkNames.Length; i++)
+        {
+            filled.Add(false);
+        }
         Vector3[] defaultPositions = new Vector3[] {
                 new Vector3 {x = 2.44f, y = 5.69f, z = 0f },
                 new Vector3 {x = 0.13f, y = 7.34f, z = -1.21f },
@@ -163,7 +181,6 @@ public class SceneController : MonoBehaviour
         }
         else
         {
-            string[] alias = { "lefteye", "nosetip", "righteye", "left_triangle", "middle_triangle", "right_triangle", "top" };
             string fileData = System.IO.File.ReadAllText(inputFile);
             string[] lines = fileData.Split("\n"[0]);
             for (int i = 0; i < lines.Length; i++)
@@ -172,7 +189,7 @@ public class SceneController : MonoBehaviour
                 if (lineData[0] != "")
                 {
                     string name = lineData[0].ToLower();
-                    int index = System.Array.IndexOf(alias, name);
+                    int index = System.Array.IndexOf(landmarkNames, name);
                     if (index != -1)
                     {
                         float x, y, z;
@@ -189,7 +206,7 @@ public class SceneController : MonoBehaviour
             {
                 if (!entry)
                 {
-                    System.Console.WriteLine("Error finding sticker with alias: " + alias[j] + ". Falling back to default.");
+                    System.Console.WriteLine("Error finding sticker with alias: " + landmarkNames[j] + ". Falling back to default.");
                     return defaultPositions;
                 }
                 j++;
@@ -205,7 +222,7 @@ public class SceneController : MonoBehaviour
 
     }
 
-    private bool verifyStickerPositions(Vector3[] positions)
+    private bool verifyLandmarkPositions(Vector3[] positions)
     {
         System.Console.WriteLine("Please note: renderer expects input to be in right-handed coordiante system (and internally switches to left-handed).");
         // just some sanity checks on input
@@ -237,7 +254,7 @@ public class SceneController : MonoBehaviour
         return true;
     }
 
-    private Vector3[] centerStickerPostions(Vector3[] positions)
+    private Vector3[] centerLandmarkPostions(Vector3[] positions)
     {
         Vector3[] centeredPositions = positions;
         //todo: estimate better center of brain (nose bridge, Inion, right ear and left ear)
@@ -256,16 +273,16 @@ public class SceneController : MonoBehaviour
     void Start()
     {
         parseCommandLine();
-        Vector3[] inputStickerPositions = readStickerLocations();
-        Vector3[] stickerPositions = centerStickerPostions(inputStickerPositions);
-        if (!verifyStickerPositions(stickerPositions))
+        Vector3[] inputStickerPositions = readLandmarkLocations();
+        Vector3[] stickerPositions = centerLandmarkPostions(inputStickerPositions);
+        if (!verifyLandmarkPositions(stickerPositions))
         {
             System.Console.WriteLine("Quitting application. Reason: sanity check failed.");
             Application.Quit();
         }
-        for (int i = 0; i < stickerNames.Length; i++)
+        for (int i = 0; i < landmarkNames.Length; i++)
         {
-            GameObject sticker = GameObject.Find(stickerNames[i]);
+            GameObject sticker = GameObject.Find(landmarkNames[i]);
             sticker.transform.localPosition = stickerPositions[i];
             initial_sticker_positions[i] = sticker.transform.localPosition;
         }
@@ -274,22 +291,22 @@ public class SceneController : MonoBehaviour
         //Vector3 occlusion_loc = new Vector3 { x = stickerPositions[5].x - 2f, y = stickerPositions[5].y, z = stickerPositions[5].z -1.5f};
         //occlusion.transform.localPosition = occlusion_loc;
 
-        startOrientation = face.transform.rotation;
-        face.transform.position = faceInitialPosition;
-        face.transform.eulerAngles = faceInitialRotation;
-        setFaceStickersProperties();
+        startOrientation = head.transform.rotation;
+        head.transform.position = headInitialPosition;
+        head.transform.eulerAngles = headInitialRotation;
+        setHeadLandmarksProperties();
         setMaskProperties();
         setCameraProperties();
     }
 
-    void setFaceStickersProperties()
+    void setHeadLandmarksProperties()
     {
         //set face stickers to initial position
         //next loop assumes face stickers are the first stickers in initial_sticker_positions
         for (int i = 0; i < 3; i++)
         {
-            GameObject sticker = GameObject.Find(stickerNames[i]);
-            sticker.transform.position = initial_sticker_positions[i];
+            GameObject landmark = GameObject.Find(landmarkNames[i]);
+            landmark.transform.position = initial_sticker_positions[i];
         }
         //set eye distance randomly but keep them in same plane as user data
         GameObject righteye = GameObject.Find("righteye");
@@ -318,25 +335,33 @@ public class SceneController : MonoBehaviour
             temp.y = righteye.transform.position.y;
             nosetip.transform.position = temp;
         }
+        //set face scale
+        float randxscale = 1.0f;
+        float randyscale = 1.0f;
+        float randzscale = 1.0f;
+        if (scaleFaceX)
+        {
+            randxscale = Random.Range(0.7f, 1.3f);
+        }
+        if (scaleFaceY)
+        {
+            randyscale = Random.Range(0.7f, 1.3f);
+        }
+        if (scaleFaceZ)
+        {
+            randzscale = Random.Range(0.7f, 1.3f);
+        }
+        face.transform.localScale = new Vector3(randxscale, randyscale, randzscale);
     }
     void setMaskProperties()
     {
         //initialize mask location (rotation is determined randomly)
         mask.transform.position = maskInitialPosition;
-        //set mask scale (not in use)
-        if (scaleFace)
-        {
-            float randxscale = Random.Range(0.7f, 1.3f);
-            float randyscale = Random.Range(0.7f, 1.3f);
-            float randzscale = Random.Range(0.7f, 1.3f);
-            mask.transform.localScale = new Vector3(randxscale, randyscale, randzscale);
-        }
         //set random mask rotation (ranges were hueristicly defined by observing real data)
         float randx = Random.Range(-10f, 10f);
         float randy = Random.Range(-15f, 15f);
         float randz = Random.Range(-20f, 20f);
         mask.transform.localRotation = Quaternion.Euler(randx, randy, randz); //note: transforms mask relative to face
-        //todo: what is the pivot?
     }
     void setCameraProperties()
     {
@@ -376,7 +401,7 @@ public class SceneController : MonoBehaviour
             if (!iterationComplete)
             {
                 //during iteration
-                facePath();
+                headPath();
                 camPath();
             }
             else
@@ -386,7 +411,7 @@ public class SceneController : MonoBehaviour
                 iterationCount++;
                 frameCounter = 0;
                 iterationComplete = false;
-                setFaceStickersProperties();
+                setHeadLandmarksProperties();
                 setMaskProperties();
                 setCameraProperties();
                 stage = RotationPaths.front_to_up;
@@ -408,7 +433,7 @@ public class SceneController : MonoBehaviour
         Vector3 dirNormalized = (targetCamHolderPosition - camHolder.transform.position).normalized;
         camHolder.transform.position = camHolder.transform.position + dirNormalized * Time.deltaTime * magicNumber;
     }
-    void facePath()
+    void headPath()
     {
         //rotate face from front to upward position
         switch (stage)
@@ -417,14 +442,14 @@ public class SceneController : MonoBehaviour
                 {
                     if (doingRotation == false)
                     {
-                        startOrientation = face.transform.rotation;
+                        startOrientation = head.transform.rotation;
                         angleAmount = finalFaceAngle;
                         doingRotation = true;
                         StartCoroutine(RotateBy(Vector3.left, angleAmount, false));
                     }
                     else
                     {
-                        if (face.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.left))
+                        if (head.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.left))
                         {
                             doingRotation = false;
                             stage = RotationPaths.up_to_front;
@@ -436,14 +461,14 @@ public class SceneController : MonoBehaviour
                 {
                     if (doingRotation == false)
                     {
-                        startOrientation = face.transform.rotation;
+                        startOrientation = head.transform.rotation;
                         angleAmount = finalFaceAngle;
                         doingRotation = true;
                         StartCoroutine(RotateBy(Vector3.right, angleAmount, true));
                     }
                     else
                     {
-                        if (face.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.right))
+                        if (head.transform.rotation == startOrientation * Quaternion.AngleAxis(angleAmount, Vector3.right))
                         {
                             doingRotation = false;
                             iterationComplete = true;
@@ -461,7 +486,7 @@ public class SceneController : MonoBehaviour
         if (immediate)
         {
             yield return new WaitForEndOfFrame();
-            face.transform.rotation = startOrientation * Quaternion.AngleAxis(angle, axis);
+            head.transform.rotation = startOrientation * Quaternion.AngleAxis(angle, axis);
         }
         else
         {
@@ -470,10 +495,9 @@ public class SceneController : MonoBehaviour
             while (amount < angle)
             {
                 yield return new WaitForEndOfFrame();
-                string filename = $"image_{iterationCount.ToString().PadLeft(6, '0')}_{frameCounter.ToString().PadLeft(3, '0')}";
-                synth.Save(filename, img_width, img_height, outputFolder, 1, saveImage, saveData);
+                painter.Save(iterationCount, frameCounter, img_width, img_height, outputFolder, saveImage, saveData);
                 amount += Time.fixedDeltaTime * speed;
-                face.transform.rotation = startOrientation * Quaternion.AngleAxis(amount, axis);
+                head.transform.rotation = startOrientation * Quaternion.AngleAxis(amount, axis);
                 //float x = Random.Range(-1f, 1f) * magxyz;
                 //float y = Random.Range(-1f, 1f) * magxyz;
                 //float z = Random.Range(-1f, 1f) * magxyz;
@@ -485,7 +509,7 @@ public class SceneController : MonoBehaviour
                 //setCapStickersProperties(0.1f);
                 frameCounter++;
             }
-            face.transform.rotation = startOrientation * Quaternion.AngleAxis(angle, axis);
+            head.transform.rotation = startOrientation * Quaternion.AngleAxis(angle, axis);
         }
     }
     enum RotationPaths

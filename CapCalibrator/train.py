@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 import utils
-import file_io
+import file_io, tf_file_io
 import logging
 import tensorflow.keras.callbacks as cb
 import models
@@ -83,7 +83,7 @@ def train(model_name, data_path, pretrained_model_path, tensorboard, verbosity, 
     input_shape = (x_train.shape[1], x_train.shape[2])
     output_shape = y_train.shape[-1]
     if pretrained_model_name:
-        model = file_io.load_keras_model(pretrained_model_name, hp["learning_rate"])
+        model = tf_file_io.load_keras_model(pretrained_model_name, output_shape, hp["learning_rate"])
     else:
         model = models.create_fc2_model(input_shape, output_shape, hp["learning_rate"])
     # keras.utils.plot_model(model, to_file=str(model_graph_path)+"_graph.png", show_shapes=True)

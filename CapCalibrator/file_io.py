@@ -1,15 +1,22 @@
 import numpy as np
-import utils
 import subprocess
 import pickle
 import json
 import logging
 import shutil
 from pathlib import Path
-import tensorflow as tf
-import models
 import re
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # suppress more warnings & info from tf
+
+
+def pairwise(iterable):
+    """
+    turns an iterable into a pairwise iterable
+    "s -> (s0, s1), (s2, s3), (s4, s5), ..."
+    :param iterable:
+    :return:
+    """
+    a = iter(iterable)
+    return zip(a, a)
 
 
 def read_template_file(template_path, input_file_format=None):
@@ -69,7 +76,7 @@ def read_template_file(template_path, input_file_format=None):
         for j, session in enumerate(sessions):
             sensor1_data = []
             sensor2_data = []
-            for i, (sens1, sens2) in enumerate(utils.pairwise(session)):
+            for i, (sens1, sens2) in enumerate(pairwise(session)):
                 if i < len(labeled_names):
                     name = labeled_names[i]
                 else:
@@ -106,9 +113,13 @@ def read_template_file(template_path, input_file_format=None):
     return names, data, file_format, skulls
 
 
-def delete_content_of_folder(folder_path):
-    for file in folder_path.glob("*"):
-        file.unlink()
+def delete_content_of_folder(folder_path, subfolders_also=True):
+    for x in folder_path.glob("*"):
+        if x.is_file():
+            x.unlink()
+        elif x.is_dir():
+            if subfolders_also:
+                x.rmdir()
 
 
 def is_process_active(process_name):
@@ -141,7 +152,7 @@ def save_results(data, output_file):
             f.write(my_line)
 
 
-def extract_session_data(file, use_scale=True, scale_by_z=False):
+def extract_session_data(file, use_scale=None, scale_by_z=False):
     timesteps_per_sample = 0
     session = open(file, 'r')
     number_of_features = 0
@@ -179,17 +190,30 @@ def extract_session_data(file, use_scale=True, scale_by_z=False):
         if use_scale:
             # cap_scalex = (cap_scalex - cap_scale_min) / (cap_scale_max - cap_scale_min)
             # cap_scalez = (cap_scalez - cap_scale_min) / (cap_scale_max - cap_scale_min)
-            cap_scalex = my_dict["scalex"]
-            cap_scaley = my_dict["scaley"]
-            cap_scalez = my_dict["scalez"]
-            if scale_by_z:
-                cap_scalex /= cap_scalez
-                cap_scaley /= cap_scalez
-                cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley)
-            else:
-                cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'], cap_scalex, cap_scaley, cap_scalez)
+            cap_scale = []
+            if "x" in use_scale:
+                if scale_by_z:
+                    xterm = my_dict["scalex"] / my_dict["scalez"]
+                else:
+                    xterm = my_dict["scalex"]
+                cap_scale.append(xterm)
+            if "y" in use_scale:
+                if scale_by_z:
+                    yterm = my_dict["scaley"] / my_dict["scalez"]
+                else:
+                    yterm = my_dict["scaley"]
+                cap_scale.append(yterm)
+            if "z" in use_scale:
+                if scale_by_z:
+                    zterm = 1.0
+                else:
+                    zterm = my_dict["scalez"]
+                cap_scale.append(zterm)
+            cap_rots = [cap_rotation['x'], cap_rotation['y'], cap_rotation['z']]
+            for term in cap_scale:
+                cap_rots.append(term)
         else:
-            cap_rots = (cap_rotation['x'], cap_rotation['y'], cap_rotation['z'])
+            cap_rots = [cap_rotation['x'], cap_rotation['y'], cap_rotation['z']]
         x_session.append(sticker_2d_locs)
     if sticker_count >= 20:  # remove datapoints with less than 20 sticker occurrences
         x_session = np.reshape(x_session, (timesteps_per_sample, number_of_features))
@@ -200,7 +224,7 @@ def extract_session_data(file, use_scale=True, scale_by_z=False):
     return x_session, y_session
 
 
-def load_raw_json_db(db_path, use_scale=False, scale_by_z=False):
+def load_raw_json_db(db_path, use_scale=None, scale_by_z=False):
     """
     loads data from folder containing json files in the format defined by synthetic data renderer
     :param db_path: path to folder
@@ -290,47 +314,6 @@ def deserialize_data(file_path, with_test_set=True):
         return x_train, x_val, y_train, y_val
 
 
-def load_semantic_seg_model(weights_loc):
-    logging.info("Loading unet model from: " + str(weights_loc))
-    g = tf.Graph()
-    with g.as_default():
-        old_model = tf.keras.models.load_model(weights_loc,
-                                               custom_objects={'iou': models.iou, 'iou_thresholded': models.iou_thresholded})
-        old_model.layers.pop(0)
-        input_shape = (512, 1024, 3)  # replace input layer with this shape so unet forward will work
-        new_input = tf.keras.layers.Input(input_shape)
-        new_outputs = old_model(new_input)
-        new_model = tf.keras.Model(new_input, new_outputs)
-        # if verbosity:
-        #     new_model.summary()
-    return new_model, g
-
-
-def load_keras_model(pretrained_model_path, output_shape, learning_rate):
-    model = tf.keras.models.load_model(str(pretrained_model_path))
-    if model.output_shape[-1] != output_shape:
-        model.pop()  # to remove last layer
-        new_model = tf.keras.Sequential([
-            model,
-            tf.keras.layers.Dense(output_shape)
-        ])
-        model = new_model
-    opt = tf.keras.optimizers.Adam(lr=learning_rate)
-    model.compile(loss='mean_squared_error', optimizer=opt)
-    # model.summary()
-    return model
-
-
-def load_clean_keras_model(path):
-    logging.info("Loading STORM model from: " + str(path))
-    g = tf.Graph()
-    with g.as_default():
-        model = tf.keras.models.load_model(str(path))
-        # if v:
-        #     model.summary()
-    return model, g
-
-
 def load_from_pickle(pickle_file_path):
     f = open(pickle_file_path, 'rb')
     data = pickle.load(f)
@@ -348,13 +331,13 @@ def dump_full_db(db, path=None):
     if path:
         pickle_path = path
     else:
-        pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
+        pickle_path = Path.joinpath(Path("cache"), "full_db.pickle")
     dump_to_pickle(pickle_path, db)
 
 
 def load_full_db(db_path=None):
     if db_path is None:
-        pickle_path = Path.joinpath(Path("data"), "full_db.pickle")
+        pickle_path = Path.joinpath(Path("cache"), "full_db.pickle")
     else:
         pickle_path = db_path
     if pickle_path.is_file():
@@ -380,7 +363,7 @@ def read_digitizer_multi_noptodes_experiment_file(exp_file_loc):
         session = non_empty_lines[delimiters[i]+1:delimiters[i+1]]
         sensor1_data = []
         sensor2_data = []
-        for sens1, sens2 in utils.pairwise(session):
+        for sens1, sens2 in pairwise(session):
             data1 = sens1.split()
             x, y, z = float(data1[1]), float(data1[2]), float(data1[3])
             sensor1_data.append(np.array([x, y, z]))

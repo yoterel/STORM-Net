@@ -103,12 +103,14 @@ public class CapMesh : MonoBehaviour
             string name = lineData[0].ToLower();
             if (name != "")
             {
-                float x, y, z;
+                float x = 0;
+                float y = 0;
+                float z = 0;
                 Assert.IsTrue(float.TryParse(lineData[1], out x));
                 Assert.IsTrue(float.TryParse(lineData[2], out y));
                 Assert.IsTrue(float.TryParse(lineData[3], out z));
-                Vector3 pos = new Vector3 { x = x, y = y, z = z };
-                int sensor_index;
+                Vector3 pos = new Vector3(x, y, z);
+                int sensor_index = 0;
                 bool success = int.TryParse(name, out sensor_index);
                 if (success)
                 {
