@@ -126,10 +126,12 @@ public class Painter : MonoBehaviour
         string imgFilename = $"image_{iterationCount.ToString().PadLeft(6, '0')}_{frameCounter.ToString().PadLeft(3, '0')}.png";
         if (saveData)
         {
-            bool[] valid_stickers = { false, false, false, false, false, false, false, false, false, false };
-            
+            string[] names = Globals.getLandmarkNames();
+            // bool[] valid_stickers = { false, false, false, false, false, false, false, false, false, false };
+            bool[] valid_stickers = new bool[names.Length];
             for (int i = 0; i < landmarks.Count; i++)
             {
+                valid_stickers[i] = false;
                 var direction = (Camera.main.transform.position - landmarks[i].transform.position).normalized;
                 if (Vector3.Dot(landmarks[i].transform.up, direction) >= Globals.getCosineThreshold())
                 {

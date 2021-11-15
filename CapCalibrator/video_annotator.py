@@ -224,6 +224,8 @@ class GUI(tk.Tk):
             elif msg[0] == "finetune_stop":
                 if self.finetune_thread:
                     self.finetune_thread.join()
+                else:
+                    logging.info("Training thread is not alive.")
             elif msg[0] == "finetune_start":
                 self.finetunning = True
                 self.finetune_thread = ThreadedPeriodicTask(self.periodic_queue, msg)
@@ -714,8 +716,8 @@ class GUI(tk.Tk):
         sets default finetuning settings in Finetune page
         :return:
         """
-        self.pretrained_stormnet_path = Path(self.args.storm_net)
-        self.finetune_log_file = Path("./cache/finetune_log.txt")
+        self.pretrained_stormnet_path = "my_new_model"
+        self.finetune_log_file = Path("./cache/training_log.txt")
         self.synth_output_dir = Path("./cache/synth_data")
         self.synth_output_dir.mkdir(parents=True, exist_ok=True)
         self.panels[self.cur_active_panel].finetune_set_defaults()
@@ -859,7 +861,7 @@ class GUI(tk.Tk):
             logging.info("Cannot fine-tune while renderer executable is running.")
             return
         elif self.finetunning:
-            logging.info("Fine-tuning is already in progress.")
+            logging.info("Training is already in progress.")
             return
         else:
             self.take_async_action(self.prep_fintune_packet(model_name), periodic=True)
@@ -971,8 +973,8 @@ class ThreadedPeriodicTask(threading.Thread):
             # train.train(model_name, synth_output_dir, pretrained_stormnet_path, None, 0, Path("models"), self.queue,
             #             self.stoprequest)
         except IndexError:
-            logging.warning("Fine tunning STORM-Net failed. Maybe the synthetic data is incorrect / corrupted ?")
-            self.queue.put(["finetune_done"])
+            logging.warning("Training STORM-Net failed. Maybe the synthetic data is incorrect / corrupted ?")
+            self.queue.put(["training_done"])
 
 
     def handle_render(self):
