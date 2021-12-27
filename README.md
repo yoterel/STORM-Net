@@ -19,7 +19,10 @@ The repository also contains:
       
 - Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
-- Precompiled binaries for the renderer which can be downloaded from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), linux and mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
+- Precompiled binaries for the renderer which can be downloaded from here:\
+ [Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
+ [Linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip)\
+ Mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
 - Hardware: Although not necessary, the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We recommend using a GPU if fast calibration times are needed.
 
 Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
@@ -54,7 +57,7 @@ First remember to activate the environment you created
 Then navigate to [main.py](CapCalibrator/main.py), and run:\
 `python main.py --mode gui`
 
-Note: in Linux you might need to unset pythonpath (after step 7) before the application can be run successfully (step 8):\
+Note: in Linux you might need to unset pythonpath before the application can be run successfully:\
 `unset PYTHONPATH`
 
 ## How to use the different modes
