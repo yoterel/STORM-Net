@@ -43,7 +43,7 @@ Note: For dlib (part of the requirements in the environment file), you must have
 Download from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip), and place them under the [models](CapCalibrator/models) folder (after extracting).
 
 ### Step 4: Download all precompiled binaries for the renderer.
-Download from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), linux and mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
+Download from here: [windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip), [linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip). mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
 
 ### Step 5: Run STORM-Net in gui mode.
 First remember to activate the environment you created
