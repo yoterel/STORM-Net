@@ -11,6 +11,7 @@ dependencies:
   - scikit-learn
   - imageio
   - matplotlib
+  - imageio-ffmpeg
   - pip:
     - tensorflow
     - opencv-python
