@@ -12,8 +12,8 @@ dependencies:
   - imageio
   - matplotlib
   - imageio-ffmpeg
+  - dlib
   - pip:
     - tensorflow
     - opencv-python
-    - dlib
     - pptk
