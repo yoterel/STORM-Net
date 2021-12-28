@@ -2,11 +2,13 @@ channels:
   - pytorch
   - defaults
   - menpo
+  - conda-forge
 dependencies:
   - pytorch
   - torchvision
-  - python=3.8
+  - python=3.7
   - pip
+  - scikit-learn
   - pip:
     - tensorflow
     - opencv-python
