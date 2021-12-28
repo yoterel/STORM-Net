@@ -13,7 +13,7 @@ The repository also contains:
 - A synthetic data generator implemented in [Unity](https://unity.com/).
 
 ### Application dependencies:
-- Python version >= 3.6, but <= 3.8 (x64)
+- Some modern C++ compiler (e.g. visual studio, gcc, clang) and [CMake](https://cmake.org/)
 - [environment.yml](environment.yml) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `conda install -f environment.yml`
       
