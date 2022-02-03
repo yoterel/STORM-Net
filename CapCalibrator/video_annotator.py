@@ -3,6 +3,8 @@ import video
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, simpledialog, messagebox, scrolledtext
+import polyscope as ps
+import polyscope.imgui as psim
 import predict
 from PIL import Image, ImageTk
 import numpy as np
@@ -13,9 +15,6 @@ import queue
 import threading
 import utils
 import geometry
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import draw
 import logging
 import webbrowser
 import render
@@ -23,7 +22,10 @@ import config
 import torch
 from torch_src import torch_model
 import torch_train
-
+## globals for gui
+prev_selection = None
+pc_names = None
+## globals for gui
 
 def post_process_db(db):
     perform_pad = False
@@ -108,14 +110,26 @@ class GUI(tk.Tk):
         self.wm_title("STORM-Net - Simple and Timely Optode Registration Method for fNIRS")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
-        photo = ImageTk.PhotoImage(master=self, file="resource/icon.png")
-        self.iconphoto(False, photo)
+        icon = ImageTk.PhotoImage(file="./resource/icon.png", master=self)
+        self.iconphoto(False, icon)
         self.configure(background='white')
         self.container = tk.Frame(self)
         self.container.pack(side="top", fill="both", expand=True)
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
         self.panels = {}
+        ps.init()
+        ps.set_program_name("STORM-Net: Point Cloud Viewer")
+        ps.set_verbosity(0)
+        ps.set_give_focus_on_show(True)
+        ps.set_print_prefix("STORM-Net")
+        ps.set_use_prefs_file(False)
+        ps.set_up_dir("z_up")
+        ps.set_ground_plane_height_factor(1.0, is_relative=False)
+        ps.look_at((15.0, 15.0, 15.0), (0., 0., 0.))
+        ps.set_open_imgui_window_for_user_callback(True)
+        # ps.set_build_gui(False)
+        ps.set_user_callback(ExperimentViewerPage.selection_callback)
         for F in (MainMenu, CalibrationPage, ProgressBarPage, AboutPage, FinetunePage, ExperimentViewerPage):
             panel = F(self.container, self)
             self.panels[F] = panel
@@ -465,9 +479,6 @@ class GUI(tk.Tk):
     def get_template_info(self):
         return self.template_names, self.template_data, self.template_format
 
-    def get_selected_optode(self):
-        return self.selected_optode
-
     def get_template_model_file_name(self):
         if self.template_file_name:
             # parent = self.template_file_name.parent.name
@@ -613,7 +624,6 @@ class GUI(tk.Tk):
     def predict_x(self):
         self.take_async_action(self.prep_predict_packet())
 
-
     def next_video(self):
         if self.cur_video_index < (len(self.paths)-1):
             self.cur_video_index += 1
@@ -697,7 +707,6 @@ class GUI(tk.Tk):
                 return
             file_io.save_results(self.projected_data, Path(f.name))
 
-    ### FinetunePage ###
     def set_default_render(self):
         """
         sets default rendering settings in Finetune page
@@ -869,7 +878,6 @@ class GUI(tk.Tk):
     def prep_fintune_packet(self, model_name):
         return ["finetune_start", model_name, self.synth_output_dir, self.args.device]
 
-    ### ExperimentViewerPage ###
     def toggle_optodes(self, event=None):
         self.selected_optode = 0
         self.view_fiducials_only = not self.view_fiducials_only
@@ -976,7 +984,6 @@ class ThreadedPeriodicTask(threading.Thread):
             logging.warning("Training STORM-Net failed. Maybe the synthetic data is incorrect / corrupted ?")
             self.queue.put(["training_done"])
 
-
     def handle_render(self):
         path = self.msg[1]
         while not path.is_file() and not self.stoprequest.isSet():
@@ -1030,12 +1037,6 @@ class ThreadedTask(threading.Thread):
         subject_name, _ = video_names[0].split("_")
         subject_name = subject_name + ".txt"
         r, s = predict.predict_rigid_transform(data, None, args)
-        # from experimental import do_vid2vid_project_beforeMNI_experiment, do_dig2dig_experiment, do_vid2dig_experiment
-        # dig_ses1, dig_ses2, _ = do_dig2dig_experiment(args.template, args.ground_truth, experiment_filter=subject_name, verbose=False)
-        # vid_ses1, vid_ses2 = do_vid2vid_project_beforeMNI_experiment(args, video_names, r, s,
-        #                                                              force_project=True,
-        #                                                              save_results=False)
-        # do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
         self.queue.put(["predict"])
 
     def handle_calibrate(self):
@@ -1257,38 +1258,57 @@ class ExperimentViewerPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
-        self.bind("<Left>", self.controller.prev_optode)
-        self.bind("<Right>", self.controller.next_optode)
-        self.bind("<space>", self.controller.toggle_optodes)
-        self.bind("<w>", self.controller.increase_elev)
-        self.bind("<a>", self.controller.decrease_azim)
-        self.bind("<s>", self.controller.decrease_elev)
-        self.bind("<d>", self.controller.increase_azim)
-        self.figure_handle = plt.Figure(figsize=(5, 5), dpi=100)
-        self.sub_plot_handle = self.figure_handle.add_subplot(111, projection='3d')
-        self.sub_plot_handle.view_init(self.controller.get_view_elev(), self.controller.get_view_azim())
-        self.canvas = FigureCanvasTkAgg(self.figure_handle, self)
-        self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-        self.canvas.draw()
+        # self.bind("<Left>", self.controller.prev_optode)
+        # self.bind("<Right>", self.controller.next_optode)
+        # self.bind("<space>", self.controller.toggle_optodes)
+        # self.bind("<w>", self.controller.increase_elev)
+        # self.bind("<a>", self.controller.decrease_azim)
+        # self.bind("<s>", self.controller.decrease_elev)
+        # self.bind("<d>", self.controller.increase_azim)
+        # self.figure_handle = plt.Figure(figsize=(5, 5), dpi=100)
+        # self.sub_plot_handle = self.figure_handle.add_subplot(111, projection='3d')
+        # self.sub_plot_handle.view_init(self.controller.get_view_elev(), self.controller.get_view_azim())
+        # self.canvas = FigureCanvasTkAgg(self.figure_handle, self)
+        # self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        # self.canvas.draw()
 
     def update_labels(self):
+        global pc_names
         names, data, my_format = self.controller.get_template_info()
         if names:
-            selected = self.controller.get_selected_optode()
+            pc_names = names
             data = geometry.to_standard_coordinate_system(names, data)
-            if not self.controller.fiducials_only():
-                spiral_index = names.index(0)
-                data = data[spiral_index:, :]
-                names = names[spiral_index:]
-            try:
-                self.canvas.get_tk_widget().pack_forget()
-                self.sub_plot_handle.cla()
-            except AttributeError:
-                pass
-            self.sub_plot_handle.view_init(elev=self.controller.get_view_elev(), azim=self.controller.get_view_azim())
-            draw.plot_3d_pc(self.sub_plot_handle, data, selected, names)
-            self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-            self.canvas.draw()
+            pc = ps.register_point_cloud(self.controller.get_template_model_file_name(),
+                                         data,
+                                         radius=0.02)
+            colors = np.zeros(len(data))
+            pc.add_scalar_quantity("colors",
+                                   colors,
+                                   enabled=True,
+                                   vminmax=(0., 1.),
+                                   cmap="blues")
+            ps.show()
+            pc.remove()
+
+
+    @staticmethod
+    def selection_callback():
+        global prev_selection, pc_names
+        if ps.have_selection():
+            cur_selection = ps.get_selection()
+            psim.TextUnformatted("Selection ID: {}".format(pc_names[cur_selection[1]]))
+            if cur_selection != prev_selection:
+                pc_name, v_index = cur_selection
+                prev_selection = cur_selection
+                pc = ps.get_point_cloud(pc_name)
+                if 0 <= v_index <= pc.n_points():
+                    colors = np.zeros(pc.n_points())
+                    colors[v_index] = 1.
+                    pc.add_scalar_quantity("colors",
+                                           colors,
+                                           enabled=True,
+                                           vminmax=(0., 1.),
+                                           cmap="blues")
 
 
 class ProgressBarPage(tk.Frame):
@@ -1483,7 +1503,6 @@ class FinetunePage(tk.Frame):
         finetune_log_file_str = self.controller.get_finetune_log_file_name()
         # pretrained_model_str = self.controller.get_pretrained_stormnet_path()
         gpu_id_str = str(self.controller.get_gpu_id())
-
         self.template_name_static.config(text="Template Model File: ")
         self.template_name.config(text=template_file_str)
         self.renderer_name_static.config(text="Renderer: ")
@@ -1501,33 +1520,3 @@ class FinetunePage(tk.Frame):
 
         self.gpu_label.config(text="GPU ID to use (-1 for CPU): ")
         self.gpu_static.config(text=gpu_id_str)
-        # my_str = "Template Model File: {} \n Renderer Executable: {} \n Iterations: {}"
-        # self.status_label.config(text=label)
-
-# def parse_arguments():
-#     parser = argparse.ArgumentParser(description='Automatically annotates FNIRS videos on disk.')
-#     parser.add_argument("video_folder", help="The path to the video folder.")
-#     parser.add_argument("model_file", help="The base model file path.")
-#     parser.add_argument("-a", "--auto_annotate", action='store_true', help="Automatically annotates videos in folder")
-#     parser.add_argument("-g", "--gui", action='store_true', help="Shows GUI")
-#     # if len(sys.argv) == 1:
-#     #     parser.print_help(sys.stderr)
-#     #     sys.exit(1)
-#     # cmd_line = '/disk1/yotam/capnet/openPos/openPos/openPos49/ /disk1/yotam/capnet/openPos/openPos/openPos46/ '.split()
-#     cmd_line = 'E:/University/masters/CapTracking/videos/openPos53/GX011577.MP4 E:/University/masters/CapTracking/videos/openPos53 -g'.split()
-#     args = parser.parse_args(cmd_line)  # cmd_line
-#     args.video_folder = Path(args.video_folder)
-#     args.model_file = Path(args.model_file)
-#     if Path.is_dir(args.model_file):
-#         args.model_file = args.model_file.glob("*.txt").__next__()
-#     return args
-
-
-# if __name__ == "__main__":
-    # blacklist = ["GX011543.MP4", "GX011544.MP4", "GX011547.MP4", "GX011549.MP4",
-    #              "GX011537.MP4", "GX011538.MP4"]
-    # args = parse_arguments()
-    # if args.auto_annotate:
-    #     new_db = video.auto_annotate_videos(args.video_folder, args.model_file)
-    # if args.gui:
-    #     annotate_videos(args.video_folder)
