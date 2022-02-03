@@ -118,7 +118,6 @@ class GUI(tk.Tk):
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
         self.panels = {}
-        ps.init()
         ps.set_program_name("STORM-Net: Point Cloud Viewer")
         ps.set_verbosity(0)
         ps.set_give_focus_on_show(True)
@@ -126,7 +125,8 @@ class GUI(tk.Tk):
         ps.set_use_prefs_file(False)
         ps.set_up_dir("z_up")
         ps.set_ground_plane_height_factor(1.0, is_relative=False)
-        ps.look_at((15.0, 15.0, 15.0), (0., 0., 0.))
+        ps.init()
+        ps.look_at((20.0, 20.0, 20.0), (0., 0., 0.))
         ps.set_open_imgui_window_for_user_callback(True)
         # ps.set_build_gui(False)
         ps.set_user_callback(ExperimentViewerPage.selection_callback)
@@ -1287,6 +1287,7 @@ class ExperimentViewerPage(tk.Frame):
                                    enabled=True,
                                    vminmax=(0., 1.),
                                    cmap="blues")
+            ps.warning("Template model shown in ""standard coordinate system"". See github repository for more details.")
             ps.show()
             pc.remove()
 
