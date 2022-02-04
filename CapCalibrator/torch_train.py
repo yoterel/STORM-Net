@@ -16,7 +16,10 @@ def train_loop(opt, sync=None):
     :param sync: list of synchronization objects: 0-event signaling to end training, 1-queue to report results
     :return:
     """
-    writer = torch_writer.Writer(opt, sync[1])
+    if sync:
+        writer = torch_writer.Writer(opt, sync[1])
+    else:
+        writer = torch_writer.Writer(opt, None)
     opt.is_train = True
     train_dataset = torch_data.MyDataLoader(opt)
     opt.is_train = False
@@ -110,7 +113,7 @@ def parse_arguments():
     parser.add_argument("--continue_train", action="store_true", help="continue from latest epoch")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for training")
     parser.add_argument("--batch_accumulation", type=int, default=16, help="Batch accumulation (only valid if batch size=1)")
-    parser.add_argument("--number_of_epochs", type=int, default=2000, help="Number of epochs for training loop")
+    parser.add_argument("--number_of_epochs", type=int, default=100, help="Number of epochs for training loop")
     parser.add_argument("--lr", type=float, default=1e-5, help="learning rate for optimizer")
     parser.add_argument('--beta1', type=float, default=0.9, help='momentum term of adam')
     parser.add_argument("--template",

@@ -962,7 +962,7 @@ class ThreadedPeriodicTask(threading.Thread):
                 self.device = device
                 self.continue_train = False
                 self.batch_size = 16
-                self.number_of_epochs = 30
+                self.number_of_epochs = 50
                 self.lr = 1e-4
                 self.beta1 = 0.9
                 # self.template = Path("../example_models/example_model.txt")
