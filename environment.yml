@@ -17,4 +17,3 @@ dependencies:
   - pip:
     - tensorflow
     - opencv-python
-    - pptk
