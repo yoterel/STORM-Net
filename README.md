@@ -1,4 +1,11 @@
 # STORM-Net: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS)
+<table>
+  <tr>
+    <td> <img src="https://github.com/yoterel/STORM-Net/blob/master/resource/img1.png"  alt="1" width = 400px height = 400px ></td>
+    <td><img src="https://github.com/yoterel/STORM-Net/blob/master/resource/img2.png" alt="2" width = 400px height = 400px></td>
+   </tr>
+</table>
+
 All files in the repository are an implementation of the original manuscript and research ([preprint](https://doi.org/10.1101/2020.12.29.424683)).
 ## Introduction
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordinates of every point of interest on the cap in (a statistical) MNI coordinate system (or, if required, in the original coordinates system that can be later transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
