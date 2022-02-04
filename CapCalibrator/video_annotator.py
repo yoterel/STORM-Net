@@ -1199,7 +1199,7 @@ class CalibrationPage(tk.Frame):
 class MainMenu(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-        self.label = tk.Label(self, text="STORM-Net Calibration Toolbox", font=("Verdana", 12))
+        self.label = tk.Label(self, text="STORM-Net Registration Toolbox", font=("Verdana", 12))
         self.canvas = tk.Canvas(self, height=400, width=400, bg="#263D42")
         img = ImageTk.PhotoImage(master=self, file="resource/render.png")
         self.canvas.img = img  # or else image gets garbage collected
