@@ -22,7 +22,7 @@ The repository also contains:
 - Precompiled binaries for the renderer which can be downloaded from here:\
  [Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
  [Linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip)\
- Mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
+ [Mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip)
 - Hardware: Although not necessary, the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We recommend using a GPU if fast calibration times are needed.
 
 Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
@@ -49,7 +49,7 @@ Download from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip
 Download from here:\
 [Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
 [Linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip)\
-Mac users must compile the renderer from source using [Unity](https://unity.com/) 2019.3 or higher.
+[Mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip)
 
 ### Step 5: Run STORM-Net in gui mode.
 First remember to activate the environment you created
