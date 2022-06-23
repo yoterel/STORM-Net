@@ -34,7 +34,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true  # IMPORTANT: This needs to be set for caching to work properly!
+          use-only-tar-bz2: true
           python-version: ${{ matrix.python-version }}
           auto-activate-base: false
       - name: Conda info
@@ -59,4 +59,7 @@ jobs:
         id: cache
       - name: Update environment
         if: steps.cache.outputs.cache-hit != 'true'
-        run: conda env update --name test --file environment.yml --prune   
+        run: |
+          conda deactivate
+          conda env update --name test --file environment.yml --prune
+          conda activate test
