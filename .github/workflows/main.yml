@@ -35,7 +35,7 @@ jobs:
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
-          environment-file: STORM-Net/example-environment.yml
+          environment-file: environment.yml
           auto-activate-base: false
       - name: Conda info
         shell: bash
