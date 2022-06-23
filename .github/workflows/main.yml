@@ -37,15 +37,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
           #environment-file: environment.yml
           auto-activate-base: false
-          activate-environment: test
       - name: Conda info
         shell: bash
         run: |
-          conda info
+          conda activate test
           conda list
           conda env list
           echo $CONDA_PREFIX
+          echo hello !
       - name: Get Date
         id: get-date
-        run: echo "::set-output name=today::$(/bin/date -u '+%Y%m%d')"
         shell: bash
+        run: echo "::set-output name=today::$(/bin/date -u '+%Y%m%d')"
