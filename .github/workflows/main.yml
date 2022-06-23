@@ -59,7 +59,6 @@ jobs:
         id: cache
       - name: Update environment
         if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash -l {0}
         run: |
-          conda deactivate
           conda env update --name test --file environment.yml --prune
-          conda activate test
