@@ -6,6 +6,7 @@ import utils
 import config
 import file_io
 import logging
+import video_annotator
 
 
 def select_frames(vid_path, steps_per_datapoint=10, starting_frame=0, local_env_size=5, frame_indices=None):
@@ -131,7 +132,6 @@ def process_video(args):
     :param args:
     :return: sticker locations in a nx14x3 numpy array
     """
-    import video_annotator
     vid_paths = args.video
     new_db = []
     if args.mode == "gui":

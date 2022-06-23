@@ -1,6 +1,3 @@
-from torch.utils.tensorboard import SummaryWriter
-
-
 class Writer:
     def __init__(self, opt, queue):
         if queue:
@@ -9,6 +6,7 @@ class Writer:
             self.queue_bridge = None
         self.opt = opt
         if self.opt.tensorboard:
+            from torch.utils.tensorboard import SummaryWriter
             self.tensorboard_wrapper = SummaryWriter(log_dir=opt.root)
         else:
             self.tensorboard_wrapper = None
