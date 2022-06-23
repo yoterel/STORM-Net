@@ -48,4 +48,4 @@ jobs:
         id: cache
       - name: Update environment
         if: steps.cache.outputs.cache-hit != 'true'
-        run: conda env update -n myenv -file environment.yml --prune
+        run: conda env update -n myenv -f environment.yml --prune
