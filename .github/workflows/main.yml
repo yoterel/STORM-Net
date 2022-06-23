@@ -36,11 +36,10 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           #environment-file: environment.yml
-          auto-activate-base: true
+          auto-activate-base: false
       - name: Conda info
-        shell: bash
+        shell: bash -l {0}
         run: |
-          conda activate test
           conda list
           conda env list
           echo $CONDA_PREFIX
