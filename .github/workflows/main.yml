@@ -58,7 +58,7 @@ jobs:
         id: cache
       - name: Update environment
         if: steps.cache.outputs.cache-hit != 'true'
-        run: conda env update -n test -f environment.yml
+        run: conda env update -f environment.yml
       - name: test main
         run: |
           cd CapCalibrator
