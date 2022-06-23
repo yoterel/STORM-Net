@@ -28,6 +28,7 @@ jobs:
           use-only-tar-bz2: true
           python-version: ${{ matrix.python-version }}
           auto-activate-base: false
+          activate-environment: myenv
       - name: Conda info
         run: |
           conda list
@@ -47,4 +48,4 @@ jobs:
         id: cache
       - name: Update environment
         if: steps.cache.outputs.cache-hit != 'true'
-        run: conda env update -n test -file environment.yml --prune --yes --verbose
+        run: conda env update -n myenv -file environment.yml --prune
