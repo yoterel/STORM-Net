@@ -1,8 +1,8 @@
 channels:
   - pytorch
+  - conda-forge
   - defaults
   - menpo
-  - conda-forge
 dependencies:
   - pytorch
   - torchvision
@@ -14,6 +14,7 @@ dependencies:
   - imageio-ffmpeg
   - dlib
   - polyscope
+  - pyinstaller
   - pip:
     - tensorflow
     - opencv-python
