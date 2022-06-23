@@ -42,6 +42,7 @@ jobs:
         run: |
           conda list
           conda env list
+          conda clean --all --yes
           echo $CONDA_PREFIX
       - name: Get date
         id: get-date
