@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: build
 
 # Controls when the workflow will run
 on:
@@ -35,17 +35,15 @@ jobs:
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
-          environment-file: environment.yml
-          auto-activate-base: false
+          #environment-file: environment.yml
+          auto-activate-base: true
       - name: Conda info
         shell: bash
         run: |
-          echo test123
-          echo test1234
           conda info
           conda list
           conda env list
-          ls      
+                
       # Runs a single command using the runners shell
       - name: Run a one-line script
         run: echo Hello, world!
