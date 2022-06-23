@@ -44,7 +44,8 @@ jobs:
           conda info
           conda list
           conda env list
-                
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+          echo $CONDA_PREFIX
+      - name: Get Date
+        id: get-date
+        run: echo "::set-output name=today::$(/bin/date -u '+%Y%m%d')"
+        shell: bash
