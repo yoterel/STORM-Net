@@ -63,23 +63,3 @@ jobs:
           echo $CONDA_PREFIX
           cd CapCalibrator
           python main.py --help
-          
-      - name: Build main
-        run: |
-          pwd
-          cd CapCalibrator
-          pyinstaller main.spec
-          
-      - name: Archive release
-        uses: thedoctor0/zip-release@0.6.2
-        with:
-          type: 'zip'
-          filename: ${{ matrix.label }}.zip
-          path: './CapCalibrator/dist/main'
-          
-      - name: Publish artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.label }}.zip
-      
-      
