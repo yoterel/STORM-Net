@@ -58,6 +58,9 @@ jobs:
       
       - name: Test main
         run: |
+          conda list
+          conda env list
+          echo $CONDA_PREFIX
           cd CapCalibrator
           python main.py --help
           
