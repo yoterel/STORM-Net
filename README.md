@@ -1,4 +1,4 @@
-[![build](https://github.com/yoterel/STORM-Net/actions/workflows/main.yml/badge.svg)](https://github.com/yoterel/STORM-Net/actions/workflows/main.yml)
+[![release](https://github.com/yoterel/STORM-Net/actions/workflows/main.yml/badge.svg)](https://github.com/yoterel/STORM-Net/actions/workflows/main.yml)
 
 # STORM-Net: Simple and Timely Optode Registration Method for Functional Near-Infrared Spectroscopy (FNIRS)
 <table>
