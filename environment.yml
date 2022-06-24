@@ -8,3 +8,9 @@ dependencies:
   - pip
   - pytorch
   - torchvision
+  - imageio
+  - imageio-ffmpeg
+  - matplotlib
+  - dlib
+  - polyscope
+  - pyinstaller
