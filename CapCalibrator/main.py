@@ -25,18 +25,22 @@ def parse_arguments():
     parser.add_argument("-s", "--session_file",
                         help="A file containing processed results for previous videos.")
     parser.add_argument("-out", "--output_file", help="The output csv file with calibrated results")
-    parser.add_argument("-v", "--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
+    parser.add_argument("--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     parser.add_argument("-log", "--log", help="If specified, log will be output to this file")
     parser.add_argument("-gt", "--ground_truth", help="Use this in experimental mode only")
     parser.add_argument("--gpu_id", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
     parser.add_argument("--headless", action="store_true",
                         help="Force no gui")
+    parser.add_argument("-v", "--version", action="store_true", help="Prints version")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
 
     args = parser.parse_args()
     # configure computing environment
+    if args.version:
+        print("1.0.0")
+        sys.exit(0)
     args.device = utils.configure_compute_environment(args.gpu_id)
     if args.mode == "gui" and not args.headless:
         args.video = None
