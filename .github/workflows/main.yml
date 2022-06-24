@@ -7,45 +7,50 @@ on:
     branches: [ "master" ]
 
   workflow_dispatch:
-
+  
+env:
+  # Increase this value to reset cache if environment.yml has not changed
+  CACHE_NUMBER: 0
+  
 jobs:
   build:
     defaults:
       run:
         shell: bash -l {0}
-    runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         os: ["ubuntu-latest"]  # ,"macos-latest", "windows-latest"
+        label: ["linux-64"]
+        prefix: ["/usr/share/miniconda3/envs/myenv"] #, "/Users/runner/miniconda3/envs/myenv",  "C:\Miniconda3\envs\myenv"
         python-version: ["3.7"]
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
+      
       - name: Setup miniconda
         uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           auto-update-conda: true
           use-only-tar-bz2: true
           python-version: ${{ matrix.python-version }}
-          auto-activate-base: false
           activate-environment: myenv
+          
       - name: Conda info
         run: |
           conda list
           conda env list
           echo $CONDA_PREFIX
-      - name: Get date
-        id: get-date
-        run: echo "::set-output name=today::$(/bin/date -u '+%Y%m%d')"
+      - name: Set cache date
+        run: echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+        
       - name: Cache conda env
         uses: actions/cache@v3
         with:
-          path: ${{ env.CONDA_PREFIX }}
-          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date.outputs.today }}-${{ hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER }}
-        env:
-          # Increase this value to reset cache if environment.yml has not changed
-          CACHE_NUMBER: 0
+          path: ${{ matrix.prefix }}
+          key: conda-${{ matrix.label }}-${{ env.DATE }}-${{ hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER }}
         id: cache
+        
       - name: Update environment
         if: steps.cache.outputs.cache-hit != 'true'
-        run: conda env update -n myenv -f environment.yml --prune
+        run: conda env update -n myenv -f environment.yml
