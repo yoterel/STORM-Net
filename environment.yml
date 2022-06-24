@@ -5,6 +5,7 @@ channels:
   - defaults
 dependencies:
   - python=3.7
+  - setuptools=59.8.0
   - pip
   - pytorch
   - torchvision
@@ -15,6 +16,7 @@ dependencies:
   - dlib
   - polyscope
   - pyinstaller
+  - pytest
   - pip:
     - tensorflow
     - opencv-python
