@@ -1,21 +1,8 @@
 channels:
   - pytorch
+  - anaconda
   - conda-forge
   - defaults
-  - menpo
 dependencies:
-  - pytorch
-  - torchvision
   - python=3.7
   - pip
-  - scikit-learn
-  - imageio
-  - matplotlib
-  - imageio-ffmpeg
-  - dlib
-  - polyscope
-  - pyinstaller
-  - pip:
-    - tensorflow
-    - opencv-python
-    - pptk
