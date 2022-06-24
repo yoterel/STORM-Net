@@ -76,8 +76,10 @@ jobs:
           type: 'zip'
           filename: ${{ matrix.label }}.zip
           path: './CapCalibrator/dist/main'
-          
-      - name: Publish artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.label }}.zip
+      
+      - name: Print content
+        run: |
+          ls
+          ls CapCalibrator
+          ls CapCalibrator/dist
+          ls CapCalibrator/dist/main
