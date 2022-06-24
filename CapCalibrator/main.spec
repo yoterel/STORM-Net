@@ -3,9 +3,8 @@
 block_cipher = None
 
 extra_data = [
-			('resource\\icon.png', 'resource\\',),
-			('resource\\render.png', 'resource\\')
-			]
+	('resource/*', 'resource',),
+]
 a = Analysis(['main.py'],
              pathex=[],
              binaries=[],
