@@ -55,3 +55,26 @@ jobs:
       - name: Update environment
         if: steps.cache.outputs.cache-hit != 'true'
         run: conda env update -n myenv -f environment.yml
+      
+      - name: Test main
+        run: |
+          cd CapCalibrator
+          python main.py --help
+          
+      - name: Build main
+        run: |
+          pyinstaller main.spec
+          
+      - name: Archive release
+        uses: thedoctor0/zip-release@0.6.2
+        with:
+          type: 'zip'
+          filename: ${{ matrix.label }}.zip
+          path: 'dist/main'
+          
+      - name: Publish artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.label }}.zip
+      
+      
