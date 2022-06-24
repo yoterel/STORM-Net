@@ -66,6 +66,8 @@ jobs:
           
       - name: Build main
         run: |
+          pwd
+          cd CapCalibrator
           pyinstaller main.spec
           
       - name: Archive release
@@ -73,7 +75,7 @@ jobs:
         with:
           type: 'zip'
           filename: ${{ matrix.label }}.zip
-          path: 'dist/main'
+          path: './CapCalibrator/dist/main'
           
       - name: Publish artifact
         uses: actions/upload-artifact@v3
