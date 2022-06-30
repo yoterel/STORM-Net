@@ -12,6 +12,7 @@ dependencies:
   - scikit-learn
   - imageio
   - imageio-ffmpeg
+  - pyqt
   - matplotlib
   - dlib
   - polyscope
