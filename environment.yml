@@ -16,9 +16,9 @@ dependencies:
   - matplotlib
   - dlib
   - polyscope
-  - pyinstaller
   - pytest
   - pip:
     - tensorflow
     - opencv-python
     - pptk
+    - pyinstaller
