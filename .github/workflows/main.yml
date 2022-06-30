@@ -69,9 +69,16 @@ jobs:
           cd CapCalibrator
           pyinstaller main.spec
       
+      - name: print dir content
+        run: |
+          ls
+          ls CapCalibrator
+          ls CapCalibrator/dist
+          ls CapCalibrator/dist/main
+      
       - name: version
         run: |
-          echo "::set-output name=version::$(./CapCalibrator/dist/main/main --version)"
+          echo "::set-output name=version::$(./CapCalibrator/dist/main/main.exe --version)"
           id: version
         
       - name: Archive release
@@ -81,7 +88,7 @@ jobs:
           filename: ${{ matrix.label }}.zip
           path: './CapCalibrator/dist/main'
       
-      - name: Print content
+      - name: print content again
         run: |
           ls
           ls CapCalibrator
