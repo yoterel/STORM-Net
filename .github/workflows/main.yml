@@ -67,8 +67,7 @@ jobs:
       - name: version
         run: |
           cd CapCalibrator
-          echo "::set-output name=version::$(python main.py --version)"
-          id: version
+          echo "STORM_VERSION=$(python main.py --version)" >> $GITHUB_ENV
           
       - name: build main
         run: |
@@ -103,7 +102,7 @@ jobs:
         with:
           draft: false
           prerelease: false
-          release_name: ${{ steps.version.outputs.version }}
+          release_name: ${{ env.STORM_VERSION }}
           tag_name: ${{ github.ref }}
           body_path: CHANGELOG.md
         env:
