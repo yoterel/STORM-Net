@@ -45,11 +45,15 @@ def dataloader():
 
     class Options():
         def __init__(self):
-            self.data_path = Path("/disk1/yotam/capnet/scene3_100k")
+            self.data_path = Path("./resource/test_synth_data")
             self.is_train = True
             self.template = Path("../example_models/example_model.txt")
-            self.device = "cuda:7"
+            self.device = "cpu"
             self.loss = "l2+projection"
+            self.scale_faces = False
+            self.force_load_raw_data = False
+            self.architecture = "2dconv"
+            self.dont_use_gmm = False
 
     opt = Options()
     loader = torch_data.MyDataSet(opt)
@@ -58,7 +62,7 @@ def dataloader():
 
 def test_raw_data_set(dataloader, anchors_and_sensors):
     origin_xyz, others_xyz, selected_indices = anchors_and_sensors
-    device = "cuda:7"
+    device = "cpu"
     x, y = dataloader.__getitem__(0)
     y_euler = y["rot_and_scale"]
     y_pc = y["raw_projected_data"]
@@ -77,11 +81,9 @@ def test_raw_data_set(dataloader, anchors_and_sensors):
     assert torch.all(torch.isclose(y_pc, torch_mni))
 
 
-
-
 def test_mni_ours_vs_naive_vs_full(anchors_and_sensors):
     origin_xyz, others_xyz, selected_indices = anchors_and_sensors
-    device = "cuda:7"
+    device = "cpu"
     euler = (np.random.rand(3) * 10) - 5
     rot = R.from_euler('xyz', list(euler), degrees=True)
     rot_mat = rot.as_matrix()
@@ -124,12 +126,12 @@ def test_differentiable_find_affine(anchors_and_sensors):
 
 def test_mni_torch_vs_mni_numpy(anchors_and_sensors):
     """
-    tests if mni projection using torch is the same as nump
+    tests if mni projection using torch is the same as numpy
     :param anchors_and_sensors:
     :return:
     """
     origin_xyz, others_xyz, selected_indices = anchors_and_sensors
-    devices = ["cpu", "cuda:7"]
+    devices = ["cpu"]  # "cuda:7"
     for device in devices:
         euler = (np.random.rand(3) * 10) - 5
         rot = R.from_euler('xyz', list(euler), degrees=True)
@@ -145,7 +147,6 @@ def test_mni_torch_vs_mni_numpy(anchors_and_sensors):
                                                                                 output_errors=True)
         assert torch.all(torch.isclose(torch.from_numpy(np_mni).float().to(device), torch_mni.squeeze(0)))
         assert torch.all(torch.isclose(torch.from_numpy(np_mni_sd).float().to(device), torch_mni_sd.squeeze(0), atol=1e-4))
-
 
 
 def test_differentiable_mni_optimization(network, anchors_and_sensors):

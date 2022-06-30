@@ -39,7 +39,7 @@ def parse_arguments():
     args = parser.parse_args()
     # configure computing environment
     if args.version:
-        print("1.0.0")
+        print("1.0.0", end="")
         sys.exit(0)
     args.device = utils.configure_compute_environment(args.gpu_id)
     if args.mode == "gui" and not args.headless:
