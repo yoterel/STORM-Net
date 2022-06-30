@@ -22,12 +22,13 @@ jobs:
         label: ["windows-64"] # "linux-64", "windows-64", "mac"
         prefix: ["C:\\Miniconda3\\envs\\myenv"] # "C:\Miniconda3\envs\myenv", "/usr/share/miniconda/envs/myenv", "/Users/runner/miniconda3/envs/myenv",  
         python-version: ["3.7"]
+        exe_name: ["main.exe"]  # "main.exe", "main"
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       
-      - name: Setup miniconda
+      - name: setup miniconda
         uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           auto-update-conda: true
@@ -35,67 +36,68 @@ jobs:
           python-version: ${{ matrix.python-version }}
           activate-environment: myenv
           
-      - name: Conda info
+      - name: conda info
         run: |
           conda list
           conda env list
           echo $CONDA_PREFIX
           
-      - name: Set cache date
+      - name: set cache date
         run: echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
         
-      - name: Cache conda env
+      - name: cache conda env
         uses: actions/cache@v3
         with:
           path: ${{ matrix.prefix }}
           key: conda-${{ matrix.label }}-${{ env.DATE }}-${{ hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER }}
         id: cache
         
-      - name: Update environment
+      - name: update environment
         if: steps.cache.outputs.cache-hit != 'true'
         run: conda env update -n myenv -f environment.yml
       
-      - name: Test main
+      - name: naive test main
         run: |
           conda list
           conda env list
           echo $CONDA_PREFIX
           cd CapCalibrator
           python main.py --help
+        
+      - name: version
+        run: |
+          cd CapCalibrator
+          echo "::set-output name=version::$(python main.py --version)"
+          id: version
           
-      - name: Build main
+      - name: build main
         run: |
           pwd
           cd CapCalibrator
           pyinstaller main.spec
       
-      - name: print dir content
+      - name: print dir content 1
         run: |
           ls
           ls CapCalibrator
           ls CapCalibrator/dist
           ls CapCalibrator/dist/main
-      
-      - name: version
-        run: |
-          echo "::set-output name=version::$(./CapCalibrator/dist/main/main.exe --version)"
-          id: version
         
-      - name: Archive release
+      - name: archive release
         uses: thedoctor0/zip-release@0.6.2
         with:
           type: 'zip'
           filename: ${{ matrix.label }}.zip
           path: './CapCalibrator/dist/main'
       
-      - name: print content again
+      - name: print dir content 2
         run: |
           ls
           ls CapCalibrator
           ls CapCalibrator/dist
           ls CapCalibrator/dist/main
           
-      - name: Create release
+      - name: create release
         uses: actions/create-release@v1
         id: create_release
         with:
