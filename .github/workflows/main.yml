@@ -97,25 +97,8 @@ jobs:
           ls CapCalibrator/dist/main
           
       - name: create release
-        uses: actions/create-release@v1
+        uses: actions/create-release@v1.10.0
         id: create_release
         with:
-          draft: false
-          prerelease: false
           release_name: ${{ env.STORM_VERSION }}
-          tag_name: ${{ github.ref }}
-          body_path: CHANGELOG.md
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          
-      - name: Upload artifact
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ matrix.label }}.zip
-          asset_name: ${{ matrix.label }}.zip
-          asset_content_type: application/zip
-          
-      
+          artifacts: ${{ matrix.label }}.zip
