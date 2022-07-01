@@ -6,7 +6,10 @@ on:
       - '*'
 
   workflow_dispatch:
-  
+    inputs:
+        tag:
+          required: true
+          type: string
 env:
   # Increase this value to reset cache if environment.yml has not changed
   CACHE_NUMBER: 0
@@ -102,3 +105,4 @@ jobs:
         with:
           name: ${{ env.STORM_VERSION }}
           artifacts: ${{ matrix.label }}.zip
+          tag: ${{ inputs.tag }
