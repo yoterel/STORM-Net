@@ -105,4 +105,4 @@ jobs:
         with:
           name: ${{ env.STORM_VERSION }}
           artifacts: ${{ matrix.label }}.zip
-          tag: ${{ inputs.tag }
+          tag: ${{ inputs.tag }}
