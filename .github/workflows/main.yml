@@ -100,5 +100,5 @@ jobs:
         uses: ncipollo/release-action@v1.10.0
         id: create_release
         with:
-          release_name: ${{ env.STORM_VERSION }}
+          name: ${{ env.STORM_VERSION }}
           artifacts: ${{ matrix.label }}.zip
