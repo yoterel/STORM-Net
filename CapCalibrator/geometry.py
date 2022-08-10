@@ -385,16 +385,19 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, 
             unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
             unsorted_origin_names = np.array(names[:names.index(0)])
             others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
-        else:  # someone forgot to pass data for projection...
-            assert False, "can't resolve origin & others from sensors."
-
+        else:  # last fallback, just project everything.
+            unsorted_origin_xyz = data
+            unsorted_origin_names = np.array(names)
+            others_xyz = data
         origin_xyz, selected_indices = sort_anchors(unsorted_origin_names, unsorted_origin_xyz)
         otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
         # todo: should we report anything but cortex locations to caller?
         if origin_optodes_names:
             sensor_locations[1][others_selector, :] = otherC
-        else:
+        elif 0 in names:
             sensor_locations[1][names.index(0):, :] = otherC
+        else:
+            sensor_locations[1][:, :] = otherC
     return projected_locations
 
 
