@@ -1,3 +1,5 @@
 /.idea
 CapCalibrator/STORM-Net/
 CapCalibrator/runs/
+*.pyc
+
