@@ -317,9 +317,9 @@ class GUI(tk.Tk):
             filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
             menubar.add_cascade(label="File", menu=filemenu)
             optionsmenu = tk.Menu(menubar, tearoff=0)
-            optionsmenu.add_command(label="Toggle Named Optodes", command=self.toggle_optodes, accelerator="Space")
-            optionsmenu.add_command(label="Next Optode", command=self.next_optode, accelerator="Right")
-            optionsmenu.add_command(label="Prev Optode", command=self.prev_optode, accelerator="Left")
+            # optionsmenu.add_command(label="Toggle Named Optodes", command=self.toggle_optodes, accelerator="Space")
+            # optionsmenu.add_command(label="Next Optode", command=self.next_optode, accelerator="Right")
+            # optionsmenu.add_command(label="Prev Optode", command=self.prev_optode, accelerator="Left")
             menubar.add_cascade(label="Options", menu=optionsmenu)
             if self.template_file_name:
                 menubar.entryconfig("Options", state="normal")
@@ -1277,7 +1277,7 @@ class ExperimentViewerPage(tk.Frame):
         names, data, my_format = self.controller.get_template_info()
         if names:
             pc_names = names
-            data = geometry.to_standard_coordinate_system(names, data)
+            # data = geometry.to_standard_coordinate_system(names, data)
             pc = ps.register_point_cloud(self.controller.get_template_model_file_name(),
                                          data,
                                          radius=0.02)
@@ -1287,7 +1287,7 @@ class ExperimentViewerPage(tk.Frame):
                                    enabled=True,
                                    vminmax=(0., 1.),
                                    cmap="blues")
-            ps.warning("Template model shown in ""standard coordinate system"". See github repository for more details.")
+            # ps.warning("Template model shown in ""standard coordinate system"". See github repository for more details.")
             ps.show()
             pc.remove()
 

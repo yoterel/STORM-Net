@@ -281,9 +281,9 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
     if 0 in names:
         data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
         data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
-    else:
-        data_origin = data
-        data_optodes = np.zeros(3)
+    else:  # just apply transform to all points...
+        data_origin = np.empty((0, 3))
+        data_optodes = data
     for rot_mat, scale_mat in zip(r_matrix, s_matrix):
         transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
         data_optodes = transformed_data_sim.T
