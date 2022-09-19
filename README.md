@@ -96,7 +96,7 @@ This template model was obtained using a 3D digitizer, but can similarly be obta
 It is strongly recommended to create your own template model file **per physical cap model you are using in your lab**, this will lead to best accuracies.
 The exact format of this file is now specified.
 The file is a csv space delimited file, where each row contains 4 values:
-1. An index of the optode (an integer numerical value representing the index of this optode. Starts from 0. any other value (strings, etc) will not be calibrated but still appear in the output file in the same standard coordiante system as the rest of the optodes).
+1. A unique name of the optode (some names are reserved, see below).
 2. 3 numerical values: X, Y, Z representing the location of this optode (note: values must be supplied in cm or inch).
 The coordinate system these values are supplied in are not improtant, as they are transformed internally to a standard right-handed system, and output coordinates are in this new cooridnate system (described below).
 
@@ -141,12 +141,15 @@ The following optodes must exist in the template model file (and their locations
 - "fp2" : used to find standard coordinate system.
 
 At least **Four** (the more the better) of the following optodes must exist in the template model file if MNI projection is required (whether using our implementation of the MNI projection, **or not**):
-["cz", "nosebridge", "inion", "rightear", "leftear", "fp1", "fp2", "fpz", "f7", "f8", "f3", "f4", "c3", "c4", "t3", "t4", "pz", "p3", "p4", "t5", "t6", "o1", "o2"]
+["cz", "nz", "iz", "rpa", "lpa", "fp1", "fp2", "fpz", "f7", "f8", "f3", "f4", "c3", "c4", "t3", "t4", "pz", "p3", "p4", "t5", "t6", "o1", "o2"]
+
+These are standard 10-20 locations. note (rpa, lpa) stands for (right, left) preauricular points.
 
 Notes:
-- Use these names (exactly, without double quoutes) as the first field for them to be parsed correctly.
+- Use these names (exactly, without double quoutes) as the first field for the file to be parsed correctly.
 - The stickers can be placed anywhere **on the cap** as long as the three frontal ones are not colinear, but we recommend using fp1, fpz + 1cm, fp2, cz as their location.
 - middle_triangle: we actually used a location 1 cm above fpz in our experiments (can be seen marked by a green sticker in the example video) - this eliminated the risk of coliniearity (but it is not mandatory).
+- Do not use these names for your sensors. They are reserved.
 
 
 ## The standard coordiante system
