@@ -12,30 +12,14 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
     :return: numpy array of size refN x number_of_sensors x 3
     represents for each refernce brain all our sensors locations in its frame of reference
     """
-    # path_wo_ext = "resource/MNI_templates/DMNIHAve"
-    # dmnihavePath = Path(path_wo_ext + ".csv")
-    # if Path(path_wo_ext+".npy").is_file():
-    #     DMNIHAve = np.load(path_wo_ext+".npy", allow_pickle=True)
-    # else:
-    #     DMNIHAve = np.genfromtxt(dmnihavePath, delimiter=',')
-    #     np.save(path_wo_ext, DMNIHAve)
-    # template_anchors_xyz = DMNIHAve[selected_indices, :]
-    # ==================== AffineEstimation4 ====================== (l 225)
+    # ==================== AffineEstimation4 ======================
     size = len(selected_indices)
     assert size >= 4
-
     # find affine transformation with ideal brain (not used anywhere..)
     listOri = np.c_[our_anchors_xyz, np.ones(size)]
-    # template_anchors_xyz[:, 3] = 1
-    # listDist = DD
-    # W = np.linalg.lstsq(listOri, listDist, rcond=None)[0]  # affine transformation matrix
-    # listCur = np.matmul(listOri, W)
-
-    # ------------ Transformation to reference brains -------------- ( l 271)
+    # ------------ Transformation to reference brains --------------
     # find affine transformation with every brain in the 17 templates
-
     refBList = np.empty((refN, 2), dtype=object)
-
     # load 17 brain templates from disk
     DMS = []
     for i in range(1, refN+1):
@@ -54,17 +38,16 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
         WW = np.linalg.lstsq(listOri, refDist, rcond=None)[0]
         refBList[i-1, 0] = np.matmul(listOri, WW)
         refBList[i-1, 1] = WW
-
-    # ---------- Transforming given head surface points stored in others to the ideal brain and each ref brain ----- (l 310)
-
+    # ---------- Transforming given head surface points stored in others to the ideal brain and each ref brain -----
     DDDD = np.c_[our_sensors_xyz, np.ones(pointN)]
     othersRefList = np.empty((refN, pointN, DDDD.shape[1]), dtype=np.float)
-
+    originRegList = np.empty((refN, our_anchors_xyz.shape[0], DDDD.shape[1]), dtype=np.float)
     for i in range(refN):
         WR = refBList[i, 1]
         othersRef = np.matmul(DDDD, WR)
         othersRefList[i] = othersRef
-    return othersRefList[:, :, :3]
+        originRegList[i] = refBList[i, 0]
+    return othersRefList[:, :, :3], originRegList[:, :, :3]
 
 
 def find_closest_on_surface_naive(othersRefList, XYZ, pointN, calc_sd_and_var=False):
@@ -85,19 +68,17 @@ def find_closest_on_surface_naive(othersRefList, XYZ, pointN, calc_sd_and_var=Fa
     top = 3
     for i in range(pointN):
         AA = np.mean(othersRefList[:, i], axis=0)
-        # ----- Back projection ----- (l 707)
+        # ----- Back projection -----
         PP = np.broadcast_to(AA, XYZ.shape)
         D = np.linalg.norm(XYZ - PP, axis=1)
         IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
-        # ID = np.argsort(D)
-        # IDtop = ID[0: top]
         XYZtop = XYZ[IDtop, :]
         closest = np.mean(XYZtop, axis=0)
         # -------- End of back projection ----------
 
         other[i, :] = closest
 
-        # ---- Variance calculation ---- (line 739)
+        # ---- Variance calculation ----
         if calc_sd_and_var:
             AAA = othersRefList[:, i]
             AV = closest
@@ -130,7 +111,6 @@ def find_closest_on_surface_full(othersRefList, refN, pointN, resource_folder):
     :return:
     """
     otherRefCList = np.empty((refN, pointN, 3), dtype=np.float)
-    # otherRefCList = np.empty((1, refN), dtype=object)
     for i in range(refN):
         my_str = resource_folder+"/MNI_templates/xyzall{}.npy".format(str(i + 1))
         XYZ = load_raw_MNI_data(my_str, i, resource_folder=resource_folder)
@@ -141,30 +121,17 @@ def find_closest_on_surface_full(othersRefList, refN, pointN, resource_folder):
             D = np.linalg.norm(XYZ - PP, axis=1)
             top = round(XYZ.shape[0] * 0.05)  # select 5% of data (original paper selects 1000 points)
             IDtop = np.argpartition(D, top)[:top]  # sort by lowest norm
-            # ID = np.argsort(D)
-            # IDtop = ID[0:top]
             XYZtop = XYZ[IDtop, :]
-
             Nclose = 200
             IDclose = np.argpartition(D, Nclose)[:Nclose]  # sort by lowest norm
-            # IDclose = ID[0:Nclose]
             XYZclose = XYZ[IDclose, :]
             PNear = np.mean(XYZclose, axis=0)  # select mean of closest 200 points
-
             # Line between P and PNear
             p1 = P
             p2 = PNear
             p3 = XYZtop
             # cross product the line with the point and normalize gives exactly distance from line
             distance_from_line = np.linalg.norm(np.cross(p2 - p1, p3 - p1) / np.linalg.norm(p2-p1), axis=1)
-            # PVec = P - PNear
-            # A, B, C = PVec[0], PVec[1], PVec[2]
-            #
-            # t = (A * (XYZtop[:, 0] - P[0]) + B * (XYZtop[:, 1] - P[1]) + C * (XYZtop[:, 2] - P[2])) / (
-            #         A * A + B * B + C * C)
-            # H = np.array([A * t + P[0], B * t + P[1], C * t + P[2]]).T
-            # distance_from_line = np.linalg.norm(XYZtop - H, axis=1)
-
             # Extend the line P-Pnear to a rod (l 851)
             det = 0
             rodR = 0
@@ -173,7 +140,6 @@ def find_closest_on_surface_full(othersRefList, refN, pointN, resource_folder):
                 Iless2 = np.where(distance_from_line <= rodR)
                 rod = XYZtop[Iless2, :][0]
                 det = np.sum(rod ** 2)
-
             # Find brain surface points on the vicinity of P (l 862)
             PPB = np.broadcast_to(P, rod.shape)
             VicD = np.linalg.norm(rod - PPB, axis=1)
@@ -184,7 +150,6 @@ def find_closest_on_surface_full(othersRefList, refN, pointN, resource_folder):
             NIVicD = IVicD[0:NVic]
             Vic = rod[NIVicD, :]
             CP = np.mean(Vic, axis=0)
-            # --- End of projection BS -----
             projectionListC[j, :] = CP
         otherRefCList[i] = projectionListC
     return otherRefCList
@@ -228,7 +193,7 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
     :param others_xyz: optodes to project given as mx3 np array (m>=1)
     :param selected_indices: which indices to select from origin_xyz as anchors given as np array (len must be at least 4)
                              order matters! selection is based on this order:
-                             ["nosebridge", "inion", "rightear", "leftear",
+                             ["nz", "iz", "rpa", "lpa",
                               "fp1", "fp2", "fz", "f3",
                               "f4", "f7", "f8", "cz",
                               "c3", "c4", "t3", "t4",
@@ -246,12 +211,12 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
     refN = 17  # number of reference brains
     pointN = others_xyz.shape[0]  # number of sensors to project
     # get sensors transformed into reference brains coordinate systems
-    others_transformed_to_ref = find_affine_transforms(origin_xyz,
-                                                       others_xyz,
-                                                       selected_indices,
-                                                       refN,
-                                                       pointN,
-                                                       resource_folder)
+    others_transformed_to_ref, origin_transformed_to_ref = find_affine_transforms(origin_xyz,
+                                                                                  others_xyz,
+                                                                                  selected_indices,
+                                                                                  refN,
+                                                                                  pointN,
+                                                                                  resource_folder)
     # load head surface raw data
     XYZ = load_raw_MNI_data(resource_folder+"/MNI_templates/xyzallHEM", "head", resource_folder=resource_folder)
     # get closest location of sensors on average head surface
@@ -271,7 +236,8 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
     # otherHSD, otherCSD -  transformation SD for given head surface points, point manner
     # SSwsH, SSwsC - transformation SD for given cortical surface points, point manner
     # ----------------------
-    return otherH, otherC, otherHSD, otherCSD
+    originTransformed = origin_transformed_to_ref.mean(axis=0)
+    return otherH, otherC, otherHSD, otherCSD, originTransformed
 
 
 def vectorized_loop(XYZ, othersRefList, i, pointN):

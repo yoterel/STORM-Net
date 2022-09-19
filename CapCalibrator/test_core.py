@@ -17,9 +17,9 @@ def anchors_and_sensors():
     data = data[0]
     data = geometry.to_standard_coordinate_system(names, data)
     assert 0 in names
-    unsorted_anchors_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+    unsorted_anchors_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not coregistered)
     unsorted_anchors_names = np.array(names[:names.index(0)])
-    others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
+    others_xyz = data[names.index(0):, :]  # numbered optodes were coregistered, and they will be transformed to MNI
     # these names are written in an order the algorithm expects (and MNI template data was written in)
     anchors_xyz, selected_indices = geometry.sort_anchors(unsorted_anchors_names, unsorted_anchors_xyz)
     return [anchors_xyz, others_xyz, selected_indices]
@@ -113,7 +113,7 @@ def test_differentiable_find_affine(anchors_and_sensors):
     origin_xyz, others_xyz, selected_indices = anchors_and_sensors
     refN = 17  # number of reference brains
     pointN = others_xyz.shape[0]  # number of sensors to project
-    classic_result = MNI.find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN, pointN)
+    classic_result, _ = MNI.find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN, pointN)
     origin_xyz = torch.from_numpy(origin_xyz).float()
     others_xyz = torch.from_numpy(others_xyz).float()
     selected_indices = torch.from_numpy(selected_indices)
@@ -137,7 +137,7 @@ def test_mni_torch_vs_mni_numpy(anchors_and_sensors):
         rot = R.from_euler('xyz', list(euler), degrees=True)
         rot_mat = rot.as_matrix()
         transformed_others_xyz = (rot_mat @ others_xyz.T).T
-        _, np_mni, _, np_mni_sd = MNI.project(origin_xyz, transformed_others_xyz, selected_indices, output_errors=True)
+        _, np_mni, _, np_mni_sd, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices, output_errors=True)
         origin_xyz_torch = torch.from_numpy(origin_xyz).float().to(device)
         transformed_others_xyz_torch = torch.from_numpy(transformed_others_xyz).float().to(device)
         selected_indices_torch = torch.from_numpy(selected_indices).to(device)
@@ -162,7 +162,7 @@ def test_differentiable_mni_optimization(network, anchors_and_sensors):
     rot = R.from_euler('xyz', list(euler), degrees=True)
     rot_mat = rot.as_matrix()
     transformed_others_xyz = (rot_mat @ others_xyz.T).T
-    _, gt, _, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices)
+    _, gt, _, _, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices)
     euler_torch = torch.full([1, 3], 1.0, device="cpu", requires_grad=True)
     init_diff = np.linalg.norm(euler - euler_torch.cpu().detach().numpy())
     optimizer = torch.optim.SGD([euler_torch], lr=1.0, momentum=0.9)
@@ -216,7 +216,7 @@ def test_differentiable_MNI_projection(anchors_and_sensors):
     rot = R.from_euler('xyz', list(euler), degrees=True)
     rot_mat = rot.as_matrix()
     transformed_others_xyz = (rot_mat @ others_xyz.T).T
-    _, test1, _, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices)
+    _, test1, _, _, _ = MNI.project(origin_xyz, transformed_others_xyz, selected_indices)
     origin_xyz_torch = torch.from_numpy(origin_xyz).float()
     transformed_others_xyz_torch = torch.from_numpy(transformed_others_xyz).float()
     test2 = MNI_torch.torch_project(origin_xyz_torch, transformed_others_xyz_torch.unsqueeze(0), selected_indices_torch)
@@ -273,11 +273,11 @@ def test_MNI_projection():
     data = data[0]
     data = geometry.to_standard_coordinate_system(names, data)
     assert 0 in names
-    unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+    unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not coregistered)
     unsorted_origin_names = np.array(names[:names.index(0)])
-    others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
+    others_xyz = data[names.index(0):, :]  # numbered optodes were coregistered, and they will be transformed to MNI
     # these names are written in an order the algorithm expects (and MNI template data was written in)
-    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
+    target_origin_names = np.array(["nz", "iz", "rpa", "lpa",
                                     "fp1", "fp2", "fz", "f3",
                                     "f4", "f7", "f8", "cz",
                                     "c3", "c4", "t3", "t4",
@@ -287,7 +287,7 @@ def test_MNI_projection():
     # sort our anchors using the order above
     selected_indices, sorting_indices = np.where(target_origin_names[:, None] == unsorted_origin_names[None, :])
     origin_xyz = unsorted_origin_xyz[sorting_indices]
-    otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices, output_errors=True)
+    otherH, otherC, otherHSD, otherCSD, _ = MNI.project(origin_xyz, others_xyz, selected_indices, output_errors=True)
     # np.savez('resource/mni_projection_test.npz', name1=otherH, name2=otherC, name3=otherHSD, name4=otherCSD)
     data = np.load('resource/mni_projection_test.npz')
     otherH_loaded, otherC_loaded, otherHSD_loaded, otherCSD_loaded = data["name1"], data["name2"], data["name3"], data["name4"]

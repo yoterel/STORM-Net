@@ -11,11 +11,11 @@ import sys
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Calibrates fNIRS sensors location based on video.')
+    parser = argparse.ArgumentParser(description='Coregisters fNIRS sensors location based on video.')
     parser.add_argument("-m", "--mode", type=str, choices=["gui", "auto", "experimental"],
                         default="gui",
                         help="Controls operation mode of application.")
-    parser.add_argument("-vid", "--video", help="The path to the video file to calibrate sensors with. Required if mode is auto.")
+    parser.add_argument("-vid", "--video", help="The path to the video file to coregister sensors with. Required if mode is auto.")
     parser.add_argument("-t", "--template", help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
     parser.add_argument("--mni", action="store_true",
                         help="If specified, output will be projected to (adult) MNI coordinates")
@@ -24,7 +24,7 @@ def parse_arguments():
                         help="A path to a trained segmentation network model")
     parser.add_argument("-s", "--session_file",
                         help="A file containing processed results for previous videos.")
-    parser.add_argument("-out", "--output_file", help="The output csv file with calibrated results")
+    parser.add_argument("-out", "--output_file", help="The output csv file with coregistered results")
     parser.add_argument("--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
     parser.add_argument("-log", "--log", help="If specified, log will be output to this file")
     parser.add_argument("-gt", "--ground_truth", help="Use this in experimental mode only")

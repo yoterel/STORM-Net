@@ -291,7 +291,7 @@ def torch_project_non_differentiable(origin_xyz, others_xyz, selected_indices, o
     :param others_xyz: optodes to project given as mx3 np array (m>=1)
     :param selected_indices: which indices to select from origin_xyz as anchors given as np array (len must be at least 4)
                              order matters! selection is based on this order:
-                             ["nosebridge", "inion", "rightear", "leftear",
+                             ["nz", "iz", "rpa", "lpa",
                               "fp1", "fp2", "fz", "f3",
                               "f4", "f7", "f8", "cz",
                               "c3", "c4", "t3", "t4",

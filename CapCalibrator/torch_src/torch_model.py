@@ -103,9 +103,9 @@ class MyNetwork(torch.nn.Module):
         data = data[0]
         data = geometry.to_standard_coordinate_system(names, data)
         assert 0 in names
-        data_anchors = data[:names.index(0), :]  # non numbered optodes are not calibrated
+        data_anchors = data[:names.index(0), :]  # non numbered optodes are not coregistered
         origin_names = np.array(names[:names.index(0)])
-        data_sensors = data[names.index(0):, :]  # selects optodes for applying calibration
+        data_sensors = data[names.index(0):, :]  # selects optodes for applying coregistration
         anchors_xyz, selected_indices = geometry.sort_anchors(origin_names, data_anchors)
         return torch.from_numpy(anchors_xyz).float().to(self.opt.device),\
                torch.from_numpy(data_sensors).float().to(self.opt.device),\

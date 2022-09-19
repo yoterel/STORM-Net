@@ -260,8 +260,8 @@ class MyDataSet(torch.utils.data.Dataset):
         data = data[0]
         data = geometry.to_standard_coordinate_system(names, data)
         assert 0 in names
-        data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-        data_others = data[names.index(0):, :]  # selects optodes for applying calibration
+        data_origin = data[:names.index(0), :]  # non numbered optodes are not coregistered
+        data_others = data[names.index(0):, :]  # selects optodes for applying coregistration
         origin_names = np.array(names[:names.index(0)])
 
         projected_data = []

@@ -71,7 +71,7 @@ def read_template_file(template_path, input_file_format=None):
             file_format = "telaviv"
     data = []
     if file_format == "telaviv":
-        labeled_names = ['leftear', 'nosebridge', 'nosetip', 'lefteye', 'righteye', 'rightear',
+        labeled_names = ['lpa', 'nz', 'nosetip', 'lefteye', 'righteye', 'rpa',
                          'f8', 'fp2', 'fpz', 'fp1', 'f7', 'cz', 'o1', 'oz', 'o2']
         for j, session in enumerate(sessions):
             sensor1_data = []

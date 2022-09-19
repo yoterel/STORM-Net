@@ -22,6 +22,7 @@ import config
 import torch
 from torch_src import torch_model
 import torch_train
+import MNI
 ## globals for gui
 prev_selection = None
 pc_names = None
@@ -130,7 +131,7 @@ class GUI(tk.Tk):
         ps.set_open_imgui_window_for_user_callback(True)
         # ps.set_build_gui(False)
         ps.set_user_callback(ExperimentViewerPage.selection_callback)
-        for F in (MainMenu, CalibrationPage, ProgressBarPage, AboutPage, FinetunePage, ExperimentViewerPage):
+        for F in (MainMenu, CoregistrationPage, ProgressBarPage, AboutPage, FinetunePage, ExperimentViewerPage):
             panel = F(self.container, self)
             self.panels[F] = panel
             panel.grid(row=0, column=0, sticky="nsew")
@@ -177,7 +178,7 @@ class GUI(tk.Tk):
         """
         try:
             msg = self.queue.get(False)
-            if msg[0] == "calibrate":
+            if msg[0] == "coregister":
                 self.projected_data = msg[1]
                 self.save_registration()
             elif msg[0] == "video_to_frames":
@@ -221,7 +222,7 @@ class GUI(tk.Tk):
                     "load_template_model": "Loading template model...",
                     "load_stormnet": "Loading Storm-Net model...",
                     "shift_video": "Selecting different frame...",
-                    "calibrate": "Performing Co-Registeration...",
+                    "coregister": "Performing Co-Registeration...",
                     "render": "Creating synthetic data, This might take a while...",
                     "finetune": "Fine-tunning STORM-Net. This might take a while...",
                     "predict": "Predicting..."}
@@ -282,7 +283,7 @@ class GUI(tk.Tk):
             videomenu.add_command(label="Previous Video", command=self.prev_video)
             videomenu.add_separator()
             videomenu.add_command(label="Auto Annotate", command=self.auto_annotate)
-            videomenu.add_command(label="Co-Register", command=self.calibrate)
+            videomenu.add_command(label="Co-Register", command=self.coregister)
             menubar.add_cascade(label="Video", menu=videomenu)
             if self.paths:
                 # a video is loaded
@@ -306,13 +307,14 @@ class GUI(tk.Tk):
                 filemenu.entryconfig("Save Session", state="disabled")
                 menubar.entryconfig("Video", state="disabled")
             if self.projected_data:
-                # calibration was performed
+                # coregistration was performed
                 filemenu.entryconfig("Save Registration", state="normal")
             else:
                 filemenu.entryconfig("Save Registration", state="disabled")
         elif page == "exp":
             filemenu = tk.Menu(menubar, tearoff=0)
             filemenu.add_command(label="Load Template Model", command=self.load_template_model)
+            # filemenu.add_command(label="Load Arbitrary Model", command=self.load_arbitrary_model)
             filemenu.add_separator()
             filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
             menubar.add_cascade(label="File", menu=filemenu)
@@ -360,7 +362,7 @@ class GUI(tk.Tk):
         panel.focus_set()
         if pan != ProgressBarPage:
             self.cur_active_panel = pan
-        if pan == CalibrationPage:
+        if pan == CoregistrationPage:
             self.config(menu=self.update_menubar("calib"))
             self.panels[pan].update_canvas()
             self.panels[pan].update_labels()
@@ -403,7 +405,7 @@ class GUI(tk.Tk):
                     # todo: okay to forget handle?
                     return Path(file.name)
 
-    ### CalibrationPage ###
+    ### CoregistrationPage ###
     def prep_vid_to_frames_packet(self, indices=None):
         path = self.paths[self.cur_video_index]
         return ["video_to_frames",
@@ -418,8 +420,8 @@ class GUI(tk.Tk):
                 self.unet_graph,
                 self.args]
 
-    def prep_calibrate_packet(self):
-        return ["calibrate",
+    def prep_coregister_packet(self):
+        return ["coregister",
                 self.template_names,
                 self.template_data,
                 self.db[self.get_cur_video_hash()][self.shift]["data"].copy(),
@@ -542,14 +544,14 @@ class GUI(tk.Tk):
 
     def go_to_next_coord(self):
         """
-        moves to next sticker and updates display of calibration page
+        moves to next sticker and updates display of coregistration page
         :return:
         """
         if self.cur_sticker_index >= 2*(config.max_number_of_landmarks_per_frames - 1):
             self.cur_sticker_index = 0
         else:
             self.cur_sticker_index += 2
-        self.panels[CalibrationPage].update_labels()
+        self.panels[CoregistrationPage].update_labels()
 
     def save_coords(self, event=None, coords=None):
         if self.frames:
@@ -602,9 +604,9 @@ class GUI(tk.Tk):
                 return
         self.take_async_action(self.prep_annotate_frame_packet())
 
-    def calibrate(self):
+    def coregister(self):
         """
-        calculates calibration from a video (in a different thread)
+        calculates registration from a video (in a different thread)
         :return:
         """
         if not np.any(self.db[self.get_cur_video_hash()][self.shift]["data"]):
@@ -619,7 +621,7 @@ class GUI(tk.Tk):
             self.args.mni = True
         else:
             self.args.mni = False
-        self.take_async_action(self.prep_calibrate_packet())
+        self.take_async_action(self.prep_coregister_packet())
 
     def predict_x(self):
         self.take_async_action(self.prep_predict_packet())
@@ -658,15 +660,15 @@ class GUI(tk.Tk):
         if self.cur_frame_index < config.number_of_frames_per_video - 1:
             self.cur_frame_index += 1
             self.cur_sticker_index = 0
-            self.panels[CalibrationPage].update_canvas()
-            self.panels[CalibrationPage].update_labels()
+            self.panels[CoregistrationPage].update_canvas()
+            self.panels[CoregistrationPage].update_labels()
 
     def prev_frame(self, event=None):
         if self.cur_frame_index > 0:
             self.cur_frame_index -= 1
             self.cur_sticker_index = 0
-            self.panels[CalibrationPage].update_canvas()
-            self.panels[CalibrationPage].update_labels()
+            self.panels[CoregistrationPage].update_canvas()
+            self.panels[CoregistrationPage].update_labels()
 
     def load_video(self):
         obj = self.select_from_filesystem(False, True, ".", "Select Video File")
@@ -1027,8 +1029,8 @@ class ThreadedTask(threading.Thread):
             self.handle_load_template_model()
         elif self.msg[0] == "load_stormnet":
             self.handle_load_stormnet()
-        elif self.msg[0] == "calibrate":
-            self.handle_calibrate()
+        elif self.msg[0] == "coregister":
+            self.handle_coregister()
         elif self.msg[0] == "predict":
             self.handle_predict()
 
@@ -1039,15 +1041,15 @@ class ThreadedTask(threading.Thread):
         r, s = predict.predict_rigid_transform(data, None, args)
         self.queue.put(["predict"])
 
-    def handle_calibrate(self):
+    def handle_coregister(self):
         template_names, template_data, data, model, args = self.msg[1:]
         r, s = predict.predict_rigid_transform(data, model, args)
         sensor_locations = geometry.apply_rigid_transform(r, s, template_names, template_data, None, args)
         if args.mni:
-            projected_data = geometry.project_sensors_to_MNI(sensor_locations)
+            projected_data = geometry.project_sensors_to_MNI(sensor_locations, transform_anchors=True)
         else:
             projected_data = sensor_locations
-        self.queue.put(["calibrate", projected_data[0]])
+        self.queue.put(["coregister", projected_data[0]])
 
     def handle_load_template_model(self):
         path = self.msg[1]
@@ -1112,7 +1114,7 @@ class ThreadedTask(threading.Thread):
         self.queue.put(["shift_video", frames, indices])
 
 
-class CalibrationPage(tk.Frame):
+class CoregistrationPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
@@ -1211,8 +1213,8 @@ class MainMenu(tk.Frame):
         self.finetune_button = ttk.Button(self, text="Offline Step",
                                           command=lambda: controller.show_panel(FinetunePage))
 
-        self.calibration_button = ttk.Button(self, text="Online Step",
-                                             command=lambda: controller.show_panel(CalibrationPage))
+        self.coregistration_button = ttk.Button(self, text="Online Step",
+                                             command=lambda: controller.show_panel(CoregistrationPage))
         self.about_button = ttk.Button(self, text="About",
                                              command=lambda: controller.show_panel(AboutPage))
 
@@ -1220,7 +1222,7 @@ class MainMenu(tk.Frame):
         self.canvas.grid(row=2, column=1, columnspan=4)
         self.tempalte_view_button.grid(row=3, column=1, sticky="w" + "e")
         self.finetune_button.grid(row=3, column=2, sticky="w" + "e")
-        self.calibration_button.grid(row=3, column=3, sticky="w" + "e")
+        self.coregistration_button.grid(row=3, column=3, sticky="w" + "e")
         self.about_button.grid(row=3, column=4, sticky="w" + "e")
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1)
@@ -1258,39 +1260,99 @@ class ExperimentViewerPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
-        # self.bind("<Left>", self.controller.prev_optode)
-        # self.bind("<Right>", self.controller.next_optode)
-        # self.bind("<space>", self.controller.toggle_optodes)
-        # self.bind("<w>", self.controller.increase_elev)
-        # self.bind("<a>", self.controller.decrease_azim)
-        # self.bind("<s>", self.controller.decrease_elev)
-        # self.bind("<d>", self.controller.increase_azim)
-        # self.figure_handle = plt.Figure(figsize=(5, 5), dpi=100)
-        # self.sub_plot_handle = self.figure_handle.add_subplot(111, projection='3d')
-        # self.sub_plot_handle.view_init(self.controller.get_view_elev(), self.controller.get_view_azim())
-        # self.canvas = FigureCanvasTkAgg(self.figure_handle, self)
-        # self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-        # self.canvas.draw()
 
     def update_labels(self):
         global pc_names
-        names, data, my_format = self.controller.get_template_info()
+        names, data, _ = self.controller.get_template_info()
         if names:
+            v_aabb, e_aabb, c_aabb = self.get_curve_network_aabb(scale=200.)
+            aabb = ps.register_curve_network("aabb", v_aabb, e_aabb, radius=0.005)
+            aabb.add_color_quantity("color", c_aabb, defined_on='edges', enabled=True)
+            cow = ps.register_point_cloud("center_of_world", np.zeros((1, 3)), radius=0.005, point_render_mode="sphere")
+            cow.add_color_quantity("color", np.array([[0, 0, 0]]), enabled=True)
+            XYZ_head = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallHEM", "head", resource_folder="./resource")
+            avg_head = ps.register_point_cloud("avg_head", XYZ_head, radius=0.0002, point_render_mode="quad")
+            col = np.zeros_like(XYZ_head)
+            col[:, 0] = 1
+            avg_head.add_color_quantity("color", col, enabled=True)
+            XYZ_brain = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallBEM.npy", "brain", resource_folder="./resource")
+            avg_brain = ps.register_point_cloud("avg_brain", XYZ_brain, radius=0.0002, point_render_mode="quad")
+            col = np.zeros_like(XYZ_brain)
+            col[:, 1] = 1
+            avg_brain.add_color_quantity("color", col, enabled=True)
             pc_names = names
-            # data = geometry.to_standard_coordinate_system(names, data)
             pc = ps.register_point_cloud(self.controller.get_template_model_file_name(),
                                          data,
-                                         radius=0.02)
-            colors = np.zeros(len(data))
-            pc.add_scalar_quantity("colors",
+                                         radius=0.005)
+            anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names))
+            colors = np.ones((len(data), 3))
+            colors[anchor_mask] = np.zeros((1, 3))
+            pc.add_color_quantity("colors",
                                    colors,
-                                   enabled=True,
-                                   vminmax=(0., 1.),
-                                   cmap="blues")
+                                   enabled=True)
+            data_norm = geometry.to_standard_coordinate_system(names, data)
+            pc_norm = ps.register_point_cloud(self.controller.get_template_model_file_name()+" (normalized)",
+                                         data_norm,
+                                         radius=0.005,
+                                         enabled=False)
+            colors = np.ones((len(data), 3))
+            colors[anchor_mask] = np.zeros((1, 3))
+            pc_norm.add_color_quantity("colors",
+                                        colors,
+                                        enabled=True)
             # ps.warning("Template model shown in ""standard coordinate system"". See github repository for more details.")
             ps.show()
             pc.remove()
+            pc_norm.remove()
+            avg_head.remove()
+            aabb.remove()
+            cow.remove()
 
+    def get_curve_network_aabb(self, scale=1., centered=True):
+        vertices = np.array([
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 1, 0],
+            [0, 1, 1],
+            [1, 0, 1],
+            [1, 1, 1],
+        ]).astype(np.float32)
+        if centered:
+            vertices -= np.array([0.5, 0.5, 0.5])
+        vertices *= scale
+        edges = np.array([
+            [0, 1],
+            [0, 2],
+            [0, 3],
+            [4, 1],
+            [4, 2],
+            [4, 7],
+            [6, 1],
+            [6, 7],
+            [6, 3],
+            [5, 2],
+            [5, 7],
+            [5, 3],
+
+            ])
+        colors = np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+        ])
+        return vertices, edges, colors
 
     @staticmethod
     def selection_callback():
@@ -1303,13 +1365,13 @@ class ExperimentViewerPage(tk.Frame):
                 prev_selection = cur_selection
                 pc = ps.get_point_cloud(pc_name)
                 if 0 <= v_index <= pc.n_points():
-                    colors = np.zeros(pc.n_points())
-                    colors[v_index] = 1.
-                    pc.add_scalar_quantity("colors",
+                    anchor_mask = np.isin(np.array(pc_names), np.array(config.all_possible_anchor_names))
+                    colors = np.ones((pc.n_points(), 3))
+                    colors[anchor_mask] = np.zeros((1, 3))
+                    colors[v_index] = np.array([0., 0., 1.])
+                    pc.add_color_quantity("colors",
                                            colors,
-                                           enabled=True,
-                                           vminmax=(0., 1.),
-                                           cmap="blues")
+                                           enabled=True)
 
 
 class ProgressBarPage(tk.Frame):

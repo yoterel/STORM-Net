@@ -153,7 +153,7 @@ def do_parameter_grid_search_experiment(opt):
     data = geometry.to_standard_coordinate_system(names, data)
     output_others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
     others_names = output_others_names #+ names[names.index(0):]
-    origin_names = ["leftear", "rightear", "nosebridge", "cz"]
+    origin_names = ["lpa", "rpa", "nz", "cz"]
     full_names = origin_names + others_names
     cached_result_ses1 = "cache/session1_opt_MNI"
     recreate_files = False
@@ -329,7 +329,7 @@ def do_skull_size_experiment(dig_intra, vid_intra, inter, args):
             names = session[0]
             data = session[1][:, 0, :] - session[1][:, 1, :]  # subtract second sensor
             data = geometry.to_standard_coordinate_system(names, data)
-            skull_sizes.append([np.linalg.norm(data[(names.index('leftear'))] - data[(names.index('rightear'))]),
+            skull_sizes.append([np.linalg.norm(data[(names.index('lpa'))] - data[(names.index('rpa'))]),
                                 np.linalg.norm(data[(names.index('fpz'))] - data[(names.index('o1'))])])
         skull_radii.append(np.mean(np.array(skull_sizes), axis=0) / 2)
     skull_radii = np.array(skull_radii)
@@ -365,11 +365,11 @@ def do_shift_experiment(r_matrix, all_digi_sessions, args):
                                         template_names.index('oz'),
                                         template_names.index('f7'),
                                         template_names.index('f8')), :]
-    template_face_data = template_data[(template_names.index('leftear'),
-                                        template_names.index('rightear'),
+    template_face_data = template_data[(template_names.index('lpa'),
+                                        template_names.index('rpa'),
                                         template_names.index('lefteye'),
                                         template_names.index('righteye'),
-                                        template_names.index('nosebridge'),
+                                        template_names.index('nz'),
                                         template_names.index('nosetip')), :]
     for i, session in enumerate(all_digi_sessions):
         for j, subject in enumerate(session):
@@ -385,11 +385,11 @@ def do_shift_experiment(r_matrix, all_digi_sessions, args):
                                        names.index('oz'),
                                        names.index('f7'),
                                        names.index('f8')), :]
-                file_face_data = data[(names.index('leftear'),
-                                       names.index('rightear'),
+                file_face_data = data[(names.index('lpa'),
+                                       names.index('rpa'),
                                        names.index('lefteye'),
                                        names.index('righteye'),
-                                       names.index('nosebridge'),
+                                       names.index('nz'),
                                        names.index('nosetip')), :]
                 # align faces as intermediate step
                 ret_R, ret_t = geometry.rigid_transform_3d_nparray(template_face_data, file_face_data)
@@ -461,7 +461,7 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
     experiment_file_list = []
     sessions = [[], [], []]
 
-    origin_names = ["leftear", "rightear", "nosebridge", "cz", "lefteye", "righteye", "nosetip"]
+    origin_names = ["lpa", "rpa", "nz", "cz", "lefteye", "righteye", "nosetip"]
     others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
     full_names = origin_names + others_names
     if experiment_folder.is_dir():
@@ -569,7 +569,7 @@ def do_vid2vid_project_afterMNI_experiment(template_path, video_names, r_matrice
     data = geometry.to_standard_coordinate_system(names, data)
     output_others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
     others_names = output_others_names + names[names.index(0):]
-    origin_names = ["leftear", "rightear", "nosebridge", "cz"]
+    origin_names = ["lpa", "rpa", "nz", "cz"]
     full_names = origin_names + others_names
     sessions = [[], []]
     rots = [[], []]
@@ -634,7 +634,7 @@ def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, force_projec
     data = geometry.to_standard_coordinate_system(names, data)
     output_others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
     others_names = output_others_names + names[names.index(0):]
-    origin_names = ["leftear", "rightear", "nosebridge", "cz"]
+    origin_names = ["lpa", "rpa", "nz", "cz"]
     full_names = origin_names + others_names
     cached_result_ses1 = "cache/session1_vid_MNI_transb"
     cached_result_ses2 = "cache/session2_vid_MNI_transb"
@@ -790,11 +790,11 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
                                         template_names.index('oz'),
                                         template_names.index('f7'),
                                         template_names.index('f8')), :]
-    template_face_data = template_data[(template_names.index('leftear'),
-                                        template_names.index('rightear'),
+    template_face_data = template_data[(template_names.index('lpa'),
+                                        template_names.index('rpa'),
                                         template_names.index('lefteye'),
                                         template_names.index('righteye'),
-                                        template_names.index('nosebridge'),
+                                        template_names.index('nz'),
                                         template_names.index('nosetip')), :]
     template_spiral_data = template_data[template_names.index(0):, :]  # select spiral
 
@@ -831,28 +831,28 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
                                    names.index('oz'),
                                    names.index('f7'),
                                    names.index('f8')), :]
-            file_face_data = data[(names.index('leftear'),
-                                   names.index('rightear'),
+            file_face_data = data[(names.index('lpa'),
+                                   names.index('rpa'),
                                    names.index('lefteye'),
                                    names.index('righteye'),
-                                   names.index('nosebridge'),
+                                   names.index('nz'),
                                    names.index('nosetip')), :]
             # align faces as intermediate step
             ret_R, ret_t = geometry.rigid_transform_3d_nparray(template_face_data, file_face_data)
             aligned_template_mask = (ret_R @ template_mask_data.T).T + ret_t
 
             if spiral_output_type == "orig":
-                subject_secific_origin = data[(names.index('leftear'),
-                                               names.index('rightear'),
-                                               names.index('nosebridge'),
+                subject_secific_origin = data[(names.index('lpa'),
+                                               names.index('rpa'),
+                                               names.index('nz'),
                                                names.index('cz')), :]
                 subject_secific_spiral = file_mask_data
                 spiral_output.append([subject_secific_origin, subject_secific_spiral])
             elif spiral_output_type == "spiral_transformed":
                 if i == 0:
-                    subject_secific_origin = data[(names.index('leftear'),
-                                                   names.index('rightear'),
-                                                   names.index('nosebridge'),
+                    subject_secific_origin = data[(names.index('lpa'),
+                                                   names.index('rpa'),
+                                                   names.index('nz'),
                                                    names.index('cz')), :]
                     subject_secific_spiral = (ret_R @ template_spiral_data.T).T + ret_t
                     spiral_output.append([subject_secific_origin, subject_secific_spiral])
@@ -874,7 +874,7 @@ def get_digi2digi_results(path_to_template, experiment_folder_path, rot_as_matri
                 rot_estimations.setdefault(exp_file.stem, []).append(ret_R)
             else:
                 rot_estimations.setdefault(exp_file.stem, []).append(gt_rot_e)
-            skull_sizes.append([np.linalg.norm(data[(names.index('leftear'))] - data[(names.index('rightear'))]),
+            skull_sizes.append([np.linalg.norm(data[(names.index('lpa'))] - data[(names.index('rpa'))]),
                                 np.linalg.norm(data[(names.index('fpz'))] - data[(names.index('o1'))])])
         skulls.append(np.mean(np.array(skull_sizes), axis=0) / 2)
 
@@ -910,7 +910,7 @@ def do_MNI_sensitivity_experiment(template_path):
     template_names = template_names[0]
     template_data = template_data[0]
     template_data = geometry.to_standard_coordinate_system(template_names, template_data)
-    origin_names = ["leftear", "rightear", "nosebridge", "cz"]
+    origin_names = ["lpa", "rpa", "nz", "cz"]
     others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
     others_template = template_names[template_names.index(0):]
     combined_others = others_names #+ others_template
@@ -1062,7 +1062,7 @@ def do_old_experiment(r_matrix, s_matrix, video_names, args):
     data_others = [x[1] for x in ss_data]
     data_origin = [x[0] for x in ss_data]
     list_extension = [x for x in range(len(data_others))]
-    digi_names = ["leftear", "rightear", "nosebridge", "cz"] + list_extension
+    digi_names = ["lpa", "rpa", "nz", "cz"] + list_extension
     if not Path("cache/session1_digi_MNI_ss.npy").is_file() or not Path("cache/session2_digi_MNI_ss.npy").is_file():
         # digi2digi session1: calc error using subject-specific MNI anchors
         for i in range(0, len(data_origin), 3):
@@ -1086,8 +1086,8 @@ def do_old_experiment(r_matrix, s_matrix, video_names, args):
         data = data[0]
         data = geometry.to_standard_coordinate_system(names, data)
         if 0 in names:
-            data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-            data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
+            data_origin = data[:names.index(0), :]  # non numbered optodes are not coregistered
+            data_optodes = data[names.index(0):, :]  # selects optodes for applying coregistration
         else:
             data_origin = data
             data_optodes = np.zeros(3)

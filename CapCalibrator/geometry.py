@@ -4,6 +4,7 @@ import math
 from file_io import read_template_file
 import logging
 import MNI
+import config
 
 
 def align_centroids(a, b):
@@ -228,8 +229,8 @@ def fix_yaw(names, data):
     """
     leftEye = names.index('lefteye')
     rightEye = names.index('righteye')
-    leftEar = names.index('leftear')
-    rightEar = names.index('rightear')
+    leftEar = names.index('lpa')
+    rightEar = names.index('rpa')
     right_triangle = names.index('right_triangle')
     left_triangle = names.index('left_triangle')
     yaw_vec_1 = (data[rightEye] - data[leftEye]) * np.array([1, 1, 0])
@@ -279,11 +280,12 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
         data = data[0]
     data = to_standard_coordinate_system(names, data)
     if 0 in names:
-        data_origin = data[:names.index(0), :]  # non numbered optodes are not calibrated
-        data_optodes = data[names.index(0):, :]  # selects optodes for applying calibration
-    else:  # just apply transform to all points...
-        data_origin = np.empty((0, 3))
-        data_optodes = data
+        data_origin = data[:names.index(0), :]  # non numbered optodes are not coregistered
+        data_optodes = data[names.index(0):, :]  # selects optodes for applying coregistration
+    else:  # apply transform to non-anchors using default configuration
+        anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names))
+        data_origin = data[anchor_mask]
+        data_optodes = data[~anchor_mask]
     for rot_mat, scale_mat in zip(r_matrix, s_matrix):
         transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
         data_optodes = transformed_data_sim.T
@@ -310,8 +312,8 @@ def compare_data_from_files(file_path1, file_path2, use_second_sensor):
 def get_x_vector(names, data):
     leftEye = names.index('lefteye')
     rightEye = names.index('righteye')
-    leftEar = names.index('leftear')
-    rightEar = names.index('rightear')
+    leftEar = names.index('lpa')
+    rightEar = names.index('rpa')
     Fp2 = names.index('fp2')
     Fp1 = names.index('fp1')
     yaw_vec_1 = (data[rightEye] - data[leftEye]) * np.array([1, 1, 0])
@@ -326,9 +328,9 @@ def get_x_vector(names, data):
 
 
 def get_y_vector(names, data):
-    nosebridge = names.index('nosebridge')
+    nosebridge = names.index('nz')
     try:
-        inion = names.index('inion')
+        inion = names.index('iz')
         yvec = data[nosebridge] - data[inion]
     except ValueError:
         spiral = data[names.index(0):, :]
@@ -363,7 +365,7 @@ def normalize_coordinates(names, data):
     # zscale = new_data[names.index('cz'), 1] - np.min(data[:, 2])
 
 
-def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, resource_folder="resource"):
+def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, resource_folder="resource", transform_anchors=False):
     """
     project new sensor locations to MNI
     :param list_of_sensor_locations: a list of lists of [names ,data (nx3)] of all sensor locations
@@ -382,22 +384,25 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, 
             others_selector = tuple([names.index(x) for x in names if x not in origin_optodes_names])
             others_xyz = data[others_selector, :]  # will be transformed to MNI
         elif 0 in names:  # fallback if someone didn't pass origin_optodes_names
-            unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not calibrated)
+            unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not coregistered)
             unsorted_origin_names = np.array(names[:names.index(0)])
-            others_xyz = data[names.index(0):, :]  # numbered optodes were calibrated, and they will be transformed to MNI
-        else:  # last fallback, just project everything.
-            unsorted_origin_xyz = data
-            unsorted_origin_names = np.array(names)
-            others_xyz = data
+            others_xyz = data[names.index(0):, :]  # numbered optodes were coregistered, and they will be transformed to MNI
+        else:  # last fallback, project only non-anchors using default configuration.
+            anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names))
+            unsorted_origin_xyz = data[anchor_mask]
+            unsorted_origin_names = np.array(names)[anchor_mask]
+            others_xyz = data[~anchor_mask]
         origin_xyz, selected_indices = sort_anchors(unsorted_origin_names, unsorted_origin_xyz)
-        otherH, otherC, otherHSD, otherCSD = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
+        otherH, otherC, otherHSD, otherCSD, anchors_transformed = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
         # todo: should we report anything but cortex locations to caller?
         if origin_optodes_names:
             sensor_locations[1][others_selector, :] = otherC
         elif 0 in names:
             sensor_locations[1][names.index(0):, :] = otherC
         else:
-            sensor_locations[1][:, :] = otherC
+            sensor_locations[1][~anchor_mask, :] = otherC
+        if transform_anchors:
+            sensor_locations[1][selected_indices, :] = anchors_transformed  # return transformed anchors aswell (but do not project)
     return projected_locations
 
 
@@ -408,8 +413,8 @@ def sort_anchors(unsorted_anchors_names: np.ndarray, unsorted_anchors_xyz: np.nd
     :param unsorted_anchors_xyz: location of anchors
     :return: the new location of anchors and the selected indices from the possible target anchors
     """
-    # these names are written in an order the algorithm expects (and MNI template data was written in)
-    target_origin_names = np.array(["nosebridge", "inion", "rightear", "leftear",
+    # these names are written in an order the projection algorithm expects (and MNI template data was written in)
+    target_origin_names = np.array(["nz", "iz", "rpa", "lpa",
                                     "fp1", "fp2", "fz", "f3",
                                     "f4", "f7", "f8", "cz",
                                     "c3", "c4", "t3", "t4",
