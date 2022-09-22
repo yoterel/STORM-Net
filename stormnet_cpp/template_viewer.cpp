@@ -97,6 +97,7 @@ void TemplateViewer::setup_geometry()
 {
 
     sphere = MeshTools::compile(Primitives::uvSphereSolid(16, 16));
+    grid = MeshTools::compile(Primitives::grid3DWireframe({ 15, 15 }));
 
 
 }
@@ -117,19 +118,24 @@ void TemplateViewer::draw_offscreen(Matrix4& projectionMatrix, Matrix4& viewMatr
             .setLightPositions({ {0.0f, 0.0f, 1.0f, 0.0f} });
 
 
+        
+
         auto& data = tmpl.data;
 
         const Vector3 centerMean(
             tmpl.data_mean[0].index({ 0 }).item<float>(),
             tmpl.data_mean[0].index({ 1 }).item<float>(),
             tmpl.data_mean[0].index({ 2 }).item<float>());
-
+        float minz = 666.0;
         for (int i = 0; i < data[0].sizes()[0]; ++i) {
             const Vector3 sensorCenter(
                 data[0].index({ i,0 }).item<float>(),
                 data[0].index({ i,1 }).item<float>(),
                 data[0].index({ i,2 }).item<float>());
-
+            if (sensorCenter[2] < minz)
+            {
+                minz = sensorCenter[2];
+            }
             const Matrix4 transformation = viewMatrix * Matrix4::rotationY(180.0_degf) * Matrix4::rotationX(-90.0_degf) * Matrix4::translation(sensorCenter - centerMean) * Matrix4::scaling(Vector3(0.5f));
 
 
@@ -149,6 +155,16 @@ void TemplateViewer::draw_offscreen(Matrix4& projectionMatrix, Matrix4& viewMatr
                 .draw(sphere);
 
         }
+        const Vector3 grid_center(
+            centerMean[0],
+            centerMean[1],
+            minz);
+        const Matrix4 grid_transform = viewMatrix * Matrix4::rotationY(180.0_degf) * Matrix4::rotationX(-90.0_degf) * Matrix4::translation(grid_center - centerMean) * Matrix4::scaling(Vector3(10.0f));
+        shader.setDiffuseColor(Color3{ 1.0f, 1.0f, 1.0f })
+            .setTransformationMatrix(grid_transform)
+            .setNormalMatrix(grid_transform.normalMatrix())
+            .setObjectId(data[0].sizes()[0])
+            .draw(grid);
 
     }
 

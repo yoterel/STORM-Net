@@ -11,6 +11,7 @@
 #include <Magnum/Math/Matrix4.h>
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/Primitives/UVSphere.h>
+#include <Magnum/Primitives/Grid.h>
 #include <Magnum/Shaders/PhongGL.h>
 #include <Magnum/Trade/MeshData.h>
 
@@ -37,7 +38,7 @@ private:
 
     Template tmpl;
 
-    GL::Mesh sphere{ NoCreate };
+    GL::Mesh sphere{ NoCreate }, grid{ NoCreate };
 
     Shaders::PhongGL shader{ Shaders::PhongGL::Flag::ObjectId };
 
