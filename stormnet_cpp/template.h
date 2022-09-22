@@ -32,7 +32,6 @@ public:
 
     vector<torch::Tensor> data_mean;
 
-
     Template();
 
     bool isEmpty() const { return empty; }
@@ -45,8 +44,7 @@ public:
 
     Template applyRigidTransform(vector<torch::Tensor>& rs, vector<torch::Tensor>& sc);
 
-
-    static Template read(string filename, string input_file_format = "");
+    static Template read(string filename);
 
 private:
 

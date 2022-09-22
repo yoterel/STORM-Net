@@ -23,7 +23,7 @@ Template::Template()
 {
 }
 
-//    reads a template file in telaviv format ("sensor x y z rx ry rz") or in princeton format ("name x y z")
+//    reads a template file in format ("name x y z")
 //    multiple sessions in same file are assumed to be delimited by a line "*" (and first session starts with it)
 //    note1: assumes certain order of capturing in telaviv format (since no names are given)
 //    note2: in tel-aviv format, two scalars in the beginning of the file are assumed to be skull sizes of subject.
@@ -31,33 +31,17 @@ Template::Template()
 //    :param input_file_format: force reading file using a specific format (if this is None tries to infer format by content)
 //    :return: positions is a list of np array per session, names is a list of lists of names per session.
 //             note: if two sensors exists, they are stacked in a nx2x3 array, else nx3 for positions.
-Template Template::read(string filename, string input_file_format)
+Template Template::read(string filename)
 {
-
-    bool is_princeton;
     vector<string> tokens;
-
-    vector<vector<string>> sessions;
-
-    vector<float> skulls;
-    bool has_skulls = false;
-    regex skull_regex("[-+]?\\d*\\.\\d+|\\d+");
-
-    float skull_mean = 0.f;
     vector<vector<string>> names{ {} };
     string file_format;
-
     Template tmpl;
-
-
-
     fstream in(filename);
     if (!in.is_open()) {
         spdlog::error("Could not load file: \"{}\"", filename);
         return Template();
     }
-
-
     vector<string> lines;
     string line;
     while (getline(in, line)) {
@@ -65,215 +49,49 @@ Template Template::read(string filename, string input_file_format)
             lines.push_back(line);
         }
     }
+    torch::Tensor sensor_data = torch::empty({ (int)lines.size(), 3 });
+    for (int i = 0; i < lines.size(); ++i) {
+        auto& line = lines[i];
 
-
-    vector<int> delimiters;
-    for (int i = 0; i < (int)lines.size(); ++i) {
-        if (lines[i] == "*") {
-            delimiters.push_back(i);
-        }
-    }
-
-
-    if (delimiters.size() == 0) {
-
-        split_words(lines[0], tokens);
-        is_princeton = tokens.size() <= 4;
-        sessions.push_back(lines);
-
-    }
-    else {
-
-        split_words(lines[delimiters[0] + 1], tokens);
-        is_princeton = tokens.size() <= 4;
-
-        vector<string> session1(lines.begin() + delimiters[0] + 1, lines.begin() + delimiters[1]);
-        vector<string> session2(lines.begin() + delimiters[1] + 1, lines.begin() + delimiters[2]);
-        vector<string> session3(lines.begin() + delimiters[2] + 1, lines.end());
-
-        sessions.push_back(session1);
-        sessions.push_back(session2);
-        sessions.push_back(session3);
-
-        for (int i = 0; i < delimiters[0]; ++i) {
-            auto& line = lines[i];
-
-            smatch m;
-            if (regex_search(line, m, skull_regex)) {
-                float skull_value;
-                istringstream iss(m.str());
-                iss >> skull_value;
-
-                skulls.push_back(skull_value);
-            }
+        split_words(line, tokens);
+        if (tokens.size() != 4) {
+            split_words(line, tokens, ',');
         }
 
-        if (skulls.size() > 0) {
-            skull_mean = 0.f;
-            for (float skull : skulls) {
-                skull_mean += skull;
-            }
-            skull_mean /= (float)skulls.size();
-            has_skulls = true;
-        }
-
-        names = vector<vector<string>>{ {}, {}, {} };
-
-    }
-
-    if (input_file_format != "") {
-
-        file_format = input_file_format;
+        sensor_data.index_put_({ i, 0 }, str2float(tokens[1]));
+        sensor_data.index_put_({ i, 1 }, str2float(tokens[2]));
+        sensor_data.index_put_({ i, 2 }, str2float(tokens[3]));
 
 
-        if (file_format == "princeton") {
-            if (file_format.find("***") != string::npos) {
-                lines.pop_back();
-            }
-        }
-
-    }
-    else {
-
-        if (is_princeton) {
-            file_format = "princeton";
+        string name;
+        if (tokens[0].size() > 0 && !isdigit(tokens[0][0])) {
+            name = tolower(tokens[0]);
         }
         else {
-            file_format = "telaviv";
+            name = tokens[0];
         }
-
-
-        if (file_format == "princeton") {
-            if (file_format.find("***") != string::npos) {
-                lines.pop_back();
-            }
-        }
+        names[0].push_back(name);
 
     }
 
-    if (file_format == "telaviv") {
+    auto it0 = std::find(names[0].begin(), names[0].end(), "0");
+    auto it1 = std::find(names[0].begin(), names[0].end(), "1");
 
-        vector<string> labeled_names{
-          "leftear",
-          "nosebridge",
-          "nosetip",
-          "lefteye",
-          "righteye",
-          "rightear",
-          "f8",
-          "fp2",
-          "fpz",
-          "fp1",
-          "f7",
-          "cz",
-          "o1",
-          "oz",
-          "o2"
-        };
+    if (it0 == names[0].end() && it1 != names[0].end()) {
+        int end = str2int(names[0].back());
+        names[0].erase(it1, names[0].end());
 
-        for (int j = 0; j < (int)sessions.size(); ++j) {
-            auto& session = sessions[j];
-
-            int num_session = sessions.size() - 1; // pairwise
-            torch::Tensor sensor1_data = torch::empty({ num_session, 3 });
-            torch::Tensor sensor2_data = torch::empty({ num_session, 3 });
-
-            for (int i = 0; i < (int)session.size() - 1; ++i) {
-                auto& sens1 = session[i];
-                auto& sens2 = session[i + 1];
-
-
-                string name;
-                if (i < labeled_names.size()) {
-                    name = labeled_names[i];
-                }
-                else {
-                    name = to_string(i - labeled_names.size());
-                }
-
-                names[j].push_back(name);
-
-
-                vector<string> data1, data2;
-                split_words(sens1, data1);
-                split_words(sens2, data2);
-
-                if (data1[1] == "?") {
-                    continue;
-                }
-
-
-                torch::Tensor p1 = torch::empty({ 3 });
-                p1.index_put_({ 0 }, str2float(data1[1]));
-                p1.index_put_({ 1 }, str2float(data1[2]));
-                p1.index_put_({ 2 }, str2float(data1[3]));
-
-
-                torch::Tensor p2 = torch::empty({ 3 });
-                p2.index_put_({ 0 }, str2float(data2[1]));
-                p2.index_put_({ 1 }, str2float(data2[2]));
-                p2.index_put_({ 2 }, str2float(data2[3]));
-
-
-
-                sensor1_data.index_put_({ i }, p1);
-                sensor2_data.index_put_({ i }, p2);
-
-            }
-
-            tmpl.data.push_back(torch::concat({ sensor1_data, sensor2_data }, 1));
-
+        for (int i = 0; i < end; ++i) {
+            names[0].push_back(to_string(i));
         }
-
     }
-    else {
-
-        torch::Tensor sensor_data = torch::empty({ (int)lines.size(), 3 });
-        for (int i = 0; i < lines.size(); ++i) {
-            auto& line = lines[i];
-
-            split_words(line, tokens);
-            if (tokens.size() != 4) {
-                split_words(line, tokens, ',');
-            }
-
-            sensor_data.index_put_({ i, 0 }, str2float(tokens[1]));
-            sensor_data.index_put_({ i, 1 }, str2float(tokens[2]));
-            sensor_data.index_put_({ i, 2 }, str2float(tokens[3]));
 
 
-            string name;
-            if (tokens[0].size() > 0 && !isdigit(tokens[0][0])) {
-                name = tolower(tokens[0]);
-            }
-            else {
-                name = tokens[0];
-            }
-            names[0].push_back(name);
-
-        }
-
-        auto it0 = std::find(names[0].begin(), names[0].end(), "0");
-        auto it1 = std::find(names[0].begin(), names[0].end(), "1");
-
-        if (it0 == names[0].end() && it1 != names[0].end()) {
-            int end = str2int(names[0].back());
-            names[0].erase(it1, names[0].end());
-
-            for (int i = 0; i < end; ++i) {
-                names[0].push_back(to_string(i));
-            }
-        }
+    torch::Tensor mean = torch::mean(sensor_data, 0);
+    tmpl.data_mean.push_back(mean);
 
 
-        torch::Tensor mean = torch::mean(sensor_data, 0);
-        tmpl.data_mean.push_back(mean);
-
-
-        tmpl.data.push_back(sensor_data);
-
-
-    }
+    tmpl.data.push_back(sensor_data);
 
 
     tmpl.names = move(names);
