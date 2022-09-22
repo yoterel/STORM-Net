@@ -33,248 +33,254 @@ Template::Template()
 //             note: if two sensors exists, they are stacked in a nx2x3 array, else nx3 for positions.
 Template Template::read(string filename, string input_file_format)
 {
-  
-  bool is_princeton;
-  vector<string> tokens;
 
-  vector<vector<string>> sessions;
+    bool is_princeton;
+    vector<string> tokens;
 
-  vector<float> skulls;
-  bool has_skulls = false;
-  regex skull_regex("[-+]?\\d*\\.\\d+|\\d+");
+    vector<vector<string>> sessions;
 
-  float skull_mean = 0.f;
-  vector<vector<string>> names { {} };
-  string file_format;
+    vector<float> skulls;
+    bool has_skulls = false;
+    regex skull_regex("[-+]?\\d*\\.\\d+|\\d+");
 
-  Template tmpl;
+    float skull_mean = 0.f;
+    vector<vector<string>> names{ {} };
+    string file_format;
 
-
-  
-  fstream in(filename);
-  if(!in.is_open()) {
-    spdlog::error("Could not load file: \"{}\"", filename);
-    return Template();
-  }
-
-  
-  vector<string> lines;
-  string line;
-  while(getline(in, line)) {
-    if(line.size() > 0) {
-      lines.push_back(line);
-    }
-  }
-
-  
-  vector<int> delimiters;
-  for(int i=0; i<(int)lines.size(); ++i) {
-    if(lines[i] == "*") {
-      delimiters.push_back(i);
-    }
-  }
+    Template tmpl;
 
 
-  if(delimiters.size() == 0) {
-    
-    split_words(lines[0], tokens);
-    is_princeton = tokens.size() <= 4;
-    sessions.push_back(lines);
 
-  } else {
-    
-    split_words(lines[delimiters[0]+1], tokens);
-    is_princeton = tokens.size() <= 4;
-
-    vector<string> session1(lines.begin() + delimiters[0] + 1, lines.begin() + delimiters[1]);
-    vector<string> session2(lines.begin() + delimiters[1] + 1, lines.begin() + delimiters[2]);
-    vector<string> session3(lines.begin() + delimiters[2] + 1, lines.end());
-
-    sessions.push_back(session1);
-    sessions.push_back(session2);
-    sessions.push_back(session3);
-
-    for(int i=0; i<delimiters[0]; ++i) {
-      auto& line = lines[i];
-
-      smatch m;
-      if(regex_search(line, m, skull_regex)) {
-        float skull_value;
-        istringstream iss(m.str());
-        iss >> skull_value;
-
-        skulls.push_back(skull_value);
-      }
+    fstream in(filename);
+    if (!in.is_open()) {
+        spdlog::error("Could not load file: \"{}\"", filename);
+        return Template();
     }
 
-    if(skulls.size() > 0) {
-      skull_mean = 0.f;
-      for(float skull : skulls) { 
-        skull_mean += skull;
-      }
-      skull_mean /= (float)skulls.size();
-      has_skulls = true;
+
+    vector<string> lines;
+    string line;
+    while (getline(in, line)) {
+        if (line.size() > 0) {
+            lines.push_back(line);
+        }
     }
 
-    names = vector<vector<string>>{ {}, {}, {} };
 
-  }
-
-  if(input_file_format != "") {
-    
-    file_format = input_file_format;
-
-    
-    if(file_format == "princeton") {
-      if(file_format.find("***") != string::npos) {
-        lines.pop_back();
-      }
+    vector<int> delimiters;
+    for (int i = 0; i < (int)lines.size(); ++i) {
+        if (lines[i] == "*") {
+            delimiters.push_back(i);
+        }
     }
 
-  } else {
-    
-    if(is_princeton) {
-      file_format = "princeton";
-    } else {
-      file_format = "telaviv";
+
+    if (delimiters.size() == 0) {
+
+        split_words(lines[0], tokens);
+        is_princeton = tokens.size() <= 4;
+        sessions.push_back(lines);
+
     }
+    else {
 
-    
-    if(file_format == "princeton") {
-      if(file_format.find("***") != string::npos) {
-        lines.pop_back();
-      }
-    }
+        split_words(lines[delimiters[0] + 1], tokens);
+        is_princeton = tokens.size() <= 4;
 
-  }
+        vector<string> session1(lines.begin() + delimiters[0] + 1, lines.begin() + delimiters[1]);
+        vector<string> session2(lines.begin() + delimiters[1] + 1, lines.begin() + delimiters[2]);
+        vector<string> session3(lines.begin() + delimiters[2] + 1, lines.end());
 
-  if(file_format == "telaviv") {
-    
-    vector<string> labeled_names {
-      "leftear", 
-      "nosebridge", 
-      "nosetip", 
-      "lefteye", 
-      "righteye", 
-      "rightear",
-      "f8", 
-      "fp2", 
-      "fpz", 
-      "fp1", 
-      "f7", 
-      "cz", 
-      "o1", 
-      "oz", 
-      "o2"
-    };
+        sessions.push_back(session1);
+        sessions.push_back(session2);
+        sessions.push_back(session3);
 
-    for(int j=0; j<(int)sessions.size(); ++j) {
-      auto& session = sessions[j];
+        for (int i = 0; i < delimiters[0]; ++i) {
+            auto& line = lines[i];
 
-      int num_session = sessions.size() - 1; // pairwise
-      torch::Tensor sensor1_data = torch::empty({num_session, 3});
-      torch::Tensor sensor2_data = torch::empty({num_session, 3});
+            smatch m;
+            if (regex_search(line, m, skull_regex)) {
+                float skull_value;
+                istringstream iss(m.str());
+                iss >> skull_value;
 
-      for(int i=0; i<(int)session.size()-1; ++i) {
-        auto& sens1 = session[i];
-        auto& sens2 = session[i+1];
-
-        
-        string name;
-        if(i < labeled_names.size()) {
-          name = labeled_names[i];
-        } else {
-          name = to_string(i - labeled_names.size());
+                skulls.push_back(skull_value);
+            }
         }
 
-        names[j].push_back(name);
-
-
-        vector<string> data1, data2;
-        split_words(sens1, data1);
-        split_words(sens2, data2);
-
-        if(data1[1] == "?") {
-          continue;
+        if (skulls.size() > 0) {
+            skull_mean = 0.f;
+            for (float skull : skulls) {
+                skull_mean += skull;
+            }
+            skull_mean /= (float)skulls.size();
+            has_skulls = true;
         }
 
-        
-        torch::Tensor p1 = torch::empty({3});
-        p1.index_put_({0}, str2float(data1[1]));
-        p1.index_put_({1}, str2float(data1[2]));
-        p1.index_put_({2}, str2float(data1[3]));
-
-        
-        torch::Tensor p2 = torch::empty({3});
-        p2.index_put_({0}, str2float(data2[1]));
-        p2.index_put_({1}, str2float(data2[2]));
-        p2.index_put_({2}, str2float(data2[3]));
-
-
-        
-        sensor1_data.index_put_({i}, p1);
-        sensor2_data.index_put_({i}, p2);
-
-      }
-      
-      tmpl.data.push_back(torch::concat({sensor1_data, sensor2_data}, 1));
+        names = vector<vector<string>>{ {}, {}, {} };
 
     }
 
-  } else {
-    
-    torch::Tensor sensor_data = torch::empty({(int)lines.size(), 3});
-    for(int i=0; i<lines.size(); ++i) {
-      auto& line = lines[i];
-      
-      split_words(line, tokens);
-      if(tokens.size() != 4) {
-        split_words(line, tokens, ',');
-      }
+    if (input_file_format != "") {
 
-      sensor_data.index_put_({i, 0}, str2float(tokens[1]));
-      sensor_data.index_put_({i, 1}, str2float(tokens[2]));
-      sensor_data.index_put_({i, 2}, str2float(tokens[3]));
+        file_format = input_file_format;
 
-      
-      string name;
-      if(tokens[0].size() > 0 && !isdigit(tokens[0][0])) {
-        name = tolower(tokens[0]);
-      } else {
-        name = tokens[0];
-      }
-      names[0].push_back(name);
+
+        if (file_format == "princeton") {
+            if (file_format.find("***") != string::npos) {
+                lines.pop_back();
+            }
+        }
 
     }
-    
-    auto it0 = std::find(names[0].begin(), names[0].end(), "0");
-    auto it1 = std::find(names[0].begin(), names[0].end(), "1");
+    else {
 
-    if(it0 == names[0].end() && it1 != names[0].end()) {
-      int end = str2int(names[0].back());
-      names[0].erase(it1, names[0].end());
+        if (is_princeton) {
+            file_format = "princeton";
+        }
+        else {
+            file_format = "telaviv";
+        }
 
-      for(int i=0; i<end; ++i) {
-        names[0].push_back(to_string(i));
-      }
+
+        if (file_format == "princeton") {
+            if (file_format.find("***") != string::npos) {
+                lines.pop_back();
+            }
+        }
+
     }
 
-    
-    torch::Tensor mean = torch::mean(sensor_data, 0);
-    tmpl.data_mean.push_back(mean);
+    if (file_format == "telaviv") {
 
-    
-    tmpl.data.push_back(sensor_data);
+        vector<string> labeled_names{
+          "leftear",
+          "nosebridge",
+          "nosetip",
+          "lefteye",
+          "righteye",
+          "rightear",
+          "f8",
+          "fp2",
+          "fpz",
+          "fp1",
+          "f7",
+          "cz",
+          "o1",
+          "oz",
+          "o2"
+        };
+
+        for (int j = 0; j < (int)sessions.size(); ++j) {
+            auto& session = sessions[j];
+
+            int num_session = sessions.size() - 1; // pairwise
+            torch::Tensor sensor1_data = torch::empty({ num_session, 3 });
+            torch::Tensor sensor2_data = torch::empty({ num_session, 3 });
+
+            for (int i = 0; i < (int)session.size() - 1; ++i) {
+                auto& sens1 = session[i];
+                auto& sens2 = session[i + 1];
 
 
-  }
+                string name;
+                if (i < labeled_names.size()) {
+                    name = labeled_names[i];
+                }
+                else {
+                    name = to_string(i - labeled_names.size());
+                }
 
-  
-  tmpl.names = move(names);
+                names[j].push_back(name);
 
-  tmpl.empty = false;
 
-  return tmpl;
+                vector<string> data1, data2;
+                split_words(sens1, data1);
+                split_words(sens2, data2);
+
+                if (data1[1] == "?") {
+                    continue;
+                }
+
+
+                torch::Tensor p1 = torch::empty({ 3 });
+                p1.index_put_({ 0 }, str2float(data1[1]));
+                p1.index_put_({ 1 }, str2float(data1[2]));
+                p1.index_put_({ 2 }, str2float(data1[3]));
+
+
+                torch::Tensor p2 = torch::empty({ 3 });
+                p2.index_put_({ 0 }, str2float(data2[1]));
+                p2.index_put_({ 1 }, str2float(data2[2]));
+                p2.index_put_({ 2 }, str2float(data2[3]));
+
+
+
+                sensor1_data.index_put_({ i }, p1);
+                sensor2_data.index_put_({ i }, p2);
+
+            }
+
+            tmpl.data.push_back(torch::concat({ sensor1_data, sensor2_data }, 1));
+
+        }
+
+    }
+    else {
+
+        torch::Tensor sensor_data = torch::empty({ (int)lines.size(), 3 });
+        for (int i = 0; i < lines.size(); ++i) {
+            auto& line = lines[i];
+
+            split_words(line, tokens);
+            if (tokens.size() != 4) {
+                split_words(line, tokens, ',');
+            }
+
+            sensor_data.index_put_({ i, 0 }, str2float(tokens[1]));
+            sensor_data.index_put_({ i, 1 }, str2float(tokens[2]));
+            sensor_data.index_put_({ i, 2 }, str2float(tokens[3]));
+
+
+            string name;
+            if (tokens[0].size() > 0 && !isdigit(tokens[0][0])) {
+                name = tolower(tokens[0]);
+            }
+            else {
+                name = tokens[0];
+            }
+            names[0].push_back(name);
+
+        }
+
+        auto it0 = std::find(names[0].begin(), names[0].end(), "0");
+        auto it1 = std::find(names[0].begin(), names[0].end(), "1");
+
+        if (it0 == names[0].end() && it1 != names[0].end()) {
+            int end = str2int(names[0].back());
+            names[0].erase(it1, names[0].end());
+
+            for (int i = 0; i < end; ++i) {
+                names[0].push_back(to_string(i));
+            }
+        }
+
+
+        torch::Tensor mean = torch::mean(sensor_data, 0);
+        tmpl.data_mean.push_back(mean);
+
+
+        tmpl.data.push_back(sensor_data);
+
+
+    }
+
+
+    tmpl.names = move(names);
+
+    tmpl.empty = false;
+
+    return tmpl;
 }
 
 // given certain sticker names, converts the nx3 data to the standard coordinate system where:
@@ -289,69 +295,69 @@ Template Template::read(string filename, string input_file_format)
 // :return: returns the data in the standard coordinate system
 Template Template::toStandardCoordinateSystem()
 {
-  Template new_template(*this);
+    Template new_template(*this);
 
-  auto& template_names = new_template.names[0];
-  auto& d0 = new_template.data[0];
+    auto& template_names = new_template.names[0];
+    auto& d0 = new_template.data[0];
 
-  int left_eye = getIndex(template_names, "lefteye");
-  int right_eye = getIndex(template_names, "righteye");
+    int left_eye = getIndex(template_names, "lefteye");
+    int right_eye = getIndex(template_names, "righteye");
 
-  int cz = getIndex(template_names, "cz");
+    int cz = getIndex(template_names, "cz");
 
-  int left_triangle, right_triangle;
-  left_triangle = getIndex(template_names, "left_triangle");
-  right_triangle = getIndex(template_names, "right_triangle");
+    int left_triangle, right_triangle;
+    left_triangle = getIndex(template_names, "left_triangle");
+    right_triangle = getIndex(template_names, "right_triangle");
 
-  if(left_triangle == -1 && right_triangle == -1) {
-    left_triangle = getIndex(template_names, "fp1");
-    right_triangle = getIndex(template_names, "fp2");
-  }
+    if (left_triangle == -1 && right_triangle == -1) {
+        left_triangle = getIndex(template_names, "fp1");
+        right_triangle = getIndex(template_names, "fp2");
+    }
 
-  // swap x axis with best candidate
-  int x_axis = torch::argmax(
-      torch::abs(d0.index({right_eye}) - 
-        d0.index({left_eye}))).item<int>();
+    // swap x axis with best candidate
+    int x_axis = torch::argmax(
+        torch::abs(d0.index({ right_eye }) -
+            d0.index({ left_eye }))).item<int>();
 
-  // data[:, [0, x_axis]] = data[:, [x_axis, 0]]
-  d0.index_put_({Slice(), torch::tensor({0,x_axis})}, d0.index({Slice(), torch::tensor({x_axis, 0})}));
+    // data[:, [0, x_axis]] = data[:, [x_axis, 0]]
+    d0.index_put_({ Slice(), torch::tensor({0,x_axis}) }, d0.index({ Slice(), torch::tensor({x_axis, 0}) }));
 
-  auto eyes_midpoint = (d0.index({left_eye}) + d0.index({right_eye})) / 2;
+    auto eyes_midpoint = (d0.index({ left_eye }) + d0.index({ right_eye })) / 2;
 
-  auto fp1fp2_midpoint = (d0.index({left_triangle}) + d0.index({right_triangle})) / 2;
+    auto fp1fp2_midpoint = (d0.index({ left_triangle }) + d0.index({ right_triangle })) / 2;
 
-  int z_axis = torch::argmax(
-      torch::abs(eyes_midpoint - 
-        fp1fp2_midpoint)).item<int>();
+    int z_axis = torch::argmax(
+        torch::abs(eyes_midpoint -
+            fp1fp2_midpoint)).item<int>();
 
-  if(z_axis != 0) {
-    // data[:, [2, z_axis]] = data[:, [z_axis, 2]]
-    d0.index_put_({Slice(), torch::tensor({2,z_axis})}, d0.index({Slice(), torch::tensor({z_axis, 2})}));
-  }
+    if (z_axis != 0) {
+        // data[:, [2, z_axis]] = data[:, [z_axis, 2]]
+        d0.index_put_({ Slice(), torch::tensor({2,z_axis}) }, d0.index({ Slice(), torch::tensor({z_axis, 2}) }));
+    }
 
-  // find reflections
-  float xdir = (d0.index({right_eye, 0}) - d0.index({left_eye, 0})).item<float>();
-  float ydir = (d0.index({left_eye, 1}) - d0.index({cz, 1})).item<float>();
-  float zdir = (d0.index({cz, 2}) - d0.index({left_eye, 2})).item<float>();
+    // find reflections
+    float xdir = (d0.index({ right_eye, 0 }) - d0.index({ left_eye, 0 })).item<float>();
+    float ydir = (d0.index({ left_eye, 1 }) - d0.index({ cz, 1 })).item<float>();
+    float zdir = (d0.index({ cz, 2 }) - d0.index({ left_eye, 2 })).item<float>();
 
-  float i = (xdir > 0)*2-1;
-  float j = (ydir > 0)*2-1;
-  float k = (zdir > 0)*2-1;
+    float i = (xdir > 0) * 2 - 1;
+    float j = (ydir > 0) * 2 - 1;
+    float k = (zdir > 0) * 2 - 1;
 
-  d0.index_put_({Slice(), 0}, d0.index({Slice(), 0})*i);
-  d0.index_put_({Slice(), 1}, d0.index({Slice(), 1})*j);
-  d0.index_put_({Slice(), 2}, d0.index({Slice(), 2})*k);
+    d0.index_put_({ Slice(), 0 }, d0.index({ Slice(), 0 }) * i);
+    d0.index_put_({ Slice(), 1 }, d0.index({ Slice(), 1 }) * j);
+    d0.index_put_({ Slice(), 2 }, d0.index({ Slice(), 2 }) * k);
 
-  eyes_midpoint = (d0.index({left_eye}) + d0.index({right_eye})) / 2;
-  auto origin = torch::tensor({eyes_midpoint[0].item<float>(), d0.index({cz, 1}).item<float>(), eyes_midpoint[2].item<float>()});
+    eyes_midpoint = (d0.index({ left_eye }) + d0.index({ right_eye })) / 2;
+    auto origin = torch::tensor({ eyes_midpoint[0].item<float>(), d0.index({cz, 1}).item<float>(), eyes_midpoint[2].item<float>() });
 
-  d0 = d0 - origin;
+    d0 = d0 - origin;
 
-  if(d0.index({cz, 2}).item<float>() < 7) {
-    d0 *= 2.54f;
-  }
+    if (d0.index({ cz, 2 }).item<float>() < 7) {
+        d0 *= 2.54f;
+    }
 
-  return new_template;
+    return new_template;
 }
 
 // given sticker names and data (nx3),
@@ -362,92 +368,93 @@ Template Template::toStandardCoordinateSystem()
 // :return:
 Template Template::fixYaw()
 {
-  Template new_template(*this);
+    Template new_template(*this);
 
-  auto& template_names = new_template.names[0];
-  auto& d0 = new_template.data[0];
+    auto& template_names = new_template.names[0];
+    auto& d0 = new_template.data[0];
 
-  int left_eye = getIndex(template_names, "lefteye");
-  int right_eye = getIndex(template_names, "righteye");
-  int left_ear = getIndex(template_names, "leftear");
-  int right_ear = getIndex(template_names, "rightear");
-  int right_triangle = getIndex(template_names, "right_triangle");
-  int left_triangle = getIndex(template_names, "left_triangle");
+    int left_eye = getIndex(template_names, "lefteye");
+    int right_eye = getIndex(template_names, "righteye");
+    int left_ear = getIndex(template_names, "leftear");
+    int right_ear = getIndex(template_names, "rightear");
+    int right_triangle = getIndex(template_names, "right_triangle");
+    int left_triangle = getIndex(template_names, "left_triangle");
 
-  auto yaw_vec_1 = (d0.index({right_eye}) - d0.index({left_eye})) * torch::tensor({1, 1, 0});
-  auto yaw_vec_2 = (d0.index({right_ear}) - d0.index({left_ear})) * torch::tensor({1, 1, 0});
-  auto yaw_vec_3 = (d0.index({right_triangle}) - d0.index({left_triangle})) * torch::tensor({1, 1, 0});
+    auto yaw_vec_1 = (d0.index({ right_eye }) - d0.index({ left_eye })) * torch::tensor({ 1, 1, 0 });
+    auto yaw_vec_2 = (d0.index({ right_ear }) - d0.index({ left_ear })) * torch::tensor({ 1, 1, 0 });
+    auto yaw_vec_3 = (d0.index({ right_triangle }) - d0.index({ left_triangle })) * torch::tensor({ 1, 1, 0 });
 
-  yaw_vec_1 /= torch::linalg_norm(yaw_vec_1);
-  yaw_vec_2 /= torch::linalg_norm(yaw_vec_2);
-  yaw_vec_3 /= torch::linalg_norm(yaw_vec_3);
+    yaw_vec_1 /= torch::linalg_norm(yaw_vec_1);
+    yaw_vec_2 /= torch::linalg_norm(yaw_vec_2);
+    yaw_vec_3 /= torch::linalg_norm(yaw_vec_3);
 
-  auto avg = torch::mean(torch::vstack({yaw_vec_1, yaw_vec_2, yaw_vec_3}), 0);
+    auto avg = torch::mean(torch::vstack({ yaw_vec_1, yaw_vec_2, yaw_vec_3 }), 0);
 
-  avg /= torch::linalg_norm(avg);
-  auto u = avg;
-  auto v = torch::tensor({0.f, 0.f, 1.f});
-  auto w = torch::cross(v, u);
+    avg /= torch::linalg_norm(avg);
+    auto u = avg;
+    auto v = torch::tensor({ 0.f, 0.f, 1.f });
+    auto w = torch::cross(v, u);
 
-  auto transform = torch::vstack({u, w, v});
+    auto transform = torch::vstack({ u, w, v });
 
-  // torch.dot does not behave like np.dot
-  // instead torch.mm has to be used for matrix multiplication
-  auto new_data = torch::mm(transform, torch::transpose(d0, 0, 1));
-  d0 = new_data.transpose(0, 1);
+    // torch.dot does not behave like np.dot
+    // instead torch.mm has to be used for matrix multiplication
+    auto new_data = torch::mm(transform, torch::transpose(d0, 0, 1));
+    d0 = new_data.transpose(0, 1);
 
-  return new_template;
+    return new_template;
 }
 
 void Template::writeTemporaryFile(std::string file_path)
 {
-  std::ofstream out(file_path);
+    std::ofstream out(file_path);
 
-  auto& template_names = names[0];
-  auto& d0 = data[0];
+    auto& template_names = names[0];
+    auto& d0 = data[0];
 
-  for(int i=0; i<(int)template_names.size(); ++i) {
-    out << template_names[i] << " " 
-      << d0.index({i, 0}).item<float>()
-      << d0.index({i, 1}).item<float>()
-      << d0.index({i, 2}).item<float>() << std::endl;
-  }
+    for (int i = 0; i < (int)template_names.size(); ++i) {
+        out << template_names[i] << " "
+            << d0.index({ i, 0 }).item<float>()
+            << d0.index({ i, 1 }).item<float>()
+            << d0.index({ i, 2 }).item<float>() << std::endl;
+    }
 }
 
 Template Template::applyRigidTransform(vector<torch::Tensor>& rs, vector<torch::Tensor>& sc)
 {
-  auto& template_names = names[0];
-  auto& d0 = data[0];
+    auto& template_names = names[0];
+    auto& d0 = data[0];
 
-  auto it = std::find(template_names.begin(), template_names.end(), "0");
+    auto it = std::find(template_names.begin(), template_names.end(), "0");
 
-  torch::Tensor data_origin, data_optodes;
-  if(it != template_names.end()) {
-    int start = std::distance(template_names.begin(), it);
-    data_origin = d0.index({Slice(None, start)});
-    data_optodes = d0.index({Slice(start,None)});
-  } else {
-    data_origin = torch::empty({0, 3});
-    data_optodes = d0;
-  }
+    torch::Tensor data_origin, data_optodes;
+    if (it != template_names.end()) {
+        int start = std::distance(template_names.begin(), it);
+        data_origin = d0.index({ Slice(None, start) });
+        data_optodes = d0.index({ Slice(start,None) });
+    }
+    else {
+        data_origin = torch::empty({ 0, 3 });
+        data_optodes = d0;
+    }
 
-  // Using a template because it has the same structure,
-  // that may not be semantically correct
-  Template vid_est;
+    // Using a template because it has the same structure,
+    // that may not be semantically correct
+    Template vid_est;
 
-  if(rs.size() != 1) {
-    spdlog::error("rs.size() = {} in applyRigidTransform (should be 1)", rs.size());
+    if (rs.size() != 1) {
+        spdlog::error("rs.size() = {} in applyRigidTransform (should be 1)", rs.size());
+        return vid_est;
+    }
+
+    auto& rot_mat = rs[0];
+    auto& scale_mat = sc[0];
+
+    auto transformed_data_sim = rot_mat.mm(scale_mat.mm(torch::transpose(data_optodes, 0, 1)));
+    data_optodes = torch::transpose(transformed_data_sim, 0, 1);
+
+    vid_est.names.push_back(template_names);
+    vid_est.data.push_back(torch::vstack({ data_origin, data_optodes }));
     return vid_est;
-  }
-
-  auto& rot_mat = rs[0];
-  auto& scale_mat = sc[0];
-
-  auto transformed_data_sim = rot_mat.mm(scale_mat.mm(torch::transpose(data_optodes, 0, 1)));
-  data_optodes = torch::transpose(transformed_data_sim, 0, 1);
-
-  vid_est.names.push_back(template_names);
-  vid_est.data.push_back(torch::vstack({data_origin, data_optodes}));
-  return vid_est;
 }
 

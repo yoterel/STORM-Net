@@ -10,7 +10,7 @@ using namespace std;
 
 
 
-void split_words(const string& str, vector<string>& words, char sep=' ');
+void split_words(const string& str, vector<string>& words, char sep = ' ');
 
 float str2float(const string& str);
 

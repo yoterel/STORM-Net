@@ -70,91 +70,91 @@ using namespace torch::indexing;
 class VideoAnnotator
 {
 private:
-  
-  thread fetch_frames;
-  bool update_video = false;
-  bool is_fetching_frames = false;
 
-  string video_path;
+    thread fetch_frames;
+    bool update_video = false;
+    bool is_fetching_frames = false;
 
-  GL::Texture2D frameView;
-  bool hasFrameView = false;
+    string video_path;
 
-  Mat frame;
-  Mat annotated;
+    GL::Texture2D frameView;
+    bool hasFrameView = false;
 
-  bool frameViewCreated = false;
+    Mat frame;
+    Mat annotated;
 
-  int video_width, video_height;
+    bool frameViewCreated = false;
 
-  int marker_id=0; 
-  vector<array<Vector2, 7>> markers;
-  array<string, 7> marker_names;
+    int video_width, video_height;
 
-  bool has_manually_annotated = false;
-  int frame_idx = 0;
+    int marker_id = 0;
+    vector<array<Vector2, 7>> markers;
+    array<string, 7> marker_names;
 
-  dlib::frontal_face_detector detector;
-  dlib::shape_predictor sp;
-  bool dlib_loaded = false;
-  std::thread dlib_load_thread;
+    bool has_manually_annotated = false;
+    int frame_idx = 0;
 
-  int face_detector_method = 0;
+    dlib::frontal_face_detector detector;
+    dlib::shape_predictor sp;
+    bool dlib_loaded = false;
+    std::thread dlib_load_thread;
 
-  CascadeClassifier face_cascade;
-  thread haarcascade_load_thread;
-  bool haarcascade_loaded = false;
+    int face_detector_method = 0;
 
-  bool do_autoannotate = false;
+    CascadeClassifier face_cascade;
+    thread haarcascade_load_thread;
+    bool haarcascade_loaded = false;
 
-  thread autoannotate;
-  bool is_autoannotating = false;
-  int autoannotating_progress = 0;
+    bool do_autoannotate = false;
 
-  vector<Mat> frames;
+    thread autoannotate;
+    bool is_autoannotating = false;
+    int autoannotating_progress = 0;
 
-  string template_name;
-  string template_path;
+    vector<Mat> frames;
 
-  string stormnet_model;
-  string stormnet_model_path;
+    string template_name;
+    string template_path;
 
-  Template online_template;
-  
-  Settings& settings;
+    string stormnet_model;
+    string stormnet_model_path;
 
-  torch::Tensor marker_to_tensor(int frame_idx);
+    Template online_template;
+
+    Settings& settings;
+
+    torch::Tensor marker_to_tensor(int frame_idx);
 
 public:
-  
-  VideoAnnotator(Settings& settings);
 
-  ~VideoAnnotator();
+    VideoAnnotator(Settings& settings);
 
-  void draw_gui(bool* show_online_step);
+    ~VideoAnnotator();
 
-  void update();
+    void draw_gui(bool* show_online_step);
 
-  void join_threads();
+    void update();
 
-  void updateVideoTexture();
+    void join_threads();
 
-  void updateAnnotations();
+    void updateVideoTexture();
 
-  void clearMarkers();
+    void updateAnnotations();
 
-  void setup_dlib();
+    void clearMarkers();
 
-  bool is_dlib_loaded();
+    void setup_dlib();
 
-  void load_classifier();
+    bool is_dlib_loaded();
 
-  bool is_haarcascade_loaded();
+    void load_classifier();
 
-  vector<array<Vector2, 7>>& getMarkers();
+    bool is_haarcascade_loaded();
+
+    vector<array<Vector2, 7>>& getMarkers();
 
 
-  bool fetchFrames(const char* filename, vector<int> frame_indices = {});
+    bool fetchFrames(const char* filename, vector<int> frame_indices = {});
 
 };
 

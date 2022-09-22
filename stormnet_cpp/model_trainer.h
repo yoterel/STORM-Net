@@ -65,31 +65,31 @@ using json = nlohmann::json;
 class ModelTrainer
 {
 private:
-  
-  Settings& settings;
 
-  string train_synth_output;
-  string train_synth_output_short;
+    Settings& settings;
 
-  string train_log_file;
-  string train_log_file_short;
+    string train_synth_output;
+    string train_synth_output_short;
 
-  atomic_bool stop_stormnet_training = true;
-  thread train_stormnet;
+    string train_log_file;
+    string train_log_file_short;
 
-  vector<string> train_lines;
+    atomic_bool stop_stormnet_training = true;
+    thread train_stormnet;
 
-  mutex train_log_mutex;
+    vector<string> train_lines;
+
+    mutex train_log_mutex;
 
 public:
-  
-  ModelTrainer(Settings& settings);
 
-  ~ModelTrainer();
+    ModelTrainer(Settings& settings);
 
-  void draw_gui();
+    ~ModelTrainer();
 
-  void join_threads();
+    void draw_gui();
+
+    void join_threads();
 
 };
 

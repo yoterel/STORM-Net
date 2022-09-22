@@ -34,40 +34,40 @@ using namespace Math::Literals;
 class TemplateViewer
 {
 private:
-  
-  Template tmpl;
 
-  GL::Mesh sphere{NoCreate};
+    Template tmpl;
 
-  Shaders::PhongGL shader{Shaders::PhongGL::Flag::ObjectId};
+    GL::Mesh sphere{ NoCreate };
 
-  GL::Framebuffer framebuffer;
-  GL::Renderbuffer color, objectId, depth;
+    Shaders::PhongGL shader{ Shaders::PhongGL::Flag::ObjectId };
 
-  int selected = -1;
+    GL::Framebuffer framebuffer;
+    GL::Renderbuffer color, objectId, depth;
+
+    int selected = -1;
 
 
 public:
-  
-  TemplateViewer(Range2Di& viewport);
 
-  ~TemplateViewer();
+    TemplateViewer(Range2Di& viewport);
 
-  void draw_gui(bool* show_template_viewer);
+    ~TemplateViewer();
 
-  void setup_geometry();
+    void draw_gui(bool* show_template_viewer);
 
-  void draw_offscreen(Matrix4& projectionMatrix, Matrix4& viewMatrix);
+    void setup_geometry();
 
-  void setup_shader();
+    void draw_offscreen(Matrix4& projectionMatrix, Matrix4& viewMatrix);
 
-  void setup_framebuffer();
+    void setup_shader();
 
-  void blit();
+    void setup_framebuffer();
 
-  void sensor_pick(Vector2i fbPosition);
+    void blit();
 
-  void resize(Vector2i framebufferSize);
+    void sensor_pick(Vector2i fbPosition);
+
+    void resize(Vector2i framebufferSize);
 
 };
 

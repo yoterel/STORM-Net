@@ -23,33 +23,33 @@ using namespace torch::indexing;
 class Template
 {
 public:
-  
-  bool empty = true;
 
-  vector<torch::Tensor> data;
+    bool empty = true;
 
-  vector<vector<string>> names;
+    vector<torch::Tensor> data;
 
-  vector<torch::Tensor> data_mean;
+    vector<vector<string>> names;
 
-  
-  Template();
+    vector<torch::Tensor> data_mean;
 
-  bool isEmpty() const { return empty; }
 
-  Template toStandardCoordinateSystem();
+    Template();
 
-  Template fixYaw();
+    bool isEmpty() const { return empty; }
 
-  void writeTemporaryFile(std::string file_path);
+    Template toStandardCoordinateSystem();
 
-  Template applyRigidTransform(vector<torch::Tensor>& rs, vector<torch::Tensor>& sc);
+    Template fixYaw();
 
-  
-  static Template read(string filename, string input_file_format="");
+    void writeTemporaryFile(std::string file_path);
+
+    Template applyRigidTransform(vector<torch::Tensor>& rs, vector<torch::Tensor>& sc);
+
+
+    static Template read(string filename, string input_file_format = "");
 
 private:
-  
+
 };
 
 
