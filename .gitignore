@@ -1,5 +1,7 @@
 /.idea
 CapCalibrator/STORM-Net/
 CapCalibrator/runs/
+CapCalibrator/cache/
 *.pyc
-
+*.json
+*.ini
