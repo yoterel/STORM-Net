@@ -46,7 +46,7 @@ public:
   Template applyRigidTransform(vector<torch::Tensor>& rs, vector<torch::Tensor>& sc);
 
   
-  static Template read(string filename);
+  static Template read(string filename, string input_file_format="");
 
 private:
   

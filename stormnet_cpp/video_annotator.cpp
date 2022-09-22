@@ -561,7 +561,7 @@ void VideoAnnotator::setup_dlib()
     // landmark positions given an image and face bounding box.  Here we are just
     // loading the model from the shape_predictor_68_face_landmarks.dat file you gave
     // as a command line argument.
-    dlib::deserialize("./models/shape_predictor_68_face_landmarks.dat") >> sp;
+    dlib::deserialize("models/shape_predictor_68_face_landmarks.dat") >> sp;
     dlib_loaded = true;
   });
 
