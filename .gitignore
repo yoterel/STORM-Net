@@ -2,6 +2,17 @@
 CapCalibrator/STORM-Net/
 CapCalibrator/runs/
 CapCalibrator/cache/
+stormnet_cpp/build/
+stormnet_cpp/corrade/
+stormnet_cpp/imgui/
+stormnet_cpp/libtorch/
+stormnet_cpp/magnum/
+stormnet_cpp/magnum-integration/
+stormnet_cpp/modules/
+stormnet_cpp/nativefiledialog-extended/
+stormnet_cpp/opencv/
+stormnet_cpp/SDL2-2.24.0/
+stormnet_cpp/spdlog/
 *.pyc
 *.json
 *.ini
