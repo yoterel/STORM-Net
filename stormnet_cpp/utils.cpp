@@ -75,4 +75,21 @@ void executeAsyncStop(FILE* pipe)
 
 }
 
-
+torch::Tensor CSV_to_tensor(std::ifstream& file, bool hasHeader, torch::Device device) {
+    std::vector<std::vector<float>> features;
+    const std::regex comma(",");
+    std::vector<std::vector<std::string>> csv_data;
+    std::string line{};
+    // throw first row if header
+    if (hasHeader)
+    {
+        getline(file, line);
+    }
+    while (file && getline(file, line)) {
+        // Tokenize the line and store result in vector. Use range constructor of std::vector
+        std::vector<std::string> row{ std::sregex_token_iterator(line.begin(), line.end(), comma,-1), std::sregex_token_iterator() };
+        csv_data.push_back(row);
+    }
+    auto tensor = torch::from_blob(csv_data.data(), { (int)csv_data.size(), (int)csv_data[0].size() }, device);
+    return tensor;
+}

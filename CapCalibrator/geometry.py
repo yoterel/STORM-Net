@@ -285,7 +285,10 @@ def apply_rigid_transform(r_matrix, s_matrix, template_names, template_data, vid
     else:  # apply transform to non-anchors using default configuration
         anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names))
         data_origin = data[anchor_mask]
+        names_origin = np.array(names)[anchor_mask]
         data_optodes = data[~anchor_mask]
+        names_optodes = np.array(names)[~anchor_mask]
+        names = np.concatenate((names_origin, names_optodes)).tolist()
     for rot_mat, scale_mat in zip(r_matrix, s_matrix):
         transformed_data_sim = rot_mat @ (scale_mat @ data_optodes.T)
         data_optodes = transformed_data_sim.T
