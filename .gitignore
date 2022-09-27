@@ -2,6 +2,7 @@
 CapCalibrator/STORM-Net/
 CapCalibrator/runs/
 CapCalibrator/cache/
+stormnet_cpp/
 *.pyc
 *.json
 *.ini
