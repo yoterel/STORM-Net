@@ -1539,7 +1539,7 @@ def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force
         avg_brain.add_color_quantity("color", col, enabled=True)
         pc_name = str(template_file_name) + "(MNI)"
         data = orig_data
-        radius=0.0025
+        radius=0.005
         if force_transform:
             names_copy = orig_names.copy()
             data_copy = orig_data.copy()
