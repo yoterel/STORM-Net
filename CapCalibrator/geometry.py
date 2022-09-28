@@ -7,6 +7,53 @@ import MNI
 import config
 
 
+def get_curve_network_aabb(scale=1., centered=True):
+        vertices = np.array([
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 1, 0],
+            [0, 1, 1],
+            [1, 0, 1],
+            [1, 1, 1],
+        ]).astype(np.float32)
+        if centered:
+            vertices -= np.array([0.5, 0.5, 0.5])
+        vertices *= scale
+        edges = np.array([
+            [0, 1],
+            [0, 2],
+            [0, 3],
+            [4, 1],
+            [4, 2],
+            [4, 7],
+            [6, 1],
+            [6, 7],
+            [6, 3],
+            [5, 2],
+            [5, 7],
+            [5, 3],
+
+            ])
+        colors = np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+        ])
+        return vertices, edges, colors
+
+
 def align_centroids(a, b):
     """
     aligns a point cloud to another such that the first one's centroid is moved to the second one's centroid
@@ -370,7 +417,7 @@ def normalize_coordinates(names, data):
 
 def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, resource_folder="resource", transform_anchors=False):
     """
-    project new sensor locations to MNI
+    project new sensor locations to (statistical) MNI
     :param list_of_sensor_locations: a list of lists of [names ,data (nx3)] of all sensor locations
     :param origin_optodes_names:
     :return:
@@ -386,26 +433,24 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, 
             unsorted_origin_names = np.array(origin_optodes_names)
             others_selector = tuple([names.index(x) for x in names if x not in origin_optodes_names])
             others_xyz = data[others_selector, :]  # will be transformed to MNI
-        elif 0 in names:  # fallback if someone didn't pass origin_optodes_names
-            unsorted_origin_xyz = data[:names.index(0), :]  # non numbered optodes are treated as anchors for projection (they were not coregistered)
-            unsorted_origin_names = np.array(names[:names.index(0)])
-            others_xyz = data[names.index(0):, :]  # numbered optodes were coregistered, and they will be transformed to MNI
-        else:  # last fallback, project only non-anchors using default configuration.
+        else:  # last fallback, transform only non-anchors using default configuration.
             anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names))
             unsorted_origin_xyz = data[anchor_mask]
             unsorted_origin_names = np.array(names)[anchor_mask]
             others_xyz = data[~anchor_mask]
         origin_xyz, selected_indices = sort_anchors(unsorted_origin_names, unsorted_origin_xyz)
-        otherH, otherC, otherHSD, otherCSD, anchors_transformed = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
+        otherH, otherC, otherHSD, otherCSD, transforms = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
         # todo: should we report anything but cortex locations to caller?
         if origin_optodes_names:
-            sensor_locations[1][others_selector, :] = otherC
-        elif 0 in names:
-            sensor_locations[1][names.index(0):, :] = otherC
+            sensor_locations[1][others_selector, :] = otherH
         else:
-            sensor_locations[1][~anchor_mask, :] = otherC
+            sensor_locations[1][~anchor_mask, :] = otherH
         if transform_anchors:
-            sensor_locations[1][selected_indices, :] = anchors_transformed  # return transformed anchors aswell (but do not project)
+            anchors = sensor_locations[1][anchor_mask, :]
+            anchors_hom = np.c_[anchors, np.ones(anchors.shape[0])]
+            anchors_transformed = np.matmul(anchors_hom, transforms)
+            anchors_transformed = anchors_transformed.mean(axis=0)[:, :3]
+            sensor_locations[1][anchor_mask, :] = anchors_transformed  # return transformed anchors aswell (do not neccesarily reside on head surface, just naively transfromed using the affine transform)
     return projected_locations
 
 

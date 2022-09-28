@@ -113,7 +113,7 @@ def test_differentiable_find_affine(anchors_and_sensors):
     origin_xyz, others_xyz, selected_indices = anchors_and_sensors
     refN = 17  # number of reference brains
     pointN = others_xyz.shape[0]  # number of sensors to project
-    classic_result, _ = MNI.find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN, pointN)
+    _, classic_result, _ = MNI.find_affine_transforms(origin_xyz, others_xyz, selected_indices, refN, pointN)
     origin_xyz = torch.from_numpy(origin_xyz).float()
     others_xyz = torch.from_numpy(others_xyz).float()
     selected_indices = torch.from_numpy(selected_indices)

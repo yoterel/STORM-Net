@@ -26,6 +26,12 @@ import MNI
 ## globals for gui
 prev_selection = None
 pc_names = None
+pc_path = None
+pc_data = None
+mni_flag = False
+ui_options = ["Original", "MNI", "STORM-Net"]
+ui_options_selected = ui_options[0]
+prev_ui_options_selected = ui_options_selected
 ## globals for gui
 
 def post_process_db(db):
@@ -313,20 +319,10 @@ class GUI(tk.Tk):
                 filemenu.entryconfig("Save Registration", state="disabled")
         elif page == "exp":
             filemenu = tk.Menu(menubar, tearoff=0)
-            filemenu.add_command(label="Load Template Model", command=self.load_template_model)
-            # filemenu.add_command(label="Load Arbitrary Model", command=self.load_arbitrary_model)
             filemenu.add_separator()
             filemenu.add_command(label="Back To Main Menu", command=lambda: self.show_panel(MainMenu))
             menubar.add_cascade(label="File", menu=filemenu)
             optionsmenu = tk.Menu(menubar, tearoff=0)
-            # optionsmenu.add_command(label="Toggle Named Optodes", command=self.toggle_optodes, accelerator="Space")
-            # optionsmenu.add_command(label="Next Optode", command=self.next_optode, accelerator="Right")
-            # optionsmenu.add_command(label="Prev Optode", command=self.prev_optode, accelerator="Left")
-            menubar.add_cascade(label="Options", menu=optionsmenu)
-            if self.template_file_name:
-                menubar.entryconfig("Options", state="normal")
-            else:
-                menubar.entryconfig("Options", state="disabled")
         elif page == "finetune":
             filemenu = tk.Menu(menubar, tearoff=0)
             filemenu.add_command(label="Load Template Model", command=self.load_template_model)
@@ -615,8 +611,8 @@ class GUI(tk.Tk):
                                             icon='warning')
             if result != 'yes':
                 return
-        result = messagebox.askyesno("Project to MNI?",
-                                     "Would you like the registered data to be projected to MNI coordinates?")
+        result = messagebox.askyesno("Transform to MNI?",
+                                     "Would you like the registered data to be transformed to statistical MNI coordinates?")
         if result:
             self.args.mni = True
         else:
@@ -1146,7 +1142,7 @@ class CoregistrationPage(tk.Frame):
         cur_video_hash = self.controller.get_cur_video_hash()
         template_name = self.controller.get_template_model_file_name()
         storm_net_name = self.controller.get_pretrained_stormnet_path()
-        sticker_names = config.gui_sticker_names
+        sticker_names = config.virtual_sticker_names
         num_of_stickers = len(sticker_names)
         db_to_show = np.zeros((num_of_stickers, 2))
         if db:
@@ -1262,101 +1258,40 @@ class ExperimentViewerPage(tk.Frame):
         self.controller = controller
 
     def update_labels(self):
-        global pc_names
-        names, data, _ = self.controller.get_template_info()
-        if names:
-            v_aabb, e_aabb, c_aabb = self.get_curve_network_aabb(scale=200.)
-            aabb = ps.register_curve_network("aabb", v_aabb, e_aabb, radius=0.005)
-            aabb.add_color_quantity("color", c_aabb, defined_on='edges', enabled=True)
-            cow = ps.register_point_cloud("center_of_world", np.zeros((1, 3)), radius=0.005, point_render_mode="sphere")
-            cow.add_color_quantity("color", np.array([[0, 0, 0]]), enabled=True)
-            XYZ_head = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallHEM", "head", resource_folder="./resource")
-            avg_head = ps.register_point_cloud("avg_head", XYZ_head, radius=0.0002, point_render_mode="quad")
-            col = np.zeros_like(XYZ_head)
-            col[:, 0] = 1
-            avg_head.add_color_quantity("color", col, enabled=True)
-            XYZ_brain = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallBEM.npy", "brain", resource_folder="./resource")
-            avg_brain = ps.register_point_cloud("avg_brain", XYZ_brain, radius=0.0002, point_render_mode="quad")
-            col = np.zeros_like(XYZ_brain)
-            col[:, 1] = 1
-            avg_brain.add_color_quantity("color", col, enabled=True)
-            pc_names = names
-            pc = ps.register_point_cloud(self.controller.get_template_model_file_name(),
-                                         data,
-                                         radius=0.005)
-            anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names))
-            colors = np.ones((len(data), 3))
-            colors[anchor_mask] = np.zeros((1, 3))
-            pc.add_color_quantity("colors",
-                                   colors,
-                                   enabled=True)
-            data_norm = geometry.to_standard_coordinate_system(names, data)
-            pc_norm = ps.register_point_cloud(self.controller.get_template_model_file_name()+" (normalized)",
-                                         data_norm,
-                                         radius=0.005,
-                                         enabled=False)
-            colors = np.ones((len(data), 3))
-            colors[anchor_mask] = np.zeros((1, 3))
-            pc_norm.add_color_quantity("colors",
-                                        colors,
-                                        enabled=True)
-            # ps.warning("Template model shown in ""standard coordinate system"". See github repository for more details.")
-            ps.show()
-            pc.remove()
-            pc_norm.remove()
-            avg_head.remove()
-            aabb.remove()
-            cow.remove()
+        ps.show()
+        self.controller.show_panel(MainMenu)
 
-    def get_curve_network_aabb(self, scale=1., centered=True):
-        vertices = np.array([
-            [0, 0, 0],
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1],
-            [1, 1, 0],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 1, 1],
-        ]).astype(np.float32)
-        if centered:
-            vertices -= np.array([0.5, 0.5, 0.5])
-        vertices *= scale
-        edges = np.array([
-            [0, 1],
-            [0, 2],
-            [0, 3],
-            [4, 1],
-            [4, 2],
-            [4, 7],
-            [6, 1],
-            [6, 7],
-            [6, 3],
-            [5, 2],
-            [5, 7],
-            [5, 3],
-
-            ])
-        colors = np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1],
-
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-        ])
-        return vertices, edges, colors
-
-    @staticmethod
     def selection_callback():
-        global prev_selection, pc_names
+        global prev_selection, pc_names, pc_data, pc_path, ui_options_selected, prev_ui_options_selected, mni_flag
+        if(psim.Button("Load Template Model")):
+        # This code is executed when the button is pressed
+            ps.remove_all_structures()
+            path = file_io.select_from_filesystem(False, True, ".", "Select Template Model File")
+            if path:
+                names, data, _, _ = file_io.read_template_file(path)
+                pc_names = names[0]
+                pc_data = data[0]
+                pc_path = path
+                fill_structures(pc_names, pc_data, path.name, ui_options_selected)
+        psim.PushItemWidth(200)
+        changed = psim.BeginCombo("Visualization Mode", ui_options_selected)
+        if changed:
+            for val in ui_options:
+                _, selected = psim.Selectable(val, ui_options_selected==val)
+                if selected:
+                    ui_options_selected = val
+                    if prev_ui_options_selected != ui_options_selected:
+                        prev_ui_options_selected = ui_options_selected
+                        if pc_names is not None and pc_data is not None and pc_path is not None:
+                            ps.remove_all_structures()
+                            fill_structures(pc_names, pc_data, pc_path, ui_options_selected, force_transform=mni_flag)
+            psim.EndCombo()
+        psim.PopItemWidth() 
+        changed, mni_flag = psim.Checkbox("Transform to MNI?", mni_flag) 
+        if(changed):
+            if pc_names is not None and pc_data is not None and pc_path is not None:
+                ps.remove_all_structures()
+                fill_structures(pc_names, pc_data, pc_path, ui_options_selected, force_transform=mni_flag)
         if ps.have_selection():
             cur_selection = ps.get_selection()
             psim.TextUnformatted("Selection ID: {}".format(pc_names[cur_selection[1]]))
@@ -1366,8 +1301,10 @@ class ExperimentViewerPage(tk.Frame):
                 pc = ps.get_point_cloud(pc_name)
                 if 0 <= v_index <= pc.n_points():
                     anchor_mask = np.isin(np.array(pc_names), np.array(config.all_possible_anchor_names))
+                    sticker_mask = np.isin(np.array(pc_names), np.array(config.physical_sticker_names))
                     colors = np.ones((pc.n_points(), 3))
-                    colors[anchor_mask] = np.zeros((1, 3))
+                    colors[anchor_mask] = 0
+                    colors[sticker_mask] = np.array([0, 1, 0])
                     colors[v_index] = np.array([0., 0., 1.])
                     pc.add_color_quantity("colors",
                                            colors,
@@ -1583,3 +1520,56 @@ class FinetunePage(tk.Frame):
 
         self.gpu_label.config(text="GPU ID to use (-1 for CPU): ")
         self.gpu_static.config(text=gpu_id_str)
+
+def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force_transform=False):
+    # cow = ps.register_point_cloud("center_of_world", np.zeros((1, 3)), radius=0.005, point_render_mode="sphere")
+    # cow.add_color_quantity("color", np.array([[0, 0, 0]]), enabled=True)
+    names = orig_names
+    if mode == "MNI":
+        scale = 200.
+        XYZ_head = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallHEM", "head", resource_folder="./resource")
+        avg_head = ps.register_point_cloud("avg_head", XYZ_head, radius=0.0002, point_render_mode="quad")
+        col = np.zeros_like(XYZ_head)
+        col[:, 0] = 1
+        avg_head.add_color_quantity("color", col, enabled=True)
+        XYZ_brain = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallBEM.npy", "brain", resource_folder="./resource")
+        avg_brain = ps.register_point_cloud("avg_brain", XYZ_brain, radius=0.0002, point_render_mode="quad")
+        col = np.zeros_like(XYZ_brain)
+        col[:, 1] = 1
+        avg_brain.add_color_quantity("color", col, enabled=True)
+        pc_name = str(template_file_name) + "(MNI)"
+        data = orig_data
+        radius=0.0025
+        if force_transform:
+            names_copy = orig_names.copy()
+            data_copy = orig_data.copy()
+            sensors = geometry.project_sensors_to_MNI([[names_copy, data_copy]], transform_anchors=True)
+            names = sensors[0][0]
+            data = sensors[0][1]
+            radius=0.005
+    elif mode == "STORM-Net":
+        scale = np.abs(orig_data.max() - orig_data.min()) * 2
+        data = geometry.to_standard_coordinate_system(orig_names, orig_data)
+        pc_name = str(template_file_name)+ "(normalized)"
+        radius=0.005
+    elif mode == "Original":
+        scale = np.abs(orig_data.max() - orig_data.min()) * 2
+        data = orig_data
+        pc_name = str(template_file_name)
+        radius=0.005
+    else:
+        raise NotImplementedError
+    v_aabb, e_aabb, c_aabb = geometry.get_curve_network_aabb(scale=scale)
+    aabb = ps.register_curve_network("aabb", v_aabb, e_aabb, radius=0.005)
+    aabb.add_color_quantity("color", c_aabb, defined_on='edges', enabled=True)
+    pc = ps.register_point_cloud(pc_name,
+                                 data,
+                                 radius=radius)
+    anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names)).squeeze()
+    sticker_mask = np.isin(np.array(names), np.array(config.physical_sticker_names)).squeeze()
+    colors = np.ones_like(data)
+    colors[anchor_mask] = 0
+    colors[sticker_mask] = np.array([0, 1, 0])
+    pc.add_color_quantity("colors",
+                            colors,
+                            enabled=True)

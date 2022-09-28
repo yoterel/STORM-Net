@@ -12,6 +12,8 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
     :return: numpy array of size refN x number_of_sensors x 3
     represents for each refernce brain all our sensors locations in its frame of reference
     """
+    # todo: refactor this function to be more readable
+
     # ==================== AffineEstimation4 ======================
     size = len(selected_indices)
     assert size >= 4
@@ -47,7 +49,8 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
         othersRef = np.matmul(DDDD, WR)
         othersRefList[i] = othersRef
         originRegList[i] = refBList[i, 0]
-    return othersRefList[:, :, :3], originRegList[:, :, :3]
+    affine_transforms = np.stack([x for x in refBList[:, 1]])
+    return affine_transforms, othersRefList[:, :, :3], originRegList[:, :, :3]
 
 
 def find_closest_on_surface_naive(othersRefList, XYZ, pointN, calc_sd_and_var=False):
@@ -211,12 +214,12 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
     refN = 17  # number of reference brains
     pointN = others_xyz.shape[0]  # number of sensors to project
     # get sensors transformed into reference brains coordinate systems
-    others_transformed_to_ref, origin_transformed_to_ref = find_affine_transforms(origin_xyz,
-                                                                                  others_xyz,
-                                                                                  selected_indices,
-                                                                                  refN,
-                                                                                  pointN,
-                                                                                  resource_folder)
+    transforms, others_transformed_to_ref, _ = find_affine_transforms(origin_xyz,
+                                                                      others_xyz,
+                                                                      selected_indices,
+                                                                      refN,
+                                                                      pointN,
+                                                                      resource_folder)
     # load head surface raw data
     XYZ = load_raw_MNI_data(resource_folder+"/MNI_templates/xyzallHEM", "head", resource_folder=resource_folder)
     # get closest location of sensors on average head surface
@@ -236,8 +239,7 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
     # otherHSD, otherCSD -  transformation SD for given head surface points, point manner
     # SSwsH, SSwsC - transformation SD for given cortical surface points, point manner
     # ----------------------
-    originTransformed = origin_transformed_to_ref.mean(axis=0)
-    return otherH, otherC, otherHSD, otherCSD, originTransformed
+    return otherH, otherC, otherHSD, otherCSD, transforms
 
 
 def vectorized_loop(XYZ, othersRefList, i, pointN):

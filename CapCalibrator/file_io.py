@@ -6,7 +6,38 @@ import logging
 import shutil
 from pathlib import Path
 import re
+from tkinter import filedialog
 
+
+def select_from_filesystem(isdir, exists, initial_dir, title):
+        """
+        selects a filesystem object and returns its path
+        :param isdir: is object to select a dir? (else assumes it is a file)
+        :param exists: does the filesystem object exist? ignored if isdir is true
+        :param initial_dir: the initial popup dialog dir
+        :param title: the title of the popup dialog
+        :return: the path to the object or None if failure occurs
+        """
+        if isdir:
+            folder = filedialog.askdirectory(initialdir=initial_dir, title=title)
+            if not folder:
+                return None
+            else:
+                return Path(folder)
+        else:
+            if exists:
+                file = filedialog.askopenfilename(initialdir=initial_dir, title=title)
+                if not file:
+                    return None
+                else:
+                    return Path(file)
+            else:
+                file = filedialog.asksaveasfile(initialdir=initial_dir, title=title)
+                if not file:
+                    return None
+                else:
+                    # todo: okay to forget handle?
+                    return Path(file.name)
 
 def pairwise(iterable):
     """
