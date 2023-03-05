@@ -26,7 +26,7 @@ The repository also contains:
 - [environment.yml](environment.yml) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `conda install -f environment.yml`
       
-- Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
+- Neural-network model files which can be downloaded from [here](https://osf.io/3j6u2/download). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
 - Precompiled binaries for the renderer which can be downloaded from here:\
  [Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
@@ -52,7 +52,7 @@ Note: For dlib (part of the requirements in the environment file), you must have
 
 ### Step 3: Download all pre-trained neural network models.
 
-Download from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip), and place them under the [models](CapCalibrator/models) folder (after extracting).
+Download from [here](https://osf.io/3j6u2/download), and place them under the [models](CapCalibrator/models) folder (after extracting).
 
 ### Step 4: Download all precompiled binaries for the renderer.
 Download from here:\
