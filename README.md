@@ -29,9 +29,9 @@ The repository also contains:
 - Neural-network model files which can be downloaded from [here](https://osf.io/3j6u2/download). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
 - Precompiled binaries for the renderer which can be downloaded from here:\
- [Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
- [Linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip)\
- [Mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip)
+ [Windows](https://osf.io/n382w/download)\
+ [Linux](https://osf.io/56a28/download)\
+ [Mac](https://osf.io/gfpcw/download)
 - Hardware: Although not necessary, the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We recommend using a GPU if fast calibration times are needed.
 
 Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
@@ -56,9 +56,9 @@ Download from [here](https://osf.io/3j6u2/download), and place them under the [m
 
 ### Step 4: Download all precompiled binaries for the renderer.
 Download from here:\
-[Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
-[Linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip)\
-[Mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip)
+[Windows](https://osf.io/n382w/download)\
+[Linux](https://osf.io/56a28/download)\
+[Mac](https://osf.io/gfpcw/download)
 
 ### Step 5: Run STORM-Net in gui mode.
 First remember to activate the environment you created
