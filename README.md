@@ -112,12 +112,12 @@ To do this, follow the steps below:
    
    `python render.py --help`
    
-2. Train the network on the images using the GUI or the [train script](CapCalibrator/train.py). We recommend using a gpu to speed up the training process:\
-   `python train.py my_new_model_name path_to_synthetic_data_folder --gpu_id 2`
+2. Train the network on the images using the GUI or the [train script](CapCalibrator/torch_train.py). We recommend using a gpu to speed up the training process:\
+   `python torch_train.py my_new_model_name path_to_synthetic_data_folder --gpu_id 2`
    
    For all command line options see:
    
-   `python train.py --help`
+   `python torch_train.py --help`
    
    When training is done, a model file will be availble in the [models](CapCalibrator/models) directory.
    
