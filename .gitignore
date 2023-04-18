@@ -16,3 +16,6 @@ stormnet_cpp/spdlog/
 *.pyc
 *.json
 *.ini
+/windows_build
+/build
+/.vscode
