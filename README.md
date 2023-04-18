@@ -14,7 +14,9 @@ Simple and Timely Optode Registration Method for Functional Near-Infrared Spectr
 All files in the repository are an implementation of the original manuscript and research ([preprint](https://doi.org/10.1101/2020.12.29.424683)).
 
 # Introduction
-This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video. In other words, given a short video of the participant wearing the fNIRS cap, the application outputs the coordinates of every point of interest on the cap in (a statistical) MNI coordinate system (or, if required, in the original coordinates system that can be later transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
+This application is designed to provide an accurate estimation of the position of points of interest (usually, sensors) on a fNIRS probing cap mounted on a subject’s head, based on a short video. This is needed because the cap is almost never placed in perfect alignment with the actual position it was intended for (mostly due to human error, but also because of differences in skull structures and cap deformations).
+
+In other words, given a short video of the subject wearing the fNIRS cap, the application outputs the coordinates of every point of interest on the cap in (a statistical) MNI coordinate system (or, if required, in the original coordinates system that can be later transformed to MNI using external tools such as [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/)).
 
 There are 3 modes of operation:
 1. A GUI that allows manual annotation of the data / supervising the automatic method - this is recommended for first time users.
