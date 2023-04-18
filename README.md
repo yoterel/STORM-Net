@@ -26,12 +26,12 @@ The repository also contains:
 - [environment.yml](environment.yml) contains all python library dependencies (we suggest using a seperate environment such as conda or virtualenv):\
       `conda install -f environment.yml`
       
-- Neural-network model files which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip). \
+- Neural-network model files which can be downloaded from [here](https://osf.io/3j6u2/download). \
       Place the files under the [models](CapCalibrator/models) folder (after extracting).
 - Precompiled binaries for the renderer which can be downloaded from here:\
- [Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
- [Linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip)\
- [Mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip)
+ [Windows](https://osf.io/n382w/download)\
+ [Linux](https://osf.io/56a28/download)\
+ [Mac](https://osf.io/gfpcw/download)
 - Hardware: Although not necessary, the automatic anotation performes significantly faster when a compliant GPU is available (by 2 orders of magnitude). We recommend using a GPU if fast calibration times are needed.
 
 Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
@@ -52,13 +52,13 @@ Note: For dlib (part of the requirements in the environment file), you must have
 
 ### Step 3: Download all pre-trained neural network models.
 
-Download from [here](https://www.cs.tau.ac.il/~yotamerel/models/storm_models.zip), and place them under the [models](CapCalibrator/models) folder (after extracting).
+Download from [here](https://osf.io/3j6u2/download), and place them under the [models](CapCalibrator/models) folder (after extracting).
 
 ### Step 4: Download all precompiled binaries for the renderer.
 Download from here:\
-[Windows](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/windows_build.zip)\
-[Linux](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/linux_build.zip)\
-[Mac](https://www.cs.tau.ac.il/~yotamerel/precompiled_binaries/DataSynth/mac_build.zip)
+[Windows](https://osf.io/n382w/download)\
+[Linux](https://osf.io/56a28/download)\
+[Mac](https://osf.io/gfpcw/download)
 
 ### Step 5: Run STORM-Net in gui mode.
 First remember to activate the environment you created
@@ -112,12 +112,12 @@ To do this, follow the steps below:
    
    `python render.py --help`
    
-2. Train the network on the images using the GUI or the [train script](CapCalibrator/train.py). We recommend using a gpu to speed up the training process:\
-   `python train.py my_new_model_name path_to_synthetic_data_folder --gpu_id 2`
+2. Train the network on the images using the GUI or the [train script](CapCalibrator/torch_train.py). We recommend using a gpu to speed up the training process:\
+   `python torch_train.py my_new_model_name path_to_synthetic_data_folder --gpu_id 2`
    
    For all command line options see:
    
-   `python train.py --help`
+   `python torch_train.py --help`
    
    When training is done, a model file will be availble in the [models](CapCalibrator/models) directory.
    
