@@ -26,28 +26,17 @@
 class Settings
 {
 public:
-
     int starting_frame = 0;
     int local_env_size = 1;
-
     int stormnet_batchsize = 16;
-
     float stormnet_lr = 1e-4f;
     float stormnet_beta1 = 0.9f;
-
     int stormnet_num_epochs = 50;
-
     torch::DeviceType device = torch::kCPU; // torch::kCUDA;
-
     int steps_per_datapoint = 10;
 public:
-
     Settings();
-
-
     ~Settings();
-
     void draw_gui(bool* show_settings);
-
 };
 
