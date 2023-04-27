@@ -112,15 +112,35 @@ def read_template_file(template_path, input_file_format=None):
                     name = labeled_names[i]
                 else:
                     name = i-len(labeled_names)
-                data1 = sens1.split()
+                data1 = [x for x in sens1.replace(" ", ",").split(",") if x]
                 if data1[1] == "?":
                     continue
                 names[j].append(name)
                 x, y, z = float(data1[1]), float(data1[2]), float(data1[3])
                 sensor1_data.append(np.array([x, y, z]))
-                data2 = sens2.split()
+                data2 = [x for x in sens2.replace(" ", ",").split(",") if x]
                 x, y, z = float(data2[1]), float(data2[2]), float(data2[3])
                 sensor2_data.append(np.array([x, y, z]))
+            data.append(np.stack((sensor1_data, sensor2_data), axis=1))
+    elif file_format == "telaviv2":
+        labeled_names = ['lpa', 'nz', 'nosetip', 'lefteye', 'righteye', 'rpa',
+                         'f8', 'fp2', 'fpz', 'fp1', 'f7', 'cz', 'o1', 'oz', 'o2']
+        for j, session in enumerate(sessions):
+            sensor1_data = []
+            sensor2_data = []
+            for i, sens1 in enumerate(session):
+                if i < len(labeled_names):
+                    name = labeled_names[i]
+                else:
+                    name = i-len(labeled_names)
+                s = re.sub(r"\s+", ',', sens1)
+                data1 = [x for x in s.split(",") if x]
+                if data1[0] == "?":
+                    continue
+                names[j].append(name)
+                x, y, z = float(data1[0]), float(data1[1]), float(data1[2])
+                sensor1_data.append(np.array([x, y, z]))
+                sensor2_data.append(np.array([0, 0, 0]))
             data.append(np.stack((sensor1_data, sensor2_data), axis=1))
     else:  # princeton
         for line in non_empty_lines:
@@ -137,9 +157,6 @@ def read_template_file(template_path, input_file_format=None):
             except ValueError as verr:
                 name = name.lower()
             names[0].append(name)
-        if 0 not in names[0] and 1 in names[0]:
-            end = names[0][-1]
-            names[0][names.index(1):] = [x for x in range(end)]
         data = [np.array(data)]
     return names, data, file_format, skulls
 

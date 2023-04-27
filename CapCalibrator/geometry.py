@@ -5,6 +5,7 @@ from file_io import read_template_file
 import logging
 import MNI
 import config
+import copy
 
 
 def get_curve_network_aabb(scale=1., centered=True):
@@ -418,29 +419,24 @@ def project_sensors_to_MNI(list_of_sensor_locations, origin_optodes_names=None, 
     :param origin_optodes_names:
     :return:
     """
-    projected_locations = list_of_sensor_locations.copy()
+    projected_locations = copy.deepcopy(list_of_sensor_locations)
     for i, sensor_locations in enumerate(projected_locations):
         logging.info("Projecting: {} / {} point clouds to MNI".format(i+1, len(projected_locations)))
         names = sensor_locations[0]
         data = sensor_locations[1]
         if origin_optodes_names:
-            origin_selector = tuple([names.index(x) for x in origin_optodes_names])
-            unsorted_origin_xyz = data[origin_selector, :]  # treated as anchors for projection (they are not changed)
-            unsorted_origin_names = np.array(origin_optodes_names)
-            others_selector = tuple([names.index(x) for x in names if x not in origin_optodes_names])
-            others_xyz = data[others_selector, :]  # will be transformed to MNI
+            anchor_mask = np.isin(names, origin_optodes_names)
+            unsorted_anchors_xyz = data[anchor_mask, :]  # treated as anchors for projection (they are not changed)
+            unsorted_anchors_names = np.array(origin_optodes_names)
+            others_xyz = data[~anchor_mask, :]  # will be transformed to MNI
         else:  # last fallback, transform only non-anchors using default configuration.
             anchor_mask = np.isin(np.array(names), np.array(config.all_possible_anchor_names))
-            unsorted_origin_xyz = data[anchor_mask]
-            unsorted_origin_names = np.array(names)[anchor_mask]
+            unsorted_anchors_xyz = data[anchor_mask]
+            unsorted_anchors_names = np.array(names)[anchor_mask]
             others_xyz = data[~anchor_mask]
-        origin_xyz, selected_indices = sort_anchors(unsorted_origin_names, unsorted_origin_xyz)
-        otherH, otherC, otherHSD, otherCSD, transforms = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
-        # todo: should we report anything but cortex locations to caller?
-        if origin_optodes_names:
-            sensor_locations[1][others_selector, :] = otherH
-        else:
-            sensor_locations[1][~anchor_mask, :] = otherH
+        origin_xyz, selected_indices = sort_anchors(unsorted_anchors_names, unsorted_anchors_xyz)
+        otherH, _, _, _, transforms = MNI.project(origin_xyz, others_xyz, selected_indices, resource_folder=resource_folder)
+        sensor_locations[1][~anchor_mask, :] = otherH
         if transform_anchors:
             anchors = sensor_locations[1][anchor_mask, :]
             anchors_hom = np.c_[anchors, np.ones(anchors.shape[0])]

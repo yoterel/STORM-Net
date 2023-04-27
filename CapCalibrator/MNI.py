@@ -221,7 +221,7 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
                                                                       pointN,
                                                                       resource_folder)
     # load head surface raw data
-    XYZ = load_raw_MNI_data(resource_folder+"/MNI_templates/xyzallHEM", "head", resource_folder=resource_folder)
+    XYZ = load_raw_MNI_data(resource_folder+"/MNI_templates/xyzallHEM.npy", "head", resource_folder=resource_folder)
     # get closest location of sensors on average head surface
     otherH, otherHVar, otherHSD = find_closest_on_surface_naive(others_transformed_to_ref, XYZ, pointN, output_errors)
     # get location of sensors projected onto reference cortical surface by inflating a rod

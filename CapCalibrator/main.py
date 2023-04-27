@@ -12,26 +12,26 @@ import sys
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Coregisters fNIRS sensors location based on video.')
-    parser.add_argument("-m", "--mode", type=str, choices=["gui", "auto", "experimental"],
+    parser.add_argument("--mode", type=str, choices=["gui", "auto", "experimental"],
                         default="gui",
                         help="Controls operation mode of application.")
-    parser.add_argument("-vid", "--video", help="The path to the video file to coregister sensors with. Required if mode is auto.")
-    parser.add_argument("-t", "--template", help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
+    parser.add_argument("--video", help="The path to the video file to coregister sensors with. Required if mode is auto.")
+    parser.add_argument("--template", help="The template file path (given in space delimited csv format of size nx3). Required if mode is auto")
     parser.add_argument("--mni", action="store_true",
                         help="If specified, output will be projected to (adult) MNI coordinates")
-    parser.add_argument("-stormnet", "--storm_net", default="models/torch_heatmap_manuscript.h5", help="A path to a trained storm net model")
-    parser.add_argument("-unet", "--u_net", default="models/unet_tel_aviv.h5",
+    parser.add_argument("--storm_net", default="models/torch_heatmap_manuscript.h5", help="A path to a trained storm net model")
+    parser.add_argument("--unet", default="models/unet_tel_aviv.h5",
                         help="A path to a trained segmentation network model")
-    parser.add_argument("-s", "--session_file",
+    parser.add_argument("--session_file",
                         help="A file containing processed results for previous videos.")
-    parser.add_argument("-out", "--output_file", help="The output csv file with coregistered results")
+    parser.add_argument("--output_file", help="The output csv file with coregistered results")
     parser.add_argument("--verbosity", type=str, choices=["debug", "info", "warning"], default="info", help="Selects verbosity level")
-    parser.add_argument("-log", "--log", help="If specified, log will be output to this file")
-    parser.add_argument("-gt", "--ground_truth", help="Use this in experimental mode only")
+    parser.add_argument("--log", help="If specified, log will be output to this file")
+    parser.add_argument("--ground_truth", help="Use this in experimental mode only")
     parser.add_argument("--gpu_id", type=int, default=-1, help="Which GPU to use (or -1 for cpu)")
     parser.add_argument("--headless", action="store_true",
                         help="Force no gui")
-    parser.add_argument("-v", "--version", action="store_true", help="Prints version")
+    parser.add_argument("--version", action="store_true", help="Prints version")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -68,8 +68,8 @@ def parse_arguments():
             args.ground_truth = Path(args.ground_truth)
         if args.output_file:
             args.output_file = Path(args.output_file)
-        if not Path(args.stormnet).is_file():
-            logging.error("Storm-Net model file not found (using: {})".format(args.stormnet))
+        if not Path(args.storm_net).is_file():
+            logging.error("Storm-Net model file not found (using: {})".format(args.storm_net))
             exit(1)
         if not Path(args.unet).is_file():
             logging.error("Semantic segmentation model file not found (using: {})".format(args.unet))
@@ -96,4 +96,4 @@ if __name__ == "__main__":
             projected_data = sensor_locations
         save_results(projected_data[0], args.output_file)
     elif args.mode == "experimental":
-        experimental.reproduce_experiments(video_names, sticker_locations, args)
+        experimental.reproduce_experiments(None, None, args)
