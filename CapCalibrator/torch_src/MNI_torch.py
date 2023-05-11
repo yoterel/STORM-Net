@@ -288,7 +288,7 @@ def torch_project_non_differentiable(origin_xyz, others_xyz, selected_indices, o
     """
     projects others_xyz to MNI coordiantes given anchors in origin_xyz
     :param origin_xyz: anchors given as nx3 np array (n >= 4)
-    :param others_xyz: optodes to project given as mx3 np array (m>=1)
+    :param others_xyz: optodes to project given as bxmx3 np array (b is batch size, m is number of optodes)
     :param selected_indices: which indices to select from origin_xyz as anchors given as np array (len must be at least 4)
                              order matters! selection is based on this order:
                              ["nz", "iz", "rpa", "lpa",

@@ -8,6 +8,7 @@ import logging
 from file_io import save_results
 import experimental
 import sys
+__version__ = "0.0.1"
 
 
 def parse_arguments():
@@ -39,7 +40,7 @@ def parse_arguments():
     args = parser.parse_args()
     # configure computing environment
     if args.version:
-        print("1.0.0", end="")
+        print(__version__, end="")
         sys.exit(0)
     args.device = utils.configure_compute_environment(args.gpu_id)
     if args.mode == "gui" and not args.headless:
@@ -96,4 +97,4 @@ if __name__ == "__main__":
             projected_data = sensor_locations
         save_results(projected_data[0], args.output_file)
     elif args.mode == "experimental":
-        experimental.reproduce_experiments(None, None, args)
+        experimental.reproduce_experiments(video_names, sticker_locations, args)

@@ -51,7 +51,7 @@ def post_process_db(db):
 
 def annotate_videos(args):  # contains GUI mainloop
     if args.mode == "experimental":
-        special_db = Path.joinpath(Path("cache"), "telaviv_db.pickle")
+        special_db = Path("CapCalibrator", "cache", "tau_2023_single_sensor", "session") #"telaviv_db.pickle"
         new_db = file_io.load_full_db(special_db)
         # new_db = post_process_db(new_db)
         paths = []
@@ -117,7 +117,7 @@ class GUI(tk.Tk):
         self.wm_title("STORM-Net - Simple and Timely Optode Registration Method for fNIRS")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
-        icon = ImageTk.PhotoImage(file="./resource/icon.png", master=self)
+        icon = ImageTk.PhotoImage(file=str(Path(__file__, "../resource/icon.png")), master=self)
         self.iconphoto(False, icon)
         self.configure(background='white')
         self.container = tk.Frame(self)
@@ -1042,7 +1042,7 @@ class ThreadedTask(threading.Thread):
         r, s = predict.predict_rigid_transform(data, model, args)
         sensor_locations = geometry.apply_rigid_transform(r, s, template_names, template_data, None, args)
         if args.mni:
-            projected_data = geometry.project_sensors_to_MNI(sensor_locations, transform_anchors=True)
+            projected_data = geometry.project_sensors_to_MNI(sensor_locations, transform_anchors=True, resource_folder=Path(__file__, "../resource"))
         else:
             projected_data = sensor_locations
         self.queue.put(["coregister", projected_data[0]])
@@ -1199,7 +1199,7 @@ class MainMenu(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.label = tk.Label(self, text="STORM-Net Registration Toolbox", font=("Verdana", 12))
         self.canvas = tk.Canvas(self, height=400, width=400, bg="#263D42")
-        img = ImageTk.PhotoImage(master=self, file="resource/render.png")
+        img = ImageTk.PhotoImage(master=self, file=str(Path(__file__, "../resource/render.png")))
         self.canvas.img = img  # or else image gets garbage collected
         self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
 
@@ -1527,12 +1527,16 @@ def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force
     names = orig_names
     if mode == "MNI":
         scale = 200.
-        XYZ_head = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallHEM", "head", resource_folder="./resource")
+        XYZ_head = MNI.load_raw_MNI_data(str(Path(__file__, "../resource/MNI_templates/xyzallHEM.npy")),
+                                         "head",
+                                         resource_folder=str(Path(__file__, "../resource")))
         avg_head = ps.register_point_cloud("avg_head", XYZ_head, radius=0.0002, point_render_mode="quad")
         col = np.zeros_like(XYZ_head)
         col[:, 0] = 1
         avg_head.add_color_quantity("color", col, enabled=True)
-        XYZ_brain = MNI.load_raw_MNI_data("./resource/MNI_templates/xyzallBEM.npy", "brain", resource_folder="./resource")
+        XYZ_brain = MNI.load_raw_MNI_data(str(Path(__file__, "../resource/MNI_templates/xyzallBEM.npy")),
+                                          "brain",
+                                          resource_folder=str(Path(__file__, "../resource")))
         avg_brain = ps.register_point_cloud("avg_brain", XYZ_brain, radius=0.0002, point_render_mode="quad")
         col = np.zeros_like(XYZ_brain)
         col[:, 1] = 1
@@ -1543,7 +1547,7 @@ def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force
         if force_transform:
             names_copy = orig_names.copy()
             data_copy = orig_data.copy()
-            sensors = geometry.project_sensors_to_MNI([[names_copy, data_copy]], transform_anchors=True)
+            sensors = geometry.project_sensors_to_MNI([[names_copy, data_copy]], transform_anchors=True, resource_folder=Path(__file__, "../resource"))
             names = sensors[0][0]
             data = sensors[0][1]
             radius=0.005

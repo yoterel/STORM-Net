@@ -24,6 +24,7 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
     refBList = np.empty((refN, 2), dtype=object)
     # load 17 brain templates from disk
     DMS = []
+    resource_folder = str(resource_folder)
     for i in range(1, refN+1):
         path_wo_ext = resource_folder + "/MNI_templates/DMNI{:0>4d}".format(i)
         if Path(path_wo_ext+".npy").is_file():
@@ -178,6 +179,7 @@ def load_raw_MNI_data(location, type, resource_folder):
     if Path(my_str).is_file():
         XYZ = np.load(my_str, allow_pickle=True)
     else:
+        resource_folder = str(resource_folder)
         xallbemPath = Path(resource_folder+"/MNI_templates/xall"+shortcut+".csv")
         yallbemPath = Path(resource_folder+"/MNI_templates/yall"+shortcut+".csv")
         zallbemPath = Path(resource_folder+"/MNI_templates/zall"+shortcut+".csv")
@@ -203,7 +205,7 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
                               "pz", "p3", "p4", "t5",
                               "t6", "o1", "o2"]
     :param output_errors: whether to output error in estimation as well.
-    :param resource_folder: relative path to the fodler with the raw template data
+    :param resource_folder: relative path to the folder with the raw template data
     :return: otherH - others transformed to MNI of ideal head (head surface)
              otherC - others transformed to MNI of ideal head  (cortical surface)
              otherHSD - transformation standard deviation per axis, point manner (for otherH).
@@ -211,6 +213,7 @@ def project(origin_xyz, others_xyz, selected_indices, output_errors=False, resou
              otherCSD - transformation standard deviation per axis, point manner (for otherC).
                         Last channel is SD across all axes (root sum of squares).
     """
+    resource_folder = str(resource_folder)
     refN = 17  # number of reference brains
     pointN = others_xyz.shape[0]  # number of sensors to project
     # get sensors transformed into reference brains coordinate systems

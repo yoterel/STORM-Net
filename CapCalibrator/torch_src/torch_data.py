@@ -53,7 +53,7 @@ class HeatMap(torch.nn.Module):
             comp = D.Independent(my_distri, 1)
             gmm = D.MixtureSameFamily(mix, comp)
 
-            grid = torch.meshgrid(torch.arange(256), torch.arange(256))
+            grid = torch.meshgrid(torch.arange(256), torch.arange(256), indexing='ij')
             stacked_grid = torch.dstack((grid[0], grid[1])).to(landmarks.device)
             log_pdf = torch.exp(gmm.log_prob(stacked_grid))
             heatmap = (log_pdf - torch.min(log_pdf)) / (torch.max(log_pdf) - torch.min(log_pdf))

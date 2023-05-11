@@ -236,15 +236,15 @@ def reproduce_experiments(video_names, sticker_locations, args):
     :param args: see caller
     :return: -
     """
-    do_network_robustness_test(sticker_locations, args)
+    # do_network_robustness_test(sticker_locations, args)
     r_matrix, s_matrix = predict.predict_rigid_transform(sticker_locations, None, args)
     # grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
     # do_MNI_sensitivity_experiment(args.template)
     # do_digi_error_experiment()
-    dig_ses1, dig_ses2, all_digi_sessions = do_dig2dig_experiment(args.template, args.ground_truth)
+    dig_ses1, dig_ses2, all_digi_sessions = do_dig2dig_experiment(args.template, args.ground_truth, save_results=False)
     # do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)
     # vid_ses1, vid_ses2 = do_vid2vid_project_afterMNI_experiment(args.template, video_names, r_matrix, s_matrix)
-    vid_ses1, vid_ses2 = do_vid2vid_experiment(args, video_names, r_matrix, s_matrix, force_project=False)
+    vid_ses1, vid_ses2 = do_vid2vid_experiment(args, video_names, r_matrix, s_matrix, force_project=False, save_results=False)
     dig_intra, vid_intra, inter, per_landmark = do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
     do_brain_error_visualization_experiment(vid_ses1, per_landmark)
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
@@ -447,7 +447,7 @@ def do_digi_error_experiment():
         logging.info("{}->{:.3f}".format(key, value[0]))
 
 
-def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=None, verbose=True):
+def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=None, verbose=True, save_results=True):
     """
     tests how accurate is the digitizer between 2 sessions after MNI projection
     :param experiment_folder:
@@ -465,19 +465,19 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
     others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
     full_names = origin_names + others_names
     if experiment_folder.is_dir():
-        for exp_file in sorted(experiment_folder.glob("*.txt")):
+        for exp_file in sorted(experiment_folder.glob("**/*.txt")):
             experiment_file_list.append(exp_file)
     else:
         experiment_file_list.append(experiment_folder)
     for exp_file in experiment_file_list:
         if verbose:
             logging.info(exp_file.name)
-        file_names, file_data, file_format, skull = read_template_file(exp_file)
+        file_names, file_data, file_format, skull = read_template_file(exp_file, input_file_format="telaviv2")
         for i, session in enumerate(zip(file_names, file_data)):
             try:
                 names = session[0]
                 data = session[1][:, 0, :] - session[1][:, 1, :]  # subtracts second sensor
-                data = geometry.to_standard_coordinate_system(names, data)
+                # data = geometry.to_standard_coordinate_system(names, data)
                 origin_selector = tuple([names.index(x) for x in origin_names])
                 origin = data[origin_selector, :]
                 others_selector = tuple([names.index(x) for x in others_names])
@@ -493,15 +493,17 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
                 sessions[i].append([full_names, np.vstack((origin, others))])
             except IndexError:
                 sessions[i].append([None, None])
+    errors_before_projection = [np.mean(np.linalg.norm(x[1] - y[1],axis=-1)) for x, y in zip(sessions[0], sessions[1])]
     cached_result_ses1 = "cache/session1_digi_MNI"
     cached_result_ses2 = "cache/session2_digi_MNI"
     if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
         digi_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
-        digi_ss_data_ses1 = np.array([x[1] for x in digi_projected_ses1], dtype=np.object)
-        np.save(cached_result_ses1, digi_ss_data_ses1)
+        digi_ss_data_ses1 = np.array([x[1] for x in digi_projected_ses1])
         digi_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
-        digi_ss_data_ses2 = np.array([x[1] for x in digi_projected_ses2], dtype=np.object)
-        np.save(cached_result_ses2, digi_ss_data_ses2)
+        digi_ss_data_ses2 = np.array([x[1] for x in digi_projected_ses2])
+        if save_results:
+            np.save(cached_result_ses1, digi_ss_data_ses1)
+            np.save(cached_result_ses2, digi_ss_data_ses2)
     else:
         digi_ss_data_ses1 = np.load(cached_result_ses1 + ".npy", allow_pickle=True)
         digi_ss_data_ses2 = np.load(cached_result_ses2 + ".npy", allow_pickle=True)
@@ -639,11 +641,11 @@ def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, force_projec
     cached_result_ses1 = "cache/session1_vid_MNI_transb"
     cached_result_ses2 = "cache/session2_vid_MNI_transb"
     if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file() or force_project:
-        if opt.gpu_id == "cpu":
+        if True: #opt.gpu_id == "cpu":
             sessions = [[], []]
             for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrices, s_matrices, video_names)):
-                subject_name, session_name = vid.split("_")
-                session_number = int(re.findall(r'\d+', session_name)[0]) - 1
+                subject_id, _, session_number = vid.split("_")
+                session_number = int(session_number.split(".")[0]) - 1
                 if session_number == 2:
                     continue
                 origin_selector = tuple([names.index(x) for x in origin_names])
