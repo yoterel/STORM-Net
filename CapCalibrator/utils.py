@@ -43,7 +43,7 @@ def split_data(x, y, with_test_set=True):
         x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.2, random_state=1)
         return x_train, x_val, y_train, y_val, x_test, y_test
     else:
-        x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=1)
+        x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.1, random_state=1)
         return x_train, x_val, y_train, y_val
 
 

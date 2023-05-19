@@ -847,7 +847,7 @@ class GUI(tk.Tk):
                                   self.renderer_executable,
                                   self.renderer_log_file,
                                   iterations,
-                                  False,
+                                  False,  # this switch helps with debugging
                                   False)
         if status:
             if self.panels[self.cur_active_panel].render_monitor_progress.get():
