@@ -494,12 +494,12 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
             except IndexError:
                 sessions[i].append([None, None])
     errors_before_projection = [np.mean(np.linalg.norm(x[1] - y[1],axis=-1)) for x, y in zip(sessions[0], sessions[1])]
-    cached_result_ses1 = "cache/session1_digi_MNI"
-    cached_result_ses2 = "cache/session2_digi_MNI"
+    cached_result_ses1 = __file__+"../cache/session1_digi_MNI"
+    cached_result_ses2 = __file__+"../cache/session2_digi_MNI"
     if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file():
-        digi_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
+        digi_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names, resource_folder=Path(__file__, "../resource"))
         digi_ss_data_ses1 = np.array([x[1] for x in digi_projected_ses1])
-        digi_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
+        digi_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names, resource_folder=Path(__file__, "../resource"))
         digi_ss_data_ses2 = np.array([x[1] for x in digi_projected_ses2])
         if save_results:
             np.save(cached_result_ses1, digi_ss_data_ses1)
@@ -638,8 +638,8 @@ def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, force_projec
     others_names = output_others_names + names[names.index(0):]
     origin_names = ["lpa", "rpa", "nz", "cz"]
     full_names = origin_names + others_names
-    cached_result_ses1 = "cache/session1_vid_MNI_transb"
-    cached_result_ses2 = "cache/session2_vid_MNI_transb"
+    cached_result_ses1 = __file__ + "../cache/session1_vid_MNI_transb"
+    cached_result_ses2 = __file__ + "../cache/session2_vid_MNI_transb"
     if not Path(cached_result_ses1 + ".npy").is_file() or not Path(cached_result_ses2 + ".npy").is_file() or force_project:
         if True: #opt.gpu_id == "cpu":
             sessions = [[], []]
@@ -655,9 +655,9 @@ def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, force_projec
                 others = (rot_mat @ (
                             scale_mat @ others.T)).T  # apply transform before MNI projection, but before digi transform if applicaple
                 sessions[session_number].append([full_names, np.vstack((origin, others))])
-            vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names)
+            vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names, resource_folder=Path(__file__, "../resource"))
             anchors_and_sensors_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.float)
-            vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names)
+            vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names, resource_folder=Path(__file__, "../resource"))
             anchors_and_sensors_ses2 = np.array([x[1] for x in vid_projected_ses2], dtype=np.float)
         else:
             origin_selector = tuple([names.index(x) for x in origin_names])

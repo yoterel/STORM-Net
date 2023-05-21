@@ -148,7 +148,7 @@ class MyModel:
         self.opt = copy.deepcopy(opt)
         self.network = MyNetwork(opt)
         if opt.continue_train:
-            self.load_network("latest")
+            self.load_network(opt.experiment_name)
         self.optimizer = torch.optim.Adam(self.network.parameters(),
                                           lr=opt.lr,
                                           betas=(opt.beta1, 0.999),
@@ -159,7 +159,7 @@ class MyModel:
     def load_network(self, file_name):
         """load model from disk"""
         save_filename = '{}.pth'.format(str(file_name))
-        load_path = Path.joinpath(self.opt.root, save_filename)
+        load_path = Path(__file__, "../../models", save_filename)
         net = self.network
         if isinstance(net, torch.nn.DataParallel):
             net = net.module
@@ -175,7 +175,7 @@ class MyModel:
         """save model to disk"""
         if use_models_folder:
             save_filename = '{}.pth'.format(str(file_name))
-            save_path = Path("models", save_filename)
+            save_path = Path(__file__, "../../models", save_filename) # str(Path(__file__, "../resource"))
         else:
             save_filename = '{}.pth'.format(str(file_name))
             save_path = Path.joinpath(self.opt.root, save_filename)

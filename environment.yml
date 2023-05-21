@@ -1,5 +1,6 @@
 channels:
   - pytorch
+  - nvidia
   - anaconda
   - conda-forge
   - defaults
