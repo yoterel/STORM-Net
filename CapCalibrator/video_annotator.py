@@ -972,7 +972,7 @@ class ThreadedPeriodicTask(threading.Thread):
                 self.verbosity = "info"
                 self.is_train = True
                 self.network_output_size = 3
-                self.root = Path("models", self.experiment_name)
+                self.root = Path(__file__, "../models", self.experiment_name)
         opt = Options()
         try:
             torch_train.train_loop(opt, [self.stoprequest, self.queue])

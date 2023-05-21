@@ -106,7 +106,7 @@ def video_to_frames(vid_path, vid_hash=None, dump_frames=False, starting_frame=0
         hashed_name = utils.md5_from_vid(vid_path) + "_frames.pickle"
     legacy_name = vid_path.parent.name + "_" + vid_path.name
     my_string = legacy_name + "_frames.pickle"
-    cache_path = Path("cache")
+    cache_path = Path(__file__, "../cache")
     cache_path.mkdir(exist_ok=True)
     legacy_pickle_path = Path.joinpath(cache_path, my_string)
     pickle_path = Path.joinpath(cache_path, hashed_name)
