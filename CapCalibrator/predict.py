@@ -108,7 +108,8 @@ def get_facial_landmarks(frames):
     :return: a 2d numpy array containing x, y coordinates of required landmarks for each frame
     """
     import dlib
-    model_path = Path("models", "shape_predictor_68_face_landmarks.dat")
+    capcalib_folder = Path(__file__).parent
+    model_path = Path(capcalib_folder, "models", "shape_predictor_68_face_landmarks.dat")
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor(str(model_path))
     landmarks_list = []
@@ -185,7 +186,7 @@ def get_sticker_locations(frames, preloaded_model, graph, args):
     # if preloaded_model:
     #     my_model = preloaded_model
     # else:
-    model_full_path = Path(args.u_net)
+    model_full_path = Path(args.unet)
     my_model, graph = tf_file_io.load_semantic_seg_model(str(model_full_path))
     imgs_list = []
     for image in frames:

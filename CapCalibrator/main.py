@@ -21,8 +21,7 @@ def parse_arguments():
     parser.add_argument("--mni", action="store_true",
                         help="If specified, output will be projected to (adult) MNI coordinates")
     parser.add_argument("--storm_net", default="models/torch_heatmap_manuscript.h5", help="A path to a trained storm net model")
-    parser.add_argument("--unet", default="models/unet_tel_aviv.h5",
-                        help="A path to a trained segmentation network model")
+    parser.add_argument("--unet", help="A path to a trained segmentation network model")
     parser.add_argument("--session_file",
                         help="A file containing processed results for previous videos.")
     parser.add_argument("--output_file", help="The output csv file with coregistered results")
@@ -36,12 +35,13 @@ def parse_arguments():
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-
     args = parser.parse_args()
     # configure computing environment
     if args.version:
         print(__version__, end="")
         sys.exit(0)
+    if args.unet is None:
+        args.unet = Path(Path(__file__).parent, "models", "unet_tel_aviv.h5")
     args.device = utils.configure_compute_environment(args.gpu_id)
     if args.mode == "gui" and not args.headless:
         args.video = None

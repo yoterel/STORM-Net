@@ -132,7 +132,8 @@ def parse_arguments():
     #     sys.exit(1)
     # cmd = "test_torch ../../renders --template ../../example_models/example_model.txt".split()
     args = parser.parse_args()
-    args.root = Path(__file__, "../models", args.experiment_name)
+    capcalib_path = Path(__file__).parent
+    args.root = Path(capcalib_path, "models", args.experiment_name)
     args.root.mkdir(parents=True, exist_ok=True)
 
     if args.log:

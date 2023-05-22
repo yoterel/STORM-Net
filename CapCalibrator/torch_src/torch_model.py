@@ -159,7 +159,8 @@ class MyModel:
     def load_network(self, file_name):
         """load model from disk"""
         save_filename = '{}.pth'.format(str(file_name))
-        load_path = Path(__file__, "../../models", save_filename)
+        capcalib_folder = Path(__file__).parent.parent
+        load_path = Path(capcalib_folder, "models", save_filename)
         net = self.network
         if isinstance(net, torch.nn.DataParallel):
             net = net.module
@@ -175,7 +176,8 @@ class MyModel:
         """save model to disk"""
         if use_models_folder:
             save_filename = '{}.pth'.format(str(file_name))
-            save_path = Path(__file__, "../../models", save_filename) # str(Path(__file__, "../resource"))
+            capcalib_folder = Path(__file__).parent.parent
+            save_path = Path(capcalib_folder, "models", save_filename)
         else:
             save_filename = '{}.pth'.format(str(file_name))
             save_path = Path.joinpath(self.opt.root, save_filename)

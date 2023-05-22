@@ -117,7 +117,8 @@ class GUI(tk.Tk):
         self.wm_title("STORM-Net - Simple and Timely Optode Registration Method for fNIRS")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
-        icon = ImageTk.PhotoImage(file=str(Path(__file__, "../resource/icon.png")), master=self)
+        icon_path = Path(Path(__file__).parent, "resource", "icon.png")
+        icon = ImageTk.PhotoImage(file=str(icon_path), master=self)
         self.iconphoto(False, icon)
         self.configure(background='white')
         self.container = tk.Frame(self)
@@ -224,13 +225,13 @@ class GUI(tk.Tk):
         :return:
         """
         msg_dict = {"video_to_frames": "Selecting frames from video...",
-                    "annotate_frames": "Predicting landmarks...This might take some time if GPU is not being used.\nUsing GPU: {}".format(predict.is_using_gpu()),
+                    "annotate_frames": "Predicting landmarks...this might take some time if GPU is not being used.\nUsing GPU: {}".format(predict.is_using_gpu()),
                     "load_template_model": "Loading template model...",
                     "load_stormnet": "Loading Storm-Net model...",
                     "shift_video": "Selecting different frame...",
                     "coregister": "Performing Co-Registeration...",
-                    "render": "Creating synthetic data, This might take a while...",
-                    "finetune": "Fine-tunning STORM-Net. This might take a while...",
+                    "render": "Creating synthetic data, this might take a while...",
+                    "finetune": "Fine-tunning STORM-Net. this might take a while...",
                     "predict": "Predicting..."}
 
         if periodic:
@@ -972,7 +973,8 @@ class ThreadedPeriodicTask(threading.Thread):
                 self.verbosity = "info"
                 self.is_train = True
                 self.network_output_size = 3
-                self.root = Path(__file__, "../models", self.experiment_name)
+                capcalib_path = Path(__file__).parent
+                self.root = Path(capcalib_path, "models", self.experiment_name)
         opt = Options()
         try:
             torch_train.train_loop(opt, [self.stoprequest, self.queue])
@@ -1199,7 +1201,8 @@ class MainMenu(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.label = tk.Label(self, text="STORM-Net Registration Toolbox", font=("Verdana", 12))
         self.canvas = tk.Canvas(self, height=400, width=400, bg="#263D42")
-        img = ImageTk.PhotoImage(master=self, file=str(Path(__file__, "../resource/render.png")))
+        capcalib_folder = Path(__file__).parent
+        img = ImageTk.PhotoImage(master=self, file=str(Path(capcalib_folder, "resource", "render.png")))
         self.canvas.img = img  # or else image gets garbage collected
         self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
 
@@ -1527,16 +1530,17 @@ def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force
     names = orig_names
     if mode == "MNI":
         scale = 200.
-        XYZ_head = MNI.load_raw_MNI_data(str(Path(__file__, "../resource/MNI_templates/xyzallHEM.npy")),
+        resource_folder = Path(Path(__file__).parent, "resource")
+        XYZ_head = MNI.load_raw_MNI_data(str(Path(resource_folder, "MNI_templates", "xyzallHEM.npy")),
                                          "head",
-                                         resource_folder=str(Path(__file__, "../resource")))
+                                         resource_folder=str(resource_folder))
         avg_head = ps.register_point_cloud("avg_head", XYZ_head, radius=0.0002, point_render_mode="quad")
         col = np.zeros_like(XYZ_head)
         col[:, 0] = 1
         avg_head.add_color_quantity("color", col, enabled=True)
-        XYZ_brain = MNI.load_raw_MNI_data(str(Path(__file__, "../resource/MNI_templates/xyzallBEM.npy")),
+        XYZ_brain = MNI.load_raw_MNI_data(str(Path(resource_folder, "MNI_templates", "xyzallBEM.npy")),
                                           "brain",
-                                          resource_folder=str(Path(__file__, "../resource")))
+                                          resource_folder=str(resource_folder))
         avg_brain = ps.register_point_cloud("avg_brain", XYZ_brain, radius=0.0002, point_render_mode="quad")
         col = np.zeros_like(XYZ_brain)
         col[:, 1] = 1
