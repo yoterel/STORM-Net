@@ -79,7 +79,6 @@ add_executable( stormnetcpp
 
 # target_compile_definitions(stormnetcpp PRIVATE
     # MAGNUM_IMGUIINTEGRATION_USER_CONFIG="imgui/imconfig.h")
-    
 
 target_link_libraries(stormnetcpp PRIVATE SDL2::SDL2 SDL2::SDL2main)
 target_link_libraries(stormnetcpp PRIVATE
