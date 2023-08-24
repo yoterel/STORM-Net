@@ -23,6 +23,9 @@ import torch
 from torch_src import torch_model
 import torch_train
 import MNI
+import cv2
+import gsoup
+
 ## globals for gui
 prev_selection = None
 pc_names = None
@@ -711,11 +714,11 @@ class GUI(tk.Tk):
         sets default rendering settings in Finetune page
         :return:
         """
-        self.take_async_action(["load_template_model", Path("./../example_models/example_model.txt")])
-        self.renderer_log_file = Path("./cache/render_log.txt")
-        self.synth_output_dir = Path("./cache/synth_data")
+        self.take_async_action(["load_template_model", Path(__file__, "../../example_models/adultTemplate.txt")])
+        self.renderer_log_file = Path(__file__, "../cache/render_log.txt")
+        self.synth_output_dir = Path(__file__, "../cache/synth_data")
         self.synth_output_dir.mkdir(parents=True, exist_ok=True)
-        self.renderer_executable = Path("./../DataSynth/windows_build/DataSynth.exe")
+        self.renderer_executable = Path(__file__, "../../DataSynth/build/DataSynth.exe")
         self.panels[FinetunePage].render_set_defaults()
         self.show_panel(FinetunePage)
 
@@ -848,7 +851,7 @@ class GUI(tk.Tk):
                                   self.renderer_executable,
                                   self.renderer_log_file,
                                   iterations,
-                                  False,  # this switch helps with debugging
+                                  False,  # this switch helps with debugging (visualizes renders)
                                   False)
         if status:
             if self.panels[self.cur_active_panel].render_monitor_progress.get():
@@ -1179,7 +1182,38 @@ class CoregistrationPage(tk.Frame):
                                    540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
                 self.canvas.create_line(int(db_to_show[i, 0]) + 5, 540 - (int(db_to_show[i, 1])) - 5, int(db_to_show[i, 0]) - 5,
                                    540 - (int(db_to_show[i, 1])) + 5, fill="red", tag="cross")
+        # if self.controller.template_names:
+        #     pil_image = self.controller.frames[self.controller.cur_frame_index]
+        #     np_image = np.array(pil_image)
+        #     size = np_image.shape
+        #     focal_length = size[1]
+        #     center = (size[1]/2, size[0]/2)
+        #     camera_matrix = np.array(
+        #                             [[focal_length, 0, center[0]],
+        #                             [0, focal_length, center[1]],
+        #                             [0, 0, 1]], dtype = "double"
+        #                             )
+        #     dist_coeffs = np.zeros((4,1))
+        #     to_fit = np.array([self.controller.template_names.index("f3"),
+        #                         self.controller.template_names.index("fz"),
+        #                         self.controller.template_names.index("f4"),
+        #                         self.controller.template_names.index("left_triangle"),
+        #                         self.controller.template_names.index("middle_triangle"),
+        #                         self.controller.template_names.index("right_triangle"),
+        #                         self.controller.template_names.index("top")])
+        #     object_points = []
+        #     for i in range(0, len(to_fit)):
+        #         object_points.append(self.controller.template_data[to_fit[i]])
+        #     object_points = np.array(object_points)
+        #     image_points = db_to_show
+        #     success, rotation_vector, translation_vector = cv2.solvePnP(object_points, image_points, camera_matrix, dist_coeffs)
+        #     template_points_2d, jacobian = cv2.projectPoints(self.controller.template_data, rotation_vector, translation_vector, camera_matrix, dist_coeffs)
 
+        #     new_image = np_image.copy()
+        #     for i, p in enumerate(template_points_2d):
+        #         col = (0, 0, 255) if i in to_fit else (0, 255, 0)
+        #         cv2.circle(new_image, (int(p[0][0]), size[0]-int(p[0][1])), 3, col, -1)
+        #     gsoup.save_image(new_image, "test.png")
         # button = ttk.Button(self.data_panel, text="Predict", command=lambda: self.controller.predict_x())
         # button.pack(fill="x")
 
@@ -1277,7 +1311,7 @@ class ExperimentViewerPage(tk.Frame):
                 pc_path = path
                 fill_structures(pc_names, pc_data, path.name, ui_options_selected)
         psim.PushItemWidth(200)
-        changed = psim.BeginCombo("Visualization Mode", ui_options_selected)
+        changed = psim.BeginCombo("Coordinate System", ui_options_selected)
         if changed:
             for val in ui_options:
                 _, selected = psim.Selectable(val, ui_options_selected==val)
@@ -1289,12 +1323,13 @@ class ExperimentViewerPage(tk.Frame):
                             ps.remove_all_structures()
                             fill_structures(pc_names, pc_data, pc_path, ui_options_selected, force_transform=mni_flag)
             psim.EndCombo()
-        psim.PopItemWidth() 
-        changed, mni_flag = psim.Checkbox("Transform to MNI?", mni_flag) 
-        if(changed):
-            if pc_names is not None and pc_data is not None and pc_path is not None:
-                ps.remove_all_structures()
-                fill_structures(pc_names, pc_data, pc_path, ui_options_selected, force_transform=mni_flag)
+        psim.PopItemWidth()
+        if ui_options_selected == "MNI":
+            changed, mni_flag = psim.Checkbox("Project to average MNI template?", mni_flag) 
+            if(changed):
+                if pc_names is not None and pc_data is not None and pc_path is not None:
+                    ps.remove_all_structures()
+                    fill_structures(pc_names, pc_data, pc_path, ui_options_selected, force_transform=mni_flag)
         if ps.have_selection():
             cur_selection = ps.get_selection()
             psim.TextUnformatted("Selection ID: {}".format(pc_names[cur_selection[1]]))
@@ -1557,7 +1592,9 @@ def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force
             radius=0.005
     elif mode == "STORM-Net":
         scale = np.abs(orig_data.max() - orig_data.min()) * 2
-        data = geometry.to_standard_coordinate_system(orig_names, orig_data)
+        # data = geometry.to_standard_coordinate_system(orig_names, orig_data)
+        data = geometry.fix_yaw(orig_names, orig_data)
+        data = geometry.to_standard_coordinate_system(orig_names, data)
         pc_name = str(template_file_name)+ "(normalized)"
         radius=0.005
     elif mode == "Original":

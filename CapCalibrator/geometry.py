@@ -6,6 +6,7 @@ import logging
 import MNI
 import config
 import copy
+import gsoup
 
 
 def get_curve_network_aabb(scale=1., centered=True):
@@ -71,7 +72,7 @@ def align_centroids(a, b):
     return a - diff
 
 
-def to_standard_coordinate_system(names, data):
+def to_standard_coordinate_system(names, data_in):
     """
     given certain sticker names, converts the nx3 data to the standard coordinate system where:
     x is from left to right ear
@@ -80,10 +81,11 @@ def to_standard_coordinate_system(names, data):
     origin is defined by (x,y,z) = ((lefteye.x+righteye.x) / 2, cz.y, (lefteye.z+righteye.z) / 2)
     scale is cm. if cz is too close to origin in terms of cm, this function scales it to cm (assuming it is inch)
     note: only performs swaps, reflections, translation and possibly scale (no rotation is performed).
-    :param names:
-    :param data:
+    :param names: names of measurements
+    :param data_in: nx3 data
     :return: returns the data in the standard coordinate system
     """
+    data = data_in.copy()
     left_eye_index = names.index('lefteye')
     right_eye_index = names.index('righteye')
     cz_index = names.index('cz')
@@ -121,6 +123,8 @@ def to_standard_coordinate_system(names, data):
     # possibly convert from inch to cm
     if data[cz_index, 2] < 7:  # distance from "middle" of brain to top is ~9-10 cm on average
         data *= 2.54
+    if False:  # debug
+        data /= 1.5
     return data
 
 
@@ -140,19 +144,76 @@ def get_euler_angles(gt_data, model_data):
     return gt_rot_e
 
 
-def affine_transform_3d_nparray(A, B):
+def decompose44(A44):
     """
-        finds best affine transformation between pc a and pc b (in terms of rmse)
-        # Input: expects nx3 matrix of points
-        # Returns W = the transformation to apply to A such that it matches B.
-        """
-    new_A = np.c_[A, np.ones(len(A))]
-    new_B = np.c_[B, np.ones(len(B))]
-    W = np.linalg.lstsq(new_A, new_B, rcond=None)[0]  # affine transformation matrix
-    # A_transformed = np.matmul(new_A, W)
-    # get_rmse(A_transformed[:, :-1], B)
-    return W
+    Decompose 4x4 homogenous affine matrix into parts.
+    The parts are translations, rotations, zooms, shears.
+    Returns
+    -------
+    T : array, shape (3,)
+       Translation vector
+    R : array shape (3,3)
+        rotation matrix
+    Z : array, shape (3,)
+       scale vector.  May have one negative zoom to prevent need for negative
+       determinant R matrix above
+    S : array, shape (3,)
+       Shear vector, such that shears fill upper triangle above
+       diagonal to form shear matrix (type ``striu``).
+    """
+    A44 = np.asarray(A44)
+    T = A44[:-1,-1]
+    RZS = A44[:-1,:-1]
+    # compute scales and shears
+    M0, M1, M2 = np.array(RZS).T
+    # extract x scale and normalize
+    sx = math.sqrt(np.sum(M0**2))
+    M0 /= sx
+    # orthogonalize M1 with respect to M0
+    sx_sxy = np.dot(M0, M1)
+    M1 -= sx_sxy * M0
+    # extract y scale and normalize
+    sy = math.sqrt(np.sum(M1**2))
+    M1 /= sy
+    sxy = sx_sxy / sx
+    # orthogonalize M2 with respect to M0 and M1
+    sx_sxz = np.dot(M0, M2)
+    sy_syz = np.dot(M1, M2)
+    M2 -= (sx_sxz * M0 + sy_syz * M1)
+    # extract z scale and normalize
+    sz = math.sqrt(np.sum(M2**2))
+    M2 /= sz
+    sxz = sx_sxz / sx
+    syz = sy_syz / sy
+    # Reconstruct rotation matrix, ensure positive determinant
+    Rmat = np.array([M0, M1, M2]).T
+    if np.linalg.det(Rmat) < 0:
+        sx *= -1
+        Rmat[:,0] *= -1
+    return T, Rmat, np.array([sx, sy, sz]), np.array([sxy, sxz, syz])
 
+
+def find_affine_transformation(A, B, to_44=False):
+    # assemble A matrix for least squares
+    assert len(A) >= 4
+    new_A = np.c_[A, np.ones(len(A))]
+    new_A = np.repeat(np.tile(new_A, (1, 3)), 3, axis=0)
+    # now A is 3nx12
+    # zero columns depending on index of point
+    new_A[::3, 4:] = 0
+    new_A[1::3, :4] = 0
+    new_A[1::3, 8:] = 0
+    new_A[2::3, :8] = 0
+    new_B = B.flatten()
+    if len(A) == 4:
+        #solve linear system
+        W = np.linalg.inv(new_A) @ new_B
+    else:
+        W = np.linalg.lstsq(new_A, new_B, rcond=None)[0]
+    W = W.reshape(3, 4)
+    if to_44:
+        W = gsoup.to_44(W)
+    return W
 
 
 def rigid_transform_3d_nparray(A, B):
@@ -281,18 +342,22 @@ def fix_yaw(names, data):
     rightEar = names.index('rpa')
     right_triangle = names.index('right_triangle')
     left_triangle = names.index('left_triangle')
-    yaw_vec_1 = (data[rightEye] - data[leftEye]) * np.array([1, 1, 0])
-    yaw_vec_2 = (data[rightEar] - data[leftEar]) * np.array([1, 1, 0])
-    yaw_vec_3 = (data[right_triangle] - data[left_triangle]) * np.array([1, 1, 0])
-    yaw_vec_1 /= np.linalg.norm(yaw_vec_1)
-    yaw_vec_2 /= np.linalg.norm(yaw_vec_2)
-    yaw_vec_3 /= np.linalg.norm(yaw_vec_3)
-    avg = np.mean([[yaw_vec_1], [yaw_vec_2], [yaw_vec_3]], axis=0)
-    avg /= np.linalg.norm(avg)
-    u = avg
-    v = np.array([0, 0, 1])
-    w = np.cross(v, u)
-    transform = np.vstack((u, w, v))
+    cz = names.index('cz')
+    xvec1 = (data[rightEye] - data[leftEye])
+    xvec2 = (data[rightEar] - data[leftEar])
+    xvec3 = (data[right_triangle] - data[left_triangle])
+    xvec1 /= np.linalg.norm(xvec1)
+    xvec2 /= np.linalg.norm(xvec2)
+    xvec3 /= np.linalg.norm(xvec3)
+    avgxvec = np.mean([[xvec1], [xvec2], [xvec3]], axis=0)
+    avgxvec /= np.linalg.norm(avgxvec)
+    x = avgxvec
+    zvec = (data[cz] - (data[rightEar] + data[leftEar]) / 2)
+    zvec /= np.linalg.norm(zvec)
+    z = zvec
+    y = np.cross(z, x)
+    y /= np.linalg.norm(y)
+    transform = np.vstack((x, y, z))
     new_data = transform @ data.T
     return new_data.T
 

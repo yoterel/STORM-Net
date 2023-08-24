@@ -66,8 +66,8 @@ def launch_renderer(exe_path, log_path, iterations, template, output, images, sc
 
 
 def render(template_names, template_data, output_folder, exe_path, log_path, iterations, images, scale_faces):
-    data = to_standard_coordinate_system(template_names, template_data)
-    data = fix_yaw(template_names, data)
+    data = fix_yaw(template_names, template_data)
+    data = to_standard_coordinate_system(template_names, data)
     template_file_path = Path("cache", "template_transformed.txt")
     create_temporary_template(template_names, data, template_file_path)
     success, process = launch_renderer(exe_path, log_path, iterations, template_file_path, output_folder, images, scale_faces)
