@@ -90,7 +90,7 @@ In a nutshell, you will need to perform the "offline step" (slow) prior to perfo
 The offline step (and infact, the online step too) rely on a pre-measured template model file as an input. An example of such file is located under the [example_models](example_models) directory. This template model was obtained using a 3D digitizer, but can similarly be obtained in any way as long as the measurements are accurate to a satisfactory degree (e.g. by 3D scanning, or taking a video and running [COLMAP](https://colmap.github.io/)).
 It is strongly recommended to create your own template model file **per physical cap model you are using in your lab**, this will lead to best accuracies.
 
-for the exactt format, and list of the minimum neccessary points that are required in this file, see below in the section "Template Model File".
+for the exact format, and list of the minimum neccessary points that are required in this file, see below in the section "Template Model File".
 
 ### Rendering
 
