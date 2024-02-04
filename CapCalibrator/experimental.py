@@ -10,6 +10,7 @@ import predict
 import torch_src.MNI_torch as MNI_torch
 import torch
 import draw
+import cv2
 import gsoup
 
 def do_network_robustness_test(sticker_locations, args):
@@ -241,15 +242,16 @@ def reproduce_experiments(video_names, sticker_locations, args):
     # grid_search_sensor_names, grid_search_xyz, grid_search_rots, grid_search_scales = do_parameter_grid_search_experiment(args)
     # do_MNI_sensitivity_experiment(args.template)
     # do_digi_error_experiment()
-    dig_ses1, dig_ses2, all_digi_sessions = do_dig2dig_experiment(args.template, args.ground_truth, save_results=True, load_results=False)
+    dig_ses1, dig_ses2, all_digi_sessions, digi_r_matrix = do_dig2dig_experiment(args.template, args.ground_truth, save_results=True, load_results=False)
     # do_opt2dig_experiment(dig_ses1, dig_ses2, grid_search_xyz, grid_search_rots, grid_search_scales, video_names)
     # vid_ses1, vid_ses2 = do_vid2vid_project_afterMNI_experiment(args.template, video_names, r_matrix, s_matrix)
-    vid_ses1, vid_ses2 = do_vid2vid_experiment(args, video_names, r_matrix, s_matrix, save_results=True, load_results=True)
+    vid_ses1, vid_ses2 = do_vid2vid_experiment(args, video_names, r_matrix, s_matrix, save_results=True, load_results=False)
     dig_intra, vid_intra, inter, per_landmark = do_vid2dig_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
+    do_shift_experiment_2024(r_matrix, digi_r_matrix, args)
+    do_shift_experiment(r_matrix, all_digi_sessions, args)
     do_brain_error_visualization_experiment(vid_ses1, per_landmark)
     do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2)
     do_skull_size_experiment(dig_intra, vid_intra, inter, args)
-    do_shift_experiment(r_matrix, all_digi_sessions, args)
     # do_old_experiment(r_matrix, s_matrix, video_names, args)
 
 
@@ -336,6 +338,45 @@ def do_skull_size_experiment(dig_intra, vid_intra, inter, args):
     circumferences = 2 * np.pi * np.sqrt((skull_radii[:, 0] ** 2 + skull_radii[:, 1] ** 2) / 2)
     draw.plot_skull_vs_error(circumferences, dig_intra, vid_intra, inter)
 
+def do_shift_experiment_2024(r_matrix, digi_r_matrix, args):
+    assert len(r_matrix) == len(digi_r_matrix)
+    template_names, template_data, _, _ = read_template_file(args.template)
+    template_names = template_names[0]
+    template_data = template_data[0]
+    template_data = geometry.to_standard_coordinate_system(template_names, template_data)
+    experiment_file_list = []
+    sessions = [[], [], [], [], []]  # a list of lists, each containing all the subjects results for a session index
+    result_r_matrix = [] # a consecutive list of r_matrix estimations as computed from digitizer data
+    origin_names = ["lpa", "rpa", "nz", "cz", "lefteye", "righteye", "nosetip"]
+    others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
+    nonorigin_names = [x for x in template_names if x not in origin_names]
+    template_origin_selector = tuple([template_names.index(x) for x in origin_names])
+    template_others_selector = tuple([template_names.index(x) for x in others_names])
+    template_nonorigin_selector = tuple([template_names.index(x) for x in nonorigin_names])
+    template_origin = template_data[template_origin_selector, :]
+    template_others = template_data[template_others_selector, :]
+    template_nonorigin = template_data[template_nonorigin_selector, :]
+    result_storm = []
+    result_digi = []
+    storm_sessions345 = np.concatenate((r_matrix[2::5], r_matrix[3::5], r_matrix[4::5]))
+    digi_sessions345 = np.concatenate((digi_r_matrix[2::5], digi_r_matrix[3::5], digi_r_matrix[4::5]))
+    for i in range(len(storm_sessions345)):
+        storm_rot = R.from_matrix(storm_sessions345[i])
+        dig_rot = R.from_matrix(digi_sessions345[i])
+        storm_rot_euler = storm_rot.as_euler('xyz', degrees=True)
+        dig_rot_euler = dig_rot.as_euler('xyz', degrees=True)
+        print("{}: storm: {}, digi: {}".format(i, storm_rot_euler, dig_rot_euler))
+        new_mat = np.identity(4)
+        new_mat[:3, :3] = storm_sessions345[i]
+        transformed_nonorigin_storm = (new_mat @ gsoup.to_hom(template_nonorigin).T).T
+        new_mat[:3, :3] = digi_sessions345[i]
+        transformed_nonorigin_digi = (new_mat @ gsoup.to_hom(template_nonorigin).T).T
+        result_storm.append(transformed_nonorigin_storm)
+        result_digi.append(transformed_nonorigin_digi)
+    rmse = [np.mean(np.linalg.norm(x - y,axis=-1)) for x, y in zip(result_storm, result_digi)]
+    print("shift rmse: {:03f}".format(np.mean(rmse)))
+    
+    
 
 def do_shift_experiment(r_matrix, all_digi_sessions, args):
     """
@@ -458,10 +499,10 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
     template_data = template_data[0]
     template_data = geometry.to_standard_coordinate_system(template_names, template_data)
     experiment_file_list = []
-    sessions = [[], [], []]
-
+    sessions = [[], [], [], [], []]  # a list of lists, each containing all the subjects results for a session index
+    result_r_matrix = [] # a consecutive list of r_matrix estimations as computed from digitizer data
     origin_names = ["lpa", "rpa", "nz", "cz", "lefteye", "righteye", "nosetip"]
-    others_names = ["fp1", "fp2", "fpz", "o1", "o2", "oz", "f7", "f8"]
+    others_names = ["fp1", "fp2", "middle_triangle", "o1", "o2", "oz", "f7", "f8"]
     nonorigin_names = [x for x in template_names if x not in origin_names]
     template_origin_selector = tuple([template_names.index(x) for x in origin_names])
     template_others_selector = tuple([template_names.index(x) for x in others_names])
@@ -490,14 +531,19 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
                     ##### affine golden standard
                     full_names = origin_names + nonorigin_names
                     align_matrix = geometry.find_affine_transformation(origin, template_origin)
+                    # align_matrix = cv2.estimateAffine3D(origin, template_origin)[1]
                     aligned_session = (align_matrix @ gsoup.to_hom(data).T).T
                     session_affine = geometry.find_affine_transformation(template_others, aligned_session[others_selector, :])
+                    # session_affine = cv2.estimateAffine3D(template_others, aligned_session[others_selector, :])[1]
                     trans, rot, scale, shear = geometry.decompose44(gsoup.to_44(session_affine))
                     if verbose:
                         logging.info("Digitizer Prediction: {}".format(R.from_matrix(rot).as_euler('xyz', degrees=True)))
+                    # from gsoup.viewer_drivers import pcs_slide_view
+                    # pcs_slide_view()
                     transformed_nonorigin = (session_affine @ gsoup.to_hom(template_nonorigin).T).T
                     session_data = np.vstack((template_origin, transformed_nonorigin))
                     sessions[i].append([full_names, session_data])
+                    result_r_matrix.append(rot)
                     #####
                 else:
                     full_names = origin_names + others_names
@@ -505,7 +551,9 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
                     sessions[i].append([full_names, np.vstack((origin, others))])
             except IndexError:
                 sessions[i].append([None, None])
-    errors_before_projection = [np.mean(np.linalg.norm(x[1] - y[1],axis=-1)) for x, y in zip(sessions[0], sessions[1])]
+    errors_before_projection = [np.mean(np.linalg.norm(x[1][len(origin_names):] - y[1][len(origin_names):],axis=-1)) for x, y in zip(sessions[0], sessions[1])]
+    if verbose:
+        logging.info("dig2dig mean rmse (before MNI projection): {:.3f}".format(np.mean(errors_before_projection)))
     cached_result_ses1 = __file__+"/../cache/session1_digi_MNI"
     cached_result_ses2 = __file__+"/../cache/session2_digi_MNI"
 
@@ -556,7 +604,8 @@ def do_dig2dig_experiment(template_path, experiment_folder, experiment_filter=No
         names = others_names
     return [names, digi_projected_ses1_others],\
            [names, digi_projected_ses2_others],\
-           sessions
+           sessions,\
+           result_r_matrix
 
 
 def do_vid2vid_project_afterMNI_experiment(template_path, video_names, r_matrices, s_matrices):
@@ -662,7 +711,7 @@ def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, save_results
             for i, (rot_mat, scale_mat, vid) in enumerate(zip(r_matrices, s_matrices, video_names)):
                 subject_id, _, session_number = vid.split("_")
                 session_number = int(session_number.split(".")[0]) - 1
-                if session_number == 2:
+                if session_number >= 2:
                     continue
                 if use_all_sensors:
                     ##### affine golden standard
@@ -745,7 +794,7 @@ def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, save_results
     else:
         names = others_names
     return [names, vid_projected_ses1_others],\
-           [names, vid_projected_ses1_others]
+           [names, vid_projected_ses2_others]
 
 
 def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):

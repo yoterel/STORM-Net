@@ -148,7 +148,11 @@ class MyModel:
         self.opt = copy.deepcopy(opt)
         self.network = MyNetwork(opt)
         if opt.continue_train:
-            self.load_network(opt.experiment_name)
+            try:
+                self.load_network(opt.experiment_name)
+                opt.lr = opt.lr / 10  # reduce learning rate when continuing training
+            except FileNotFoundError:
+                print("could not load network, starting from scratch")
         self.optimizer = torch.optim.Adam(self.network.parameters(),
                                           lr=opt.lr,
                                           betas=(opt.beta1, 0.999),

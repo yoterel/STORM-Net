@@ -73,9 +73,11 @@ def read_template_file(template_path, input_file_format=None):
         sessions = [non_empty_lines]
     else:
         cond = len(non_empty_lines[delimiters[0]+1].split()) <= 4
-        sessions = [non_empty_lines[delimiters[0]+1:delimiters[1]],
-                    non_empty_lines[delimiters[1]+1:delimiters[2]],
-                    non_empty_lines[delimiters[2]+1:]]
+        sessions = [non_empty_lines[delimiters[i]+1:delimiters[i+1]] for i in range(len(delimiters)-1)]
+        sessions += [non_empty_lines[delimiters[-1]+1:]]
+        # sessions = [non_empty_lines[delimiters[0]+1:delimiters[1]],
+        #             non_empty_lines[delimiters[1]+1:delimiters[2]],
+        #             non_empty_lines[delimiters[2]+1:]]
         skulls = []
         for x in non_empty_lines[0:delimiters[0]]:
             skull = re.findall(r"[-+]?\d*\.\d+|\d+", x)
@@ -87,7 +89,7 @@ def read_template_file(template_path, input_file_format=None):
             skulls = np.mean(skulls)
         else:
             skulls = None
-        names = [[], [], []]
+        names = [list() for _ in range(len(sessions))]
     if input_file_format:
         file_format = input_file_format
         if file_format == "princeton":
@@ -124,7 +126,7 @@ def read_template_file(template_path, input_file_format=None):
             data.append(np.stack((sensor1_data, sensor2_data), axis=1))
     elif file_format == "telaviv2":
         labeled_names = ['lpa', 'nz', 'nosetip', 'lefteye', 'righteye', 'rpa',
-                         'f8', 'fp2', 'fpz', 'fp1', 'f7', 'cz', 'o1', 'oz', 'o2']
+                         'f8', 'fp2', 'middle_triangle', 'fp1', 'f7', 'cz', 'o1', 'oz', 'o2']
         for j, session in enumerate(sessions):
             sensor1_data = []
             sensor2_data = []

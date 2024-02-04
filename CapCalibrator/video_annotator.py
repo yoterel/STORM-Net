@@ -54,7 +54,7 @@ def post_process_db(db):
 
 def annotate_videos(args):  # contains GUI mainloop
     if args.mode == "experimental":
-        special_db = Path("CapCalibrator", "cache", "tau_2023_single_sensor", "session") #"telaviv_db.pickle"
+        special_db = Path("CapCalibrator", "cache", "tau_2024", "session") #"telaviv_db.pickle"
         new_db = file_io.load_full_db(special_db)
         # new_db = post_process_db(new_db)
         paths = []
@@ -289,8 +289,8 @@ class GUI(tk.Tk):
             videomenu.add_command(label="Set (current) Sticker", command=self.set_coords, accelerator="LMB")
             videomenu.add_command(label="Zero (current) Sticker", command=self.zero_coords, accelerator="MMB")
             videomenu.add_command(label="Next Sticker", command=self.next_coords, accelerator="RMB")
-            videomenu.add_command(label="Next Video", command=self.next_video)
-            videomenu.add_command(label="Previous Video", command=self.prev_video)
+            videomenu.add_command(label="Next Video", command=self.next_video, accelerator="Up")
+            videomenu.add_command(label="Previous Video", command=self.prev_video, accelerator="Down")
             videomenu.add_separator()
             videomenu.add_command(label="Auto Annotate", command=self.auto_annotate)
             videomenu.add_command(label="Co-Register", command=self.coregister)
@@ -626,14 +626,14 @@ class GUI(tk.Tk):
     def predict_x(self):
         self.take_async_action(self.prep_predict_packet())
 
-    def next_video(self):
+    def next_video(self, event=None):
         if self.cur_video_index < (len(self.paths)-1):
             self.cur_video_index += 1
             self.cur_frame_index = 0
             self.cur_sticker_index = 0
             self.take_async_action(self.prep_vid_to_frames_packet())
 
-    def prev_video(self):
+    def prev_video(self, event=None):
         if self.cur_video_index > 0:
             self.cur_video_index -= 1
             self.cur_frame_index = 0
@@ -1129,6 +1129,8 @@ class CoregistrationPage(tk.Frame):
         self.canvas.bind("<ButtonPress-3>", self.controller.next_coords)
         self.bind("<Left>", self.controller.prev_frame)
         self.bind("<Right>", self.controller.next_frame)
+        self.bind("<Up>", self.controller.next_video)
+        self.bind("<Down>", self.controller.prev_video)
         self.bind("<Shift-Left>", self.controller.shift_cur_frame_backward)
         self.bind("<Shift-Right>", self.controller.shift_cur_frame_forward)
         self.data_panel = tk.Frame(self, bg="white")
