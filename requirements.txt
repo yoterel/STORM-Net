@@ -1,0 +1,10 @@
+torch
+opencv-python-headless
+imageio
+imageio-ffmpeg
+scikit-learn
+dlib
+polyscope
+matplotlib
+gsoup
+tensorflow
