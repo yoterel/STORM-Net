@@ -46,16 +46,20 @@ def create_temporary_template(names, data, template_file):
 
 
 def launch_renderer(exe_path, log_path, iterations, template, output, images, scale_faces):
-    cmd = str(exe_path) + \
-          " -logFile {}".format(str(log_path.resolve())) +\
-          " -iterations {}".format(iterations) +\
-          " -input_file {}".format(str(template.resolve())) +\
-          " -output_folder {}".format(str(output.resolve())) +\
-          " -batchmode"
+    # breakpoint()
+    cmd = [
+        str(exe_path), 
+        "-logFile", str(log_path.resolve()),
+        "-iterations", str(iterations),
+        "-input_file", str(template.resolve()),
+        "-output_folder", str(output.resolve()),
+        "-batchmode",
+        "-nographics"
+    ]
     if scale_faces:
-        cmd += " -scale {}".format(scale_faces)
+        cmd.extend(["-scale", str(scale_faces)])
     if images:
-        cmd += " -save_image True"
+        cmd.extend(["-save_image", "True"])
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         logging.info("Renderer launched as daemon.")

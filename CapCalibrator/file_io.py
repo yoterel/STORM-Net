@@ -173,13 +173,21 @@ def delete_content_of_folder(folder_path, subfolders_also=True):
 
 
 def is_process_active(process_name):
-    call = 'TASKLIST', '/FI', 'imagename eq %s' % process_name
-    # use buildin check_output right away
-    output = subprocess.check_output(call).decode()
-    # check in last line for process name
-    last_line = output.strip().split('\r\n')[-1]
-    # because Fail message could be translated
-    return last_line.lower().startswith(process_name.lower())
+    """
+    Checks if a process with the given name is running on Linux.
+    
+    :param process_name: Name of the process to check.
+    :return: True if the process is running, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["pgrep", "-x", process_name],  # Linux command
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0
+    except subprocess.CalledProcessError:
+        return False
 
 
 def save_results(data, output_file):

@@ -38,6 +38,9 @@ Note: Ubuntu 18.04, and WSL (Windows Subsystem for Linux). Windows and Mac aren'
 Clone the repository by downloading it [directly](https://github.com/yoterel/STORM-Net/archive/master.zip) or by using the git command line tool:\
 `git clone https://github.com/yoterel/STORM-Net.git`
 
+navigate into it:\
+`cd STORM-Net`
+
 ### Step 2: Navigate to the STORM-Net directory, then create a virtual environment using micromamba.
 
 We recommend installing [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) for this. After installing it, use:
@@ -55,17 +58,21 @@ Note: if dlib failed to build, it is likely due to cmake not being accessible.
 Download from [here](https://osf.io/3j6u2/download), and place them under the [models](CapCalibrator/models) folder (after extracting, e.g. using unzip).
 
 ### Step 4: Download all precompiled binaries for the renderer.
-Download from here:\
-[Linux](https://osf.io/56a28/download)\
+
+Download, extract and change permission if needed:
+`cd DataSynth`
+`wget -O linux_build.zip https://osf.io/56a28/download`
+`unzip linux_build.zip`
+`chmod -R 777 linux_build`
+`cd ..`
 
 ### Step 5: Run STORM-Net in gui mode.
 First remember to activate the environment you created
 `micromamba activate storm`
-Then navigate to [main.py](CapCalibrator/main.py), and run:\
+Then navigate to [main.py](CapCalibrator/main.py):\
+`cd CapCalibrator`\
+And run:\
 `python main.py --mode gui`
-
-Note: in Linux you might need to unset pythonpath before the application can be run successfully:\
-`unset PYTHONPATH`
 
 ## Modes of operation
 

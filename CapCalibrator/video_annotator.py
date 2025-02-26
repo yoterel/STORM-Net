@@ -120,7 +120,7 @@ class GUI(tk.Tk):
         self.wm_title("STORM-Net - Simple and Timely Optode Registration Method for fNIRS")
         self.resizable(False, False)
         self.bind("<Escape>", lambda e: self.destroy())
-        icon_path = Path(Path(__file__).parent, "resource", "icon.png")
+        icon_path = Path(Path(__file__).parent, "resource", "icon.png").resolve()
         icon = ImageTk.PhotoImage(file=str(icon_path), master=self)
         self.iconphoto(False, icon)
         self.configure(background='white')
@@ -714,11 +714,11 @@ class GUI(tk.Tk):
         sets default rendering settings in Finetune page
         :return:
         """
-        self.take_async_action(["load_template_model", Path(__file__, "../../example_models/adultTemplate.txt")])
-        self.renderer_log_file = Path(__file__, "../cache/render_log.txt")
-        self.synth_output_dir = Path(__file__, "../cache/synth_data")
+        self.take_async_action(["load_template_model", Path(__file__, "../../example_models/adultTemplate.txt").resolve()])
+        self.renderer_log_file = Path(__file__, "../cache/render_log.txt").resolve()
+        self.synth_output_dir = Path(__file__, "../cache/synth_data").resolve()
         self.synth_output_dir.mkdir(parents=True, exist_ok=True)
-        self.renderer_executable = Path(__file__, "../../DataSynth/build/DataSynth.exe")
+        self.renderer_executable = Path(__file__, "../../DataSynth/linux_build/datasynth.x86_64").resolve()
         self.panels[FinetunePage].render_set_defaults()
         self.show_panel(FinetunePage)
 
@@ -976,7 +976,7 @@ class ThreadedPeriodicTask(threading.Thread):
                 self.verbosity = "info"
                 self.is_train = True
                 self.network_output_size = 3
-                capcalib_path = Path(__file__).parent
+                capcalib_path = Path(__file__).parent.resolve()
                 self.root = Path(capcalib_path, "models", self.experiment_name)
         opt = Options()
         try:
@@ -1047,7 +1047,7 @@ class ThreadedTask(threading.Thread):
         r, s = predict.predict_rigid_transform(data, model, args)
         sensor_locations = geometry.apply_rigid_transform(r, s, template_names, template_data, None, args)
         if args.mni:
-            projected_data = geometry.project_sensors_to_MNI(sensor_locations, transform_anchors=True, resource_folder=Path(__file__, "../resource"))
+            projected_data = geometry.project_sensors_to_MNI(sensor_locations, transform_anchors=True, resource_folder=Path(__file__, "../resource").resolve())
         else:
             projected_data = sensor_locations
         self.queue.put(["coregister", projected_data[0]])
@@ -1237,7 +1237,7 @@ class MainMenu(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.label = tk.Label(self, text="STORM-Net Registration Toolbox", font=("Verdana", 12))
         self.canvas = tk.Canvas(self, height=400, width=400, bg="#263D42")
-        capcalib_folder = Path(__file__).parent
+        capcalib_folder = Path(__file__).parent.resolve()
         img = ImageTk.PhotoImage(master=self, file=str(Path(capcalib_folder, "resource", "render.png")))
         self.canvas.img = img  # or else image gets garbage collected
         self.canvas.create_image(0, 0, anchor="nw", image=img, tag="image")
@@ -1572,7 +1572,7 @@ def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force
     names = orig_names
     if mode == "MNI":
         scale = 200.
-        resource_folder = Path(Path(__file__).parent, "resource")
+        resource_folder = Path(Path(__file__).parent, "resource").resolve()
         XYZ_head = MNI.load_raw_MNI_data(str(Path(resource_folder, "MNI_templates", "xyzallHEM.npy")),
                                          "head",
                                          resource_folder=str(resource_folder))
@@ -1593,7 +1593,7 @@ def fill_structures(orig_names, orig_data, template_file_name, mode="MNI", force
         if force_transform:
             names_copy = orig_names.copy()
             data_copy = orig_data.copy()
-            sensors = geometry.project_sensors_to_MNI([[names_copy, data_copy]], transform_anchors=True, resource_folder=Path(__file__, "../resource"))
+            sensors = geometry.project_sensors_to_MNI([[names_copy, data_copy]], transform_anchors=True, resource_folder=Path(__file__, "../resource").resolve())
             names = sensors[0][0]
             data = sensors[0][1]
             radius=0.005
