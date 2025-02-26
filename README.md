@@ -31,14 +31,14 @@ The repository also contains:
 Note: Ubuntu 18.04, and WSL (Windows Subsystem for Linux). Windows and Mac aren't currently supported. The following assumes "git" and "cmake" are installed and accessible e.g.:
 
 `sudo apt-get install git` \
-`sudo apt-get install cmake` \
+`sudo apt-get install cmake`
 
 ### Step 1: Clone this repository to get a copy of the code to run locally.
 
 Clone the repository by downloading it [directly](https://github.com/yoterel/STORM-Net/archive/master.zip) or by using the git command line tool:\
 `git clone https://github.com/yoterel/STORM-Net.git`
 
-navigate into it:\
+Navigate into it:\
 `cd STORM-Net`
 
 ### Step 2: Navigate to the STORM-Net directory, then create a virtual environment using micromamba.
@@ -60,10 +60,10 @@ Download from [here](https://osf.io/3j6u2/download), and place them under the [m
 ### Step 4: Download all precompiled binaries for the renderer.
 
 Download, extract and change permission if needed:
-`cd DataSynth`
-`wget -O linux_build.zip https://osf.io/56a28/download`
-`unzip linux_build.zip`
-`chmod -R 777 linux_build`
+`cd DataSynth`\
+`wget -O linux_build.zip https://osf.io/56a28/download`\
+`unzip linux_build.zip`\
+`chmod -R 777 linux_build`\
 `cd ..`
 
 ### Step 5: Run STORM-Net in gui mode.
@@ -71,8 +71,12 @@ First remember to activate the environment you created
 `micromamba activate storm`
 Then navigate to [main.py](CapCalibrator/main.py):\
 `cd CapCalibrator`\
+
 And run:\
-`python main.py --mode gui`
+`python main.py --mode gui`\
+
+Or if you have a supported GPU:\
+`python main.py --mode gui --gpu_id 0`
 
 ## Modes of operation
 
