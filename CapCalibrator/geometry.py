@@ -308,7 +308,7 @@ def get_rmse(A, B):
     :return: rmse
     """
     assert len(A.shape) == 2 and len(B.shape) == 2
-    rmse = np.mean(np.linalg.norm((A - B).astype(np.float), axis=1))
+    rmse = np.mean(np.linalg.norm((A - B).astype(np.float32), axis=1))
     return rmse
 
 
@@ -320,8 +320,8 @@ def batch_get_rmse(A, B):
     :return: b x 1 numpy array of rmse's
     """
     assert (len(A.shape) == 2 and len(B.shape) == 3) or (len(A.shape) == 3 and len(B.shape) == 2)
-    A = A.astype(np.float)
-    B = B.astype(np.float)
+    A = A.astype(np.float32)
+    B = B.astype(np.float32)
     rmse = np.mean(np.linalg.norm(A - B, axis=-1), axis=-1)
     return rmse
 

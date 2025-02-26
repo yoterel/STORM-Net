@@ -212,7 +212,7 @@ class GUI(tk.Tk):
                 self.template_names, self.template_data, self.template_format, self.template_file_name = msg[1:]
             elif msg[0] == "load_stormnet":
                 self.storm_model = msg[1]
-                self.pretrained_stormnet_path = msg[2]
+                self.pretrained_stormnet_path = Path(msg[2])
                 # self.panels[self.cur_active_panel].update_labels()
             # Show result of the task if needed
             self.panels[ProgressBarPage].show_progress(False)
@@ -727,7 +727,7 @@ class GUI(tk.Tk):
         sets default finetuning settings in Finetune page
         :return:
         """
-        self.pretrained_stormnet_path = "my_new_model"
+        self.pretrained_stormnet_path = Path("my_new_model")
         self.finetune_log_file = Path("./cache/training_log.txt")
         self.synth_output_dir = Path("./cache/synth_data")
         self.synth_output_dir.mkdir(parents=True, exist_ok=True)
@@ -1334,21 +1334,22 @@ class ExperimentViewerPage(tk.Frame):
                     fill_structures(pc_names, pc_data, pc_path, ui_options_selected, force_transform=mni_flag)
         if ps.have_selection():
             cur_selection = ps.get_selection()
-            psim.TextUnformatted("Selection ID: {}".format(pc_names[cur_selection[1]]))
-            if cur_selection != prev_selection:
-                pc_name, v_index = cur_selection
-                prev_selection = cur_selection
-                pc = ps.get_point_cloud(pc_name)
-                if 0 <= v_index <= pc.n_points():
-                    anchor_mask = np.isin(np.array(pc_names), np.array(config.all_possible_anchor_names))
-                    sticker_mask = np.isin(np.array(pc_names), np.array(config.physical_sticker_names))
-                    colors = np.ones((pc.n_points(), 3))
-                    colors[anchor_mask] = 0
-                    colors[sticker_mask] = np.array([0, 1, 0])
-                    colors[v_index] = np.array([0., 0., 1.])
-                    pc.add_color_quantity("colors",
-                                           colors,
-                                           enabled=True)
+            pc_name, v_index = cur_selection
+            if pc_name != "avg_brain" and pc_name != "avg_head":
+                psim.TextUnformatted("Selection ID: {}".format(pc_names[v_index]))
+                if cur_selection != prev_selection:
+                    prev_selection = cur_selection
+                    pc = ps.get_point_cloud(pc_name)
+                    if 0 <= v_index <= pc.n_points():
+                        anchor_mask = np.isin(np.array(pc_names), np.array(config.all_possible_anchor_names))
+                        sticker_mask = np.isin(np.array(pc_names), np.array(config.physical_sticker_names))
+                        colors = np.ones((pc.n_points(), 3))
+                        colors[anchor_mask] = 0
+                        colors[sticker_mask] = np.array([0, 1, 0])
+                        colors[v_index] = np.array([0., 0., 1.])
+                        pc.add_color_quantity("colors",
+                                            colors,
+                                            enabled=True)
 
 
 class ProgressBarPage(tk.Frame):
@@ -1507,7 +1508,11 @@ class FinetunePage(tk.Frame):
         return
 
     def set_finetune_log_text(self, name, value, iter):
-        msg = "{}, {}: {}".format(name, iter, value)
+        # assert threading.current_thread() is threading.main_thread()
+        if type(value) == np.float32:
+            msg = "{}, {}: {:05f}".format(name, iter, value)
+        else:
+            msg = "{}, {}: {}".format(name, iter, value)
         fully_scrolled_down = self.finetune_log_text.yview()[1] == 1.0
         self.finetune_log_text.configure(state='normal')
         self.finetune_log_text.insert(tk.END, msg + "\n")

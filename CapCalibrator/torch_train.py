@@ -96,6 +96,7 @@ def train_loop(opt, sync=None):
         writer.write_scaler("epoch", "learning rate", model.optimizer.param_groups[0]['lr'], epoch)
         logging.info("lr: {}".format(model.optimizer.param_groups[0]['lr']))
         model.scheduler.step(val_loss_total)
+    logging.info("training done.")
     writer.close()
 
 
