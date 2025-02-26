@@ -28,33 +28,39 @@ The repository also contains:
 - A synthetic data generator implemented in [Unity](https://unity.com/).
 
 # Quick installation guide
-Note: tested on Windows 10 and Ubuntu 18.04. Should work for Mac as well.
+Note: Ubuntu 18.04, and WSL (Windows Subsystem for Linux). Windows and Mac aren't currently supported. The following assumes "git" and "cmake" are installed and accessible e.g.:
+
+`sudo apt-get install git` \
+`sudo apt-get install cmake` \
+
 ### Step 1: Clone this repository to get a copy of the code to run locally.
 
 Clone the repository by downloading it [directly](https://github.com/yoterel/STORM-Net/archive/master.zip) or by using the git command line tool:\
 `git clone https://github.com/yoterel/STORM-Net.git`
 
-### Step 2: Navigate to the STORM-Net directory, then create a virtual environment using conda.
+### Step 2: Navigate to the STORM-Net directory, then create a virtual environment using micromamba.
 
-We recommend installing [Miniconda](https://docs.conda.io/en/latest/miniconda.html) for this, but you can also [Install Anaconda](https://www.anaconda.com/products/individual/get-started) if needed, then create an environment using the environment.yml file in this repository:
+We recommend installing [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) for this. After installing it, use:
 
-`conda env create -n env -f environment.yml`
+`micromamba create -n storm python=3.10 -c conda-forge`
 
-Note: For dlib (part of the requirements in the environment file), you must have some modern C++ able compiler like [visual studio](https://visualstudio.microsoft.com/) or gcc installed on your computer.
+Then activate the environment and install the requirements:
+`micromamba activate storm` \
+`pip install -r requirements.txt`
+
+Note: if dlib failed to build, it is likely due to cmake not being accessible. 
 
 ### Step 3: Download all pre-trained neural network models.
 
-Download from [here](https://osf.io/3j6u2/download), and place them under the [models](CapCalibrator/models) folder (after extracting).
+Download from [here](https://osf.io/3j6u2/download), and place them under the [models](CapCalibrator/models) folder (after extracting, e.g. using unzip).
 
 ### Step 4: Download all precompiled binaries for the renderer.
 Download from here:\
-[Windows](https://osf.io/n382w/download)\
 [Linux](https://osf.io/56a28/download)\
-[Mac](https://osf.io/gfpcw/download)
 
 ### Step 5: Run STORM-Net in gui mode.
 First remember to activate the environment you created
-`conda activate env`
+`micromamba activate storm`
 Then navigate to [main.py](CapCalibrator/main.py), and run:\
 `python main.py --mode gui`
 

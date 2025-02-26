@@ -43,8 +43,8 @@ def find_affine_transforms(our_anchors_xyz, our_sensors_xyz, selected_indices, r
         refBList[i-1, 1] = WW
     # ---------- Transforming given head surface points stored in others to the ideal brain and each ref brain -----
     DDDD = np.c_[our_sensors_xyz, np.ones(pointN)]
-    othersRefList = np.empty((refN, pointN, DDDD.shape[1]), dtype=np.float)
-    originRegList = np.empty((refN, our_anchors_xyz.shape[0], DDDD.shape[1]), dtype=np.float)
+    othersRefList = np.empty((refN, pointN, DDDD.shape[1]), dtype=np.float32)
+    originRegList = np.empty((refN, our_anchors_xyz.shape[0], DDDD.shape[1]), dtype=np.float32)
     for i in range(refN):
         WR = refBList[i, 1]
         othersRef = np.matmul(DDDD, WR)
@@ -114,7 +114,7 @@ def find_closest_on_surface_full(othersRefList, refN, pointN, resource_folder):
     :param pointN: number of sensors
     :return:
     """
-    otherRefCList = np.empty((refN, pointN, 3), dtype=np.float)
+    otherRefCList = np.empty((refN, pointN, 3), dtype=np.float32)
     for i in range(refN):
         my_str = resource_folder+"/MNI_templates/xyzall{}.npy".format(str(i + 1))
         XYZ = load_raw_MNI_data(my_str, i, resource_folder=resource_folder)

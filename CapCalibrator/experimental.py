@@ -223,7 +223,7 @@ def do_parameter_grid_search_experiment(opt):
         for i in range(splits):
             name1 = cached_result_ses1 + str(i)
             ses1_list.append(np.load(name1 + ".npy", allow_pickle=True))
-    vid_ss_data_ses1 = np.vstack(ses1_list).astype(np.float)
+    vid_ss_data_ses1 = np.vstack(ses1_list).astype(np.float32)
     # output_selector = tuple([full_names.index(x) for x in output_others_names])
     return output_others_names, vid_ss_data_ses1, rots, scales
 
@@ -741,9 +741,9 @@ def do_vid2vid_experiment(opt, video_names, r_matrices, s_matrices, save_results
                             scale_mat @ others.T)).T
                 sessions[session_number].append([full_names, np.vstack((origin, others))])
             vid_projected_ses1 = geometry.project_sensors_to_MNI(sessions[0], origin_names, resource_folder=Path(__file__, "../resource"))
-            anchors_and_sensors_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.float)
+            anchors_and_sensors_ses1 = np.array([x[1] for x in vid_projected_ses1], dtype=np.float32)
             vid_projected_ses2 = geometry.project_sensors_to_MNI(sessions[1], origin_names, resource_folder=Path(__file__, "../resource"))
-            anchors_and_sensors_ses2 = np.array([x[1] for x in vid_projected_ses2], dtype=np.float)
+            anchors_and_sensors_ses2 = np.array([x[1] for x in vid_projected_ses2], dtype=np.float32)
         else:
             origin_selector = tuple([names.index(x) for x in origin_names])
             others_selector = tuple([names.index(x) for x in others_names])
@@ -820,7 +820,7 @@ def do_vid2dig_experiment(digi_ses1, digi_ses2, vid_ses1, vid_ses2):
     # for visualization, find best error per landmark on video session1
     vid_combine = vid_ses1[1]
     dig_combine = (digi_ses1[1] + digi_ses2[1]) / 2
-    landmarks_errors = np.linalg.norm((dig_combine - vid_combine).astype(np.float), axis=-1)
+    landmarks_errors = np.linalg.norm((dig_combine - vid_combine).astype(np.float32), axis=-1)
 
     logging.info("dig2vid mean, std rmse (after MNI projection): {:.3f}, {:.3f}".format(inter_method_rmse_avg,
                                                                                         inter_method_rmse_std))
@@ -855,13 +855,13 @@ def do_histogram_experiment(dig_ses1, dig_ses2, vid_ses1, vid_ses2):
     #     plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI)
     # except Exception:
     # logging.info("tried to reproduce figure but pkl data is missing")
-    dig2dig_after_MNI = np.linalg.norm(dig_ses1[1].astype(np.float) - dig_ses2[1].astype(np.float), axis=2).T
-    dig2vid_after_MNI0 = np.linalg.norm(vid_ses1[1].astype(np.float) - dig_ses1[1].astype(np.float), axis=2).T
-    dig2vid_after_MNI1 = np.linalg.norm(vid_ses1[1].astype(np.float) - dig_ses2[1].astype(np.float), axis=2).T
-    dig2vid_after_MNI2 = np.linalg.norm(vid_ses2[1].astype(np.float) - dig_ses1[1].astype(np.float), axis=2).T
-    dig2vid_after_MNI3 = np.linalg.norm(vid_ses2[1].astype(np.float) - dig_ses2[1].astype(np.float), axis=2).T
+    dig2dig_after_MNI = np.linalg.norm(dig_ses1[1].astype(np.float32) - dig_ses2[1].astype(np.float32), axis=2).T
+    dig2vid_after_MNI0 = np.linalg.norm(vid_ses1[1].astype(np.float32) - dig_ses1[1].astype(np.float32), axis=2).T
+    dig2vid_after_MNI1 = np.linalg.norm(vid_ses1[1].astype(np.float32) - dig_ses2[1].astype(np.float32), axis=2).T
+    dig2vid_after_MNI2 = np.linalg.norm(vid_ses2[1].astype(np.float32) - dig_ses1[1].astype(np.float32), axis=2).T
+    dig2vid_after_MNI3 = np.linalg.norm(vid_ses2[1].astype(np.float32) - dig_ses2[1].astype(np.float32), axis=2).T
     dig2vid_after_MNI = (dig2vid_after_MNI0 + dig2vid_after_MNI1 + dig2vid_after_MNI2 + dig2vid_after_MNI3) / 4
-    vid2vid_after_MNI = np.linalg.norm(vid_ses1[1].astype(np.float) - vid_ses2[1].astype(np.float), axis=2).T
+    vid2vid_after_MNI = np.linalg.norm(vid_ses1[1].astype(np.float32) - vid_ses2[1].astype(np.float32), axis=2).T
     plot_histogram(dig2dig_after_MNI, dig2vid_after_MNI, vid2vid_after_MNI)
 
 
